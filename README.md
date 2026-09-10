@@ -22,7 +22,7 @@ Skills are always installed inside the current project. Runtime integration dire
 └── config.yaml
 ```
 
-It does not create a PRD, engineering guide, backlog, state, decisions, work items, gates, or templates. The `/flow` skill creates those artifacts only when they become valid canonical project information.
+It does not create a PRD, engineering guide, backlog, graph, state, decisions, work items, gates, or templates. During `/flow`, new project documents and artifacts are created only when the developer explicitly requests or authorizes them. Flow updates existing approved artifacts instead of inventing ad-hoc progress, summary, handoff, or status documents.
 
 ## Workflow
 
@@ -34,7 +34,11 @@ There is one public skill:
 
 Use `/flow <intent>` to start or change work, for example `/flow I want to build a diet app`. Use `/flow` with no extra input to continue from `.flow/STATE.md`.
 
-Flow internally loads only the guidance needed for discovery, planning, build, review, or reconciliation. It asks only for consequential decisions and uses the largest safe degree of parallelism.
+Flow internally loads only the guidance needed for discovery, planning, build, review, or reconciliation. It asks only for consequential decisions and uses the largest safe degree of parallelism. Once execution is underway, it does not stop merely to announce completed tasks, progress, or next steps; it continues automatically until developer input, external approval, an unrecoverable blocker, or no ready work requires a real stop.
+
+When authorized, Flow keeps a concise artifact model: product truth in `PRD.md`, engineering truth in `ENGINEERING.md`, decisions in `DECISIONS.md`, execution context in `STATE.md`, the canonical work-item DAG in `BACKLOG.yaml`, and a human-readable derived projection in `GRAPH.md`. Work items use `SPEC.md` plus `TASKS.yaml`. `SUMMARY.md` is not part of the model.
+
+In `GRAPH.md`, work-item states are consistent: complete is green, in progress is blue, blocked is red when unfinished dependencies remain, and pending is yellow when all dependencies are complete and the item is ready to execute.
 
 ## Update
 
