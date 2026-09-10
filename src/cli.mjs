@@ -54,9 +54,11 @@ function question(rl, message) {
 }
 
 function runNpm(npmArgs, options = {}) {
+  if (process.platform === 'win32') {
+    return execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', npmCommand(), ...npmArgs], options);
+  }
   return execFileSync(npmCommand(), npmArgs, {
-    ...options,
-    shell: process.platform === 'win32'
+    ...options
   });
 }
 
@@ -190,17 +192,6 @@ async function initProject() {
   else { info(); info('Flow is ready. Open a configured coding agent and invoke /flow.'); }
 }
 
-function dependencySection(root) {
-  const file = path.join(root, 'package.json');
-  if (!fs.existsSync(file)) return '--save-dev';
-  try {
-    const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (pkg.dependencies?.[PACKAGE_NAME]) return '--save';
-    if (pkg.optionalDependencies?.[PACKAGE_NAME]) return '--save-optional';
-  } catch { /* use default */ }
-  return '--save-dev';
-}
-
 function containingNodeModules(packageRoot) {
   let current = path.resolve(packageRoot);
   while (true) {
@@ -215,7 +206,7 @@ function updatePlan(root) {
   const projectPackageRoot = packagePath(root);
   if (fs.existsSync(path.join(projectPackageRoot, 'package.json'))) {
     return {
-      npmArgs: ['install', dependencySection(root), `${PACKAGE_NAME}@latest`],
+      npmArgs: ['update', PACKAGE_NAME],
       cwd: root,
       packageRoot: projectPackageRoot,
       mode: 'project'
@@ -227,7 +218,7 @@ function updatePlan(root) {
     const globalPackageRoot = path.join(globalNodeModules, '@caiqueoak', 'flow');
     if (path.resolve(ROOT).startsWith(`${globalNodeModules}${path.sep}`) && fs.existsSync(path.join(globalPackageRoot, 'package.json'))) {
       return {
-        npmArgs: ['install', '--global', `${PACKAGE_NAME}@latest`],
+        npmArgs: ['update', '--global', PACKAGE_NAME],
         cwd: root,
         packageRoot: globalPackageRoot,
         mode: 'global'
@@ -239,7 +230,7 @@ function updatePlan(root) {
   if (nodeModules) {
     const installRoot = path.dirname(nodeModules);
     return {
-      npmArgs: ['install', dependencySection(installRoot), `${PACKAGE_NAME}@latest`],
+      npmArgs: ['update', PACKAGE_NAME],
       cwd: installRoot,
       packageRoot: ROOT,
       mode: 'local'

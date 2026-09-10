@@ -95,18 +95,21 @@ test('updates a project-local Flow installation and refreshes configured skills'
   await fs.writeFile(path.join(installed, 'skills', 'flow', 'SKILL.md'), '# Flow\n\nupdated skill');
 
   const bin = path.join(project, 'fake-bin');
+  const invocation = path.join(project, 'npm-invocation.txt');
   await fs.mkdir(bin, { recursive: true });
   if (process.platform === 'win32') {
-    await fs.writeFile(path.join(bin, 'npm.cmd'), '@echo off\r\nexit /b 0\r\n');
+    await fs.writeFile(path.join(bin, 'npm.cmd'), '@echo off\r\necho %* > "%FLOW_TEST_NPM_INVOCATION%"\r\nexit /b 0\r\n');
   } else {
     const npm = path.join(bin, 'npm');
-    await fs.writeFile(npm, '#!/bin/sh\nexit 0\n');
+    await fs.writeFile(npm, '#!/bin/sh\nprintf "%s" "$*" > "$FLOW_TEST_NPM_INVOCATION"\nexit 0\n');
     await fs.chmod(npm, 0o755);
   }
 
-  const result = await run(['update', '--path', project], project, { env: { PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+  const result = await run(['update', '--path', project], project, { env: { PATH: `${bin}${path.delimiter}${process.env.PATH}`, FLOW_TEST_NPM_INVOCATION: invocation } });
   assert.match(result.stdout, /project installation/);
   assert.match(result.stdout, /Flow updated to 9.9.9/);
+  assert.match(await fs.readFile(invocation, 'utf8'), /^update @caiqueoak\/flow\s*$/);
+  assert.doesNotMatch(result.stderr, /DEP0190/);
   assert.match(await fs.readFile(path.join(project, '.codex', 'skills', 'flow', 'SKILL.md'), 'utf8'), /updated skill/);
   assert.match(await fs.readFile(path.join(project, '.flow', 'config.yaml'), 'utf8'), /version: 9.9.9/);
 });
