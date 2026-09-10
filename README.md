@@ -1,134 +1,58 @@
 # Flow
 
-Flow is a readability-first, agent-agnostic software-development workflow for coding agents. It maximizes autonomous delivery while keeping consequential product and engineering decisions explicit and approved.
+Flow is a readability-first, agent-agnostic software delivery workflow for coding agents. It maximizes autonomous execution while keeping consequential product and engineering decisions under developer control.
 
-## Workflow
+## Install
 
-```text
-idea / existing project
-        ↓
-global discovery
-(product + engineering + production constraints)
-        ↓
-independent consequential decisions, batched for approval
-        ↓
-production-capable MVP
-        ↓
-work DAG (feature + technical + maintenance)
-        ↓
-/flow-next
-        ↓
-plan → build → gates → review → fixes → done
-        ↓
-next safe work item automatically
+```bash
+npm install --save-dev @caiqueoak/flow
+npx flow init
 ```
 
-The agent continues until it reaches a consequential decision, external approval, unrecoverable blocker, or no ready work. Every requested decision must include **Decision, Context, Options, Recommended option, Why recommended, and Impact**.
+`flow init` is interactive, or use `--runtime codex,claude` in automation. Built-in adapters install the public `/flow` skill in `.codex/skills/flow/` or `.claude/skills/flow/`; a custom project-local skills directory is also available interactively.
 
-## Project state
+Skills are always installed inside the current project. Runtime integration directories never contain project state. If `.flow/` already exists, `flow init` only adds coding-agent integrations and updates `.flow/config.yaml`; it does not modify canonical project artifacts.
+
+## Project bootstrap
+
+`flow init` creates only:
 
 ```text
 .flow/
-├── config.yaml
-├── PRD.md
-├── ENGINEERING.md
-├── SUMMARY.md
-├── DECISIONS.yaml
-├── BACKLOG.yaml
-├── STATE.yaml
-├── gates/
-└── work-items/
-    ├── 001F-user-profile/
-    │   ├── SPEC.md
-    │   └── TASKS.yaml
-    ├── 002T-production-baseline/
-    │   ├── SPEC.md
-    │   └── TASKS.yaml
-    └── 003M-auth-reconciliation/
-        ├── SPEC.md
-        └── TASKS.yaml
+└── config.yaml
 ```
 
-`F`, `T`, and `M` mean **feature**, **technical**, and **maintenance**. The numeric prefix is a stable readable sequence, not execution order. Dependencies determine execution. `work-items` is intentionally generic enough to cover all three kinds while remaining explicit to readers.
+It does not create a PRD, engineering guide, backlog, state, decisions, work items, gates, or templates. The `/flow` skill creates those artifacts only when they become valid canonical project information.
+
+## Workflow
+
+There is one public skill:
+
+```text
+/flow
+```
+
+Use `/flow <intent>` to start or change work, for example `/flow I want to build a diet app`. Use `/flow` with no extra input to continue from `.flow/STATE.md`.
+
+Flow internally loads only the guidance needed for discovery, planning, build, review, or reconciliation. It asks only for consequential decisions and uses the largest safe degree of parallelism.
+
+## Update
+
+Updates are explicit:
+
+```bash
+npx flow update
+```
+
+`flow update` updates the npm package and refreshes `/flow` for every coding agent configured in `.flow/config.yaml`. There is no background update check or automatic update mechanism.
 
 ## CLI
 
-The CLI is intentionally small:
-
-```bash
+```text
 flow init
-flow install
 flow update
+flow --version
+flow --help
 ```
 
-### Requirements
-
-Flow requires Node.js 18 or newer.
-
-- `flow init` creates `.flow/`.
-- `flow install` installs the bundled skills into a coding-agent skill directory.
-- `flow update` fetches the latest published Flow package and replaces the installed Flow skills.
-
-The CLI does **not** plan work, schedule tasks, invoke models, or orchestrate subagents. Those responsibilities stay in the skills and coding-agent runtime.
-
-Use an explicit skill directory when needed:
-
-```bash
-flow install --target .agents/skills
-flow update --target .agents/skills
-```
-
-Then start a project in the coding agent:
-
-```text
-/flow-new "I want to build a diet app"
-```
-
-Normal operation after discovery is primarily:
-
-```text
-/flow-next
-```
-
-## Parallelism
-
-```yaml
-parallelism:
-  strategy: maximum_safe
-  max_concurrent_work_items: auto
-  max_concurrent_tasks_per_work_item: auto
-  delegation: allowed
-```
-
-`auto` means the orchestrating agent chooses the largest set it can safely coordinate for the current scheduling cycle. It considers real dependencies, decision dependencies, likely write/contract overlap, uncertainty, runtime/tool capacity, merge risk, and **token/coordination overhead**. It must prefer fewer workers when additional concurrency would waste tokens or lower confidence.
-
-Before work starts, selected work items/tasks are marked `in_progress` with an execution ID. Another chat or agent must respect those claims and choose other ready work. Flow has no automatic claim timeout and never silently steals in-progress work.
-
-## Token efficiency
-
-Token efficiency is a framework constraint, not an afterthought. Skills must use the smallest sufficient context, avoid repeatedly loading historical documents, prefer targeted repository inspection, keep canonical artifacts concise, reuse accepted decisions, prefer deterministic gates to extra reviewer agents, and spawn subagents only when the expected parallel benefit exceeds duplicated context and coordination cost.
-
-## Updates
-
-`flow update` is explicit and deterministic. The default project template also contains:
-
-```yaml
-updates:
-  check_on_run: true
-  auto_update: false
-```
-
-For now, automatic checks are advisory rather than silently changing the installation. This avoids a framework update changing workflow behavior in the middle of active work. Projects can adopt a newer Flow version intentionally with `flow update`.
-
-## Package
-
-The executable is `flow`. The npm package is currently `@caiqueoak/flow` so it does not collide with the pre-existing unscoped `flow` package.
-
-```bash
-npx @caiqueoak/flow install --target .agents/skills
-npx @caiqueoak/flow init
-```
-
-## Releases
-
-Flow follows [Semantic Versioning](https://semver.org/). A merge to `main` publishes only when the version in `package.json` does not already exist on npm. GitHub Actions runs the test and packaging checks, then publishes the package with provenance. Release PRs must update both `package.json` and `package-lock.json`.
+The CLI bootstraps project-local integrations and configuration. The coding agent plus `/flow` owns discovery, planning, scheduling, delegation, build, gates, review, reconciliation, and state synchronization.

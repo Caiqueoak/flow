@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import readline from 'node:readline/promises';
+import { stdin as inputStream, stdout as outputStream } from 'node:process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,116 +15,170 @@ const VERSION = PACKAGE.version;
 const PACKAGE_NAME = PACKAGE.name;
 const args = process.argv.slice(2);
 
-function fail(message, code = 1) {
-  console.error(`flow: ${message}`);
-  process.exit(code);
-}
+const RUNTIME_DEFINITIONS = {
+  codex: { label: 'Codex', skillsPath: '.codex/skills' },
+  claude: { label: 'Claude Code', skillsPath: '.claude/skills' }
+};
 
-function info(message) { console.log(message); }
+function fail(message, code = 1) { console.error(`flow: ${message}`); process.exit(code); }
+function info(message = '') { console.log(message); }
 function hasFlag(name) { return args.includes(name); }
 function valueAfter(name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; }
 function npmCommand() { return process.platform === 'win32' ? 'npm.cmd' : 'npm'; }
+function projectRoot() { return path.resolve(valueAfter('--path') || process.cwd()); }
+function configPath(root) { return path.join(root, '.flow', 'config.yaml'); }
 
-function copyDir(source, target, { overwrite = false } = {}) {
+function copyDir(source, target) {
   fs.mkdirSync(target, { recursive: true });
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
     const src = path.join(source, entry.name);
     const dst = path.join(target, entry.name);
-    if (entry.isDirectory()) copyDir(src, dst, { overwrite });
-    else if (!fs.existsSync(dst) || overwrite) fs.copyFileSync(src, dst);
+    if (entry.isDirectory()) copyDir(src, dst);
+    else fs.copyFileSync(src, dst);
   }
 }
 
-function conventionalSkillTargets(cwd) {
-  const candidates = [
-    path.join(cwd, '.agents', 'skills'),
-    path.join(cwd, '.claude', 'skills'),
-    path.join(os.homedir(), '.agents', 'skills'),
-    path.join(os.homedir(), '.claude', 'skills')
-  ];
-  return [...new Set(candidates)].filter((candidate) => fs.existsSync(candidate));
+function quoteYaml(value) { return /^[A-Za-z0-9_.\/-]+$/.test(value) ? value : JSON.stringify(value); }
+function defaultConfig() {
+  return { frameworkVersion: VERSION, runtimes: [], continueAcrossWorkItems: true, workItemsConcurrency: 'auto', taskConcurrency: 'auto' };
 }
 
-function resolveInstallTarget() {
-  const explicit = valueAfter('--target');
-  if (explicit) return path.resolve(explicit.replace(/^~(?=$|\/|\\)/, os.homedir()));
-  const detected = conventionalSkillTargets(process.cwd());
-  if (detected.length === 1) return detected[0];
-  if (detected.length > 1) fail(`multiple skill directories detected:\n${detected.map((x) => `  - ${x}`).join('\n')}\nUse --target <skills-directory>.`);
-  fail('no skill directory detected. Use --target <skills-directory>. This keeps Flow runtime-agnostic.');
+function readConfig(root) {
+  const file = configPath(root);
+  if (!fs.existsSync(file)) return null;
+  const text = fs.readFileSync(file, 'utf8');
+  const cfg = defaultConfig();
+  const v = text.match(/^[ \t]*version:[ \t]*([^\s#]+)[ \t]*$/m);
+  if (v) cfg.frameworkVersion = v[1].replace(/^['"]|['"]$/g, '');
+  const runtimeBlock = text.match(/^runtimes:\s*\n([\s\S]*?)(?=^[A-Za-z_][A-Za-z0-9_]*:|\Z)/m)?.[1] || '';
+  const entries = runtimeBlock.split(/(?=^\s*-\s+type:)/m).filter((x) => /-\s+type:/.test(x));
+  for (const entry of entries) {
+    const type = entry.match(/-\s+type:\s*([^\s#]+)/)?.[1]?.replace(/^['"]|['"]$/g, '');
+    const skillsPath = entry.match(/skills_path:\s*([^\n#]+)/)?.[1]?.trim().replace(/^['"]|['"]$/g, '');
+    if (type && skillsPath) cfg.runtimes.push({ type, skills_path: skillsPath });
+  }
+  return cfg;
 }
 
-function initProject() {
-  const projectRoot = path.resolve(valueAfter('--path') || process.cwd());
-  const flowDir = path.join(projectRoot, '.flow');
-  if (fs.existsSync(flowDir) && !hasFlag('--force')) fail(`${flowDir} already exists. Use --force only to add missing templates without replacing project state.`);
-  fs.mkdirSync(flowDir, { recursive: true });
-  copyDir(path.join(ROOT, 'templates'), flowDir, { overwrite: false });
-  fs.mkdirSync(path.join(flowDir, 'work-items'), { recursive: true });
-  fs.mkdirSync(path.join(flowDir, 'gates'), { recursive: true });
-  info(`Initialized Flow project at ${flowDir}`);
-  info('Next: open your coding agent and run /flow-new with the idea or existing source documents.');
+function writeConfig(root, config) {
+  const lines = ['schema_version: 1', 'framework:', '  name: flow', `  version: ${VERSION}`, 'runtimes:'];
+  if (!config.runtimes.length) lines.push('  []');
+  else for (const runtime of config.runtimes) {
+    lines.push(`  - type: ${quoteYaml(runtime.type)}`);
+    lines.push(`    skills_path: ${quoteYaml(runtime.skills_path)}`);
+  }
+  lines.push('autonomy:', '  continue_across_work_items: true', '  stop_on:', '    - consequential_decision', '    - external_approval', '    - unrecoverable_blocker', '    - no_ready_work', 'parallelism:', '  strategy: maximum_safe', '  max_concurrent_work_items: auto', '  max_concurrent_tasks_per_work_item: auto', 'efficiency:', '  token_usage: optimize', '  prefer_primary_orchestrator: true', '  delegate_only_when_beneficial: true', '');
+  fs.mkdirSync(path.join(root, '.flow'), { recursive: true });
+  fs.writeFileSync(configPath(root), lines.join('\n'), 'utf8');
 }
 
-function installSkills({ force = hasFlag('--force') } = {}) {
-  const target = resolveInstallTarget();
-  fs.mkdirSync(target, { recursive: true });
-  copyDir(path.join(ROOT, 'skills'), target, { overwrite: force });
-  info(`Installed Flow ${VERSION} skills to ${target}`);
-  if (!force) info('Existing skill files were preserved. Use --force to replace them.');
+function installRuntimeSkill(root, runtime, packageRoot = ROOT) {
+  const target = path.join(root, runtime.skills_path, 'flow');
+  copyDir(path.join(packageRoot, 'skills', 'flow'), target);
   return target;
 }
+function parseRuntimeFlag() {
+  const raw = valueAfter('--runtime');
+  return raw ? raw.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean) : null;
+}
 
-function latestPublishedVersion() {
+async function promptMultiSelect(existing) {
+  const existingTypes = new Set(existing.map((r) => r.type));
+  const options = Object.entries(RUNTIME_DEFINITIONS).filter(([type]) => !existingTypes.has(type)).map(([value, def]) => ({ value, label: def.label }));
+  options.push({ value: 'custom', label: 'Custom coding agent / skills path' });
+  info(existing.length ? 'Select coding agents to add:' : 'Select coding agents:');
+  options.forEach((opt, i) => info(`  [ ] ${i + 1}. ${opt.label}`));
+  info('  (Select multiple with comma-separated numbers, e.g. 1,2)');
+  const rl = readline.createInterface({ input: inputStream, output: outputStream });
   try {
-    return execFileSync(npmCommand(), ['view', PACKAGE_NAME, 'version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15000 }).trim();
-  } catch {
-    return null;
+    while (true) {
+      const answer = (await rl.question('Selection: ')).trim();
+      const indices = [...new Set(answer.split(',').map((v) => Number.parseInt(v.trim(), 10)).filter(Number.isInteger))];
+      if (indices.length && indices.every((n) => n >= 1 && n <= options.length)) return indices.map((n) => options[n - 1].value);
+      info('Choose one or more valid numbers.');
+    }
+  } finally { rl.close(); }
+}
+
+async function promptText(message, defaultValue = '') {
+  const rl = readline.createInterface({ input: inputStream, output: outputStream });
+  try {
+    const answer = (await rl.question(`${message}${defaultValue ? ` [${defaultValue}]` : ''}: `)).trim();
+    return answer || defaultValue;
+  } finally { rl.close(); }
+}
+
+async function resolveRuntime(type, existing) {
+  if (RUNTIME_DEFINITIONS[type]) return { type, skills_path: RUNTIME_DEFINITIONS[type].skillsPath };
+  if (type !== 'custom') fail(`unsupported runtime '${type}'. Use codex, claude, or custom.`);
+  const fallback = `custom-${existing.filter((r) => r.type.startsWith('custom')).length + 1}`;
+  const name = await promptText('Custom coding agent id', fallback);
+  while (true) {
+    const skillsPath = await promptText('Project-local skills directory', `.${name}/skills`);
+    if (!path.isAbsolute(skillsPath) && !skillsPath.split(/[\\/]/).includes('..')) return { type: name, skills_path: skillsPath };
+    info('Skills path must be relative and remain inside the project.');
   }
 }
 
-function compareVersions(a, b) {
-  const pa = a.split('.').map((n) => Number.parseInt(n, 10) || 0);
-  const pb = b.split('.').map((n) => Number.parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] || 0) - (pb[i] || 0);
-    if (d) return d;
+async function initProject() {
+  const root = projectRoot();
+  const flowDir = path.join(root, '.flow');
+  const existed = fs.existsSync(flowDir);
+  const config = readConfig(root) || defaultConfig();
+  if (existed) {
+    info('Flow project already exists. Canonical project artifacts will not be created or modified.');
+    if (config.runtimes.length) info(`Configured coding agents: ${config.runtimes.map((r) => r.type).join(', ')}`);
   }
-  return 0;
+  const selected = parseRuntimeFlag() || await promptMultiSelect(config.runtimes);
+  const knownTypes = new Set(config.runtimes.map((r) => r.type));
+  const added = [];
+  for (const type of selected) {
+    if (knownTypes.has(type)) continue;
+    const runtime = await resolveRuntime(type, config.runtimes);
+    if (knownTypes.has(runtime.type)) continue;
+    config.runtimes.push(runtime); knownTypes.add(runtime.type); added.push(runtime);
+  }
+  fs.mkdirSync(flowDir, { recursive: true });
+  writeConfig(root, config);
+  for (const runtime of added) info(`✓ ${runtime.type}: ${path.relative(root, installRuntimeSkill(root, runtime))}`);
+  if (!added.length) info('No new coding-agent integration was added.');
+  else { info(); info('Flow is ready. Open a configured coding agent and invoke /flow.'); }
+}
+
+function dependencySection(root) {
+  const file = path.join(root, 'package.json');
+  if (!fs.existsSync(file)) return '--save-dev';
+  try {
+    const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (pkg.dependencies?.[PACKAGE_NAME]) return '--save';
+    if (pkg.optionalDependencies?.[PACKAGE_NAME]) return '--save-optional';
+  } catch { /* use default */ }
+  return '--save-dev';
 }
 
 function update() {
-  const target = resolveInstallTarget();
-  const latest = latestPublishedVersion();
-  if (!latest) fail(`could not read the latest ${PACKAGE_NAME} version from npm.`);
-  if (compareVersions(latest, VERSION) <= 0) {
-    copyDir(path.join(ROOT, 'skills'), target, { overwrite: true });
-    info(`Flow ${VERSION} is already current. Skills refreshed at ${target}`);
-    return;
-  }
-
-  info(`Updating Flow skills ${VERSION} → ${latest}...`);
-  const execArgs = ['exec', '--yes', `--package=${PACKAGE_NAME}@${latest}`, '--', 'flow', 'install', '--target', target, '--force'];
-  try {
-    execFileSync(npmCommand(), execArgs, { stdio: 'inherit' });
-  } catch {
-    fail('update failed. Your existing installation was not intentionally removed.');
-  }
-  info(`Skills updated to Flow ${latest}.`);
-  info(`If Flow itself is globally installed, update the CLI with: npm install -g ${PACKAGE_NAME}@latest`);
+  const root = projectRoot();
+  const config = readConfig(root);
+  if (!config) fail('this project is not initialized. Run flow init first.');
+  if (!config.runtimes.length) fail('no coding agents are configured. Run flow init to add one.');
+  info(`Updating ${PACKAGE_NAME}...`);
+  try { execFileSync(npmCommand(), ['install', dependencySection(root), `${PACKAGE_NAME}@latest`], { cwd: root, stdio: 'inherit' }); }
+  catch { fail('npm update failed. Existing project state and installed skills were not intentionally removed.'); }
+  const packageRoot = path.join(root, 'node_modules', '@caiqueoak', 'flow');
+  if (!fs.existsSync(path.join(packageRoot, 'package.json'))) fail(`updated package not found at ${path.relative(root, packageRoot)}.`);
+  const latest = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
+  for (const runtime of config.runtimes) info(`✓ ${runtime.type}: ${path.relative(root, installRuntimeSkill(root, runtime, packageRoot))}`);
+  const text = fs.readFileSync(configPath(root), 'utf8');
+  fs.writeFileSync(configPath(root), text.replace(/(^framework:\s*\n(?:.*\n)*?\s+version:\s*)[^\n]+/m, `$1${latest.version}`), 'utf8');
+  info(`Flow updated to ${latest.version}.`);
 }
 
 function help() {
-  info(`Flow ${VERSION}\n\nUsage:\n  flow init [--path <project>] [--force]\n  flow install [--target <skills-directory>] [--force]\n  flow update [--target <skills-directory>]\n  flow --version\n\nThe CLI only initializes project state and installs/updates skills.\nWorkflow orchestration is performed by the coding agent through the Flow skills.`);
+  info(`Flow ${VERSION}\n\nUsage:\n  flow init [--path <project>] [--runtime codex,claude]\n  flow update [--path <project>]\n  flow --version\n\nflow init creates only .flow/config.yaml and installs the project-local /flow skill for selected coding agents.\nIf .flow already exists, init only adds coding-agent integrations.\nThere is no flow install command and no automatic/background update mechanism.`);
 }
 
-if (args.length === 0 || hasFlag('--help') || hasFlag('-h')) help();
+if (!args.length || hasFlag('--help') || hasFlag('-h')) help();
 else if (hasFlag('--version') || hasFlag('-v')) info(VERSION);
-else {
-  switch (args[0]) {
-    case 'init': initProject(); break;
-    case 'install': installSkills(); break;
-    case 'update': update(); break;
-    default: fail(`unknown command '${args[0]}'. Run flow --help.`);
-  }
-}
+else if (args[0] === 'init') await initProject();
+else if (args[0] === 'update') update();
+else fail(`unknown command '${args[0]}'. Run flow --help.`);
