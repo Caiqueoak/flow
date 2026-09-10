@@ -30,19 +30,21 @@ jobs:
       - run: npm run pack:check
 
   publish:
-    name: publish npm
+    name: release npm
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
-      contents: read
+      contents: write
       id-token: write
     concurrency:
       group: npm-publish
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24.x
@@ -50,17 +52,19 @@ jobs:
       - name: Install npm with Trusted Publishing support
         run: npm install --global npm@latest
       - run: npm --version
-      - name: Skip versions already published
-        id: version
+      - name: Establish the npm release baseline once
         shell: bash
         run: |
           package_name="$(node -p 'require("./package.json").name')"
-          package_version="$(node -p 'require("./package.json").version')"
-          if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "${package_name}@${package_version} is already published; skipping."
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
+          published_version="$(npm view "${package_name}" version)"
+          baseline_tag="v${published_version}"
+          if git rev-parse --verify --quiet "refs/tags/${baseline_tag}"; then
+            exit 0
           fi
-      - if: steps.version.outputs.publish == 'true'
-        run: npm publish --access public --provenance
+          baseline_commit="$(git log -n 1 --format=%H -- package.json)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag --annotate "${baseline_tag}" "${baseline_commit}" --message "Release ${baseline_tag}"
+          git push origin "${baseline_tag}"
+      - name: Determine version and publish
+        run: npm exec --yes --package=semantic-release@25.0.9 -- semantic-release

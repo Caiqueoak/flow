@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,6 +23,19 @@ async function run(args, cwd = root, options = {}) {
   } catch (error) {
     return { code: error.code, stdout: error.stdout ?? '', stderr: error.stderr ?? '' };
   }
+}
+
+async function runWithClosedInput(args, cwd = root) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [cli, ...args], { cwd });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('error', reject);
+    child.on('close', (code) => resolve({ code, stdout, stderr }));
+    child.stdin.end('\n');
+  });
 }
 
 test('reports the package version', async () => {
@@ -94,4 +107,13 @@ test('rejects unsupported runtimes passed by flag', async () => {
   const result = await run(['init', '--path', project, '--runtime', 'unknown']);
   assert.equal(result.code, 1);
   assert.match(result.stderr, /unsupported runtime/);
+});
+
+test('cancels an interactive init cleanly when input closes', async () => {
+  const project = await tempDir();
+  const result = await runWithClosedInput(['init', '--path', project]);
+  assert.equal(result.code, 130);
+  assert.match(result.stdout, /Flow command canceled/);
+  assert.doesNotMatch(result.stderr, /AbortError|unsettled top-level await/);
+  await assert.rejects(fs.stat(path.join(project, '.flow')));
 });
