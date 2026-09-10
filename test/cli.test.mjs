@@ -12,57 +12,44 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(root, 'src', 'cli.mjs');
 const packageJson = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
 
-async function tempDir() {
-  return fs.mkdtemp(path.join(os.tmpdir(), 'flow-cli-'));
-}
-
-async function run(args, cwd) {
-  try {
-    return await execFileAsync(process.execPath, [cli, ...args], { cwd });
-  } catch (error) {
-    return { code: error.code, stdout: error.stdout ?? '', stderr: error.stderr ?? '' };
-  }
+async function tempDir() { return fs.mkdtemp(path.join(os.tmpdir(), 'flow-cli-')); }
+async function run(args, cwd = root) {
+  try { return await execFileAsync(process.execPath, [cli, ...args], { cwd }); }
+  catch (error) { return { code: error.code, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }; }
 }
 
 test('reports the package version', async () => {
-  const result = await run(['--version'], root);
+  const result = await run(['--version']);
   assert.equal(result.stdout.trim(), packageJson.version);
 });
 
-test('initializes the Flow project state without replacing existing templates', async () => {
+test('initializes Codex with only Flow configuration and the public skill', async () => {
   const project = await tempDir();
-  const first = await run(['init', '--path', project], root);
-  assert.match(first.stdout, /Initialized Flow project/);
-  assert.equal(await fs.readFile(path.join(project, '.flow', 'PRD.md'), 'utf8'), await fs.readFile(path.join(root, 'templates', 'PRD.md'), 'utf8'));
-
-  const second = await run(['init', '--path', project, '--force'], root);
-  assert.match(second.stdout, /Initialized Flow project/);
-  assert.equal(await fs.stat(path.join(project, '.flow', 'work-items')).then(() => true), true);
+  const result = await run(['init', '--path', project, '--runtime', 'codex']);
+  assert.match(result.stdout, /Flow is ready/);
+  const config = await fs.readFile(path.join(project, '.flow', 'config.yaml'), 'utf8');
+  assert.match(config, /type: codex/);
+  assert.match(config, /skills_path: .codex\/skills/);
+  assert.match(await fs.readFile(path.join(project, '.codex', 'skills', 'flow', 'SKILL.md'), 'utf8'), /# Flow/);
+  await assert.rejects(fs.stat(path.join(project, '.flow', 'PRD.md')));
 });
 
-test('installs skills without overwriting them unless forced', async () => {
+test('adds a second configured runtime without replacing canonical artifacts', async () => {
   const project = await tempDir();
-  const target = path.join(project, 'skills');
-  const existing = path.join(target, 'flow-new', 'SKILL.md');
-  await fs.mkdir(path.dirname(existing), { recursive: true });
-  await fs.writeFile(existing, 'custom skill');
-
-  const first = await run(['install', '--target', target], project);
-  assert.match(first.stdout, /Existing skill files were preserved/);
-  assert.equal(await fs.readFile(existing, 'utf8'), 'custom skill');
-
-  await run(['install', '--target', target, '--force'], project);
-  assert.match(await fs.readFile(existing, 'utf8'), /# Flow New/);
+  await run(['init', '--path', project, '--runtime', 'codex']);
+  await fs.writeFile(path.join(project, '.flow', 'PRD.md'), 'existing project truth');
+  const result = await run(['init', '--path', project, '--runtime', 'claude']);
+  assert.match(result.stdout, /already exists/);
+  const config = await fs.readFile(path.join(project, '.flow', 'config.yaml'), 'utf8');
+  assert.match(config, /type: codex/);
+  assert.match(config, /type: claude/);
+  assert.equal(await fs.readFile(path.join(project, '.flow', 'PRD.md'), 'utf8'), 'existing project truth');
+  assert.match(await fs.readFile(path.join(project, '.claude', 'skills', 'flow', 'SKILL.md'), 'utf8'), /# Flow/);
 });
 
-test('requires an explicit target when several conventional skill directories exist', async () => {
+test('rejects unsupported runtimes passed by flag', async () => {
   const project = await tempDir();
-  await Promise.all([
-    fs.mkdir(path.join(project, '.agents', 'skills'), { recursive: true }),
-    fs.mkdir(path.join(project, '.claude', 'skills'), { recursive: true })
-  ]);
-
-  const result = await run(['install'], project);
+  const result = await run(['init', '--path', project, '--runtime', 'unknown']);
   assert.equal(result.code, 1);
-  assert.match(result.stderr, /multiple skill directories detected/);
+  assert.match(result.stderr, /unsupported runtime/);
 });
