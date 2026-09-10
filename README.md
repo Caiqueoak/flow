@@ -11,7 +11,7 @@ npx flow init
 
 `flow init` is interactive, or use `--runtime codex,claude` in automation. Built-in adapters install the public `/flow` skill in `.codex/skills/flow/` or `.claude/skills/flow/`; a custom project-local skills directory is also available interactively.
 
-Skills are always installed inside the current project. Runtime integration directories never contain project state. If `.flow/` already exists, `flow init` only adds coding-agent integrations and updates `.flow/config.yaml`; it does not modify canonical project artifacts.
+Skills are always installed inside the current project. Runtime integration directories never contain project state. If `.flow/` already exists, `flow init` only adds missing coding-agent integrations and updates `.flow/config.yaml`. If all built-in integrations are already configured, it exits without prompting. It does not modify canonical project artifacts.
 
 ## Project bootstrap
 
@@ -45,10 +45,14 @@ In `GRAPH.md`, work-item states are consistent: complete is green, in progress i
 Updates are explicit:
 
 ```bash
-npx flow update
+flow update
 ```
 
-`flow update` updates the npm package and refreshes `/flow` for every coding agent configured in `.flow/config.yaml`. There is no background update check or automatic update mechanism.
+`flow update` detects how the active Flow CLI is installed. If the project contains `@caiqueoak/flow`, it updates that project dependency; if the CLI is globally installed, it updates the global package instead. It then refreshes `/flow` for every coding agent configured in `.flow/config.yaml` without modifying canonical project state.
+
+On Windows, npm is invoked through the command shell so `npm.cmd` can be executed correctly. When Flow is installed as a project dependency, `npx flow update` is equivalent.
+
+There is no background update check or automatic update mechanism.
 
 ## CLI
 

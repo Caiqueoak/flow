@@ -27,6 +27,14 @@ function valueAfter(name) { const i = args.indexOf(name); return i >= 0 ? args[i
 function npmCommand() { return process.platform === 'win32' ? 'npm.cmd' : 'npm'; }
 function projectRoot() { return path.resolve(valueAfter('--path') || process.cwd()); }
 function configPath(root) { return path.join(root, '.flow', 'config.yaml'); }
+function packagePath(root) { return path.join(root, 'node_modules', '@caiqueoak', 'flow'); }
+
+function runNpm(npmArgs, options = {}) {
+  return execFileSync(npmCommand(), npmArgs, {
+    ...options,
+    shell: process.platform === 'win32'
+  });
+}
 
 function copyDir(source, target) {
   fs.mkdirSync(target, { recursive: true });
@@ -82,6 +90,11 @@ function parseRuntimeFlag() {
   return raw ? raw.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean) : null;
 }
 
+function missingBuiltinRuntimes(existing) {
+  const existingTypes = new Set(existing.map((r) => r.type));
+  return Object.keys(RUNTIME_DEFINITIONS).filter((type) => !existingTypes.has(type));
+}
+
 async function promptMultiSelect(existing) {
   const existingTypes = new Set(existing.map((r) => r.type));
   const options = Object.entries(RUNTIME_DEFINITIONS).filter(([type]) => !existingTypes.has(type)).map(([value, def]) => ({ value, label: def.label }));
@@ -129,7 +142,15 @@ async function initProject() {
     info('Flow project already exists. Canonical project artifacts will not be created or modified.');
     if (config.runtimes.length) info(`Configured coding agents: ${config.runtimes.map((r) => r.type).join(', ')}`);
   }
-  const selected = parseRuntimeFlag() || await promptMultiSelect(config.runtimes);
+
+  const requested = parseRuntimeFlag();
+  if (existed && !requested && missingBuiltinRuntimes(config.runtimes).length === 0) {
+    info('All built-in coding agents are already configured. Nothing to add.');
+    info('Use --runtime custom only when you intentionally want to add a custom coding agent.');
+    return;
+  }
+
+  const selected = requested || await promptMultiSelect(config.runtimes);
   const knownTypes = new Set(config.runtimes.map((r) => r.type));
   const added = [];
   for (const type of selected) {
@@ -156,25 +177,75 @@ function dependencySection(root) {
   return '--save-dev';
 }
 
+function containingNodeModules(packageRoot) {
+  let current = path.resolve(packageRoot);
+  while (true) {
+    if (path.basename(current).toLowerCase() === 'node_modules') return current;
+    const parent = path.dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
+function updatePlan(root) {
+  const projectPackageRoot = packagePath(root);
+  if (fs.existsSync(path.join(projectPackageRoot, 'package.json'))) {
+    return {
+      npmArgs: ['install', dependencySection(root), `${PACKAGE_NAME}@latest`],
+      cwd: root,
+      packageRoot: projectPackageRoot,
+      mode: 'project'
+    };
+  }
+
+  try {
+    const globalNodeModules = path.resolve(runNpm(['root', '--global'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
+    const globalPackageRoot = path.join(globalNodeModules, '@caiqueoak', 'flow');
+    if (path.resolve(ROOT).startsWith(`${globalNodeModules}${path.sep}`) && fs.existsSync(path.join(globalPackageRoot, 'package.json'))) {
+      return {
+        npmArgs: ['install', '--global', `${PACKAGE_NAME}@latest`],
+        cwd: root,
+        packageRoot: globalPackageRoot,
+        mode: 'global'
+      };
+    }
+  } catch { /* fall through to local installation detection */ }
+
+  const nodeModules = containingNodeModules(ROOT);
+  if (nodeModules) {
+    const installRoot = path.dirname(nodeModules);
+    return {
+      npmArgs: ['install', dependencySection(installRoot), `${PACKAGE_NAME}@latest`],
+      cwd: installRoot,
+      packageRoot: ROOT,
+      mode: 'local'
+    };
+  }
+
+  fail('cannot determine how this Flow CLI was installed. Reinstall @caiqueoak/flow with npm, then run flow update again.');
+}
+
 function update() {
   const root = projectRoot();
   const config = readConfig(root);
   if (!config) fail('this project is not initialized. Run flow init first.');
   if (!config.runtimes.length) fail('no coding agents are configured. Run flow init to add one.');
-  info(`Updating ${PACKAGE_NAME}...`);
-  try { execFileSync(npmCommand(), ['install', dependencySection(root), `${PACKAGE_NAME}@latest`], { cwd: root, stdio: 'inherit' }); }
+
+  const plan = updatePlan(root);
+  info(`Updating ${PACKAGE_NAME} (${plan.mode} installation)...`);
+  try { runNpm(plan.npmArgs, { cwd: plan.cwd, stdio: 'inherit' }); }
   catch { fail('npm update failed. Existing project state and installed skills were not intentionally removed.'); }
-  const packageRoot = path.join(root, 'node_modules', '@caiqueoak', 'flow');
-  if (!fs.existsSync(path.join(packageRoot, 'package.json'))) fail(`updated package not found at ${path.relative(root, packageRoot)}.`);
-  const latest = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
-  for (const runtime of config.runtimes) info(`✓ ${runtime.type}: ${path.relative(root, installRuntimeSkill(root, runtime, packageRoot))}`);
+
+  if (!fs.existsSync(path.join(plan.packageRoot, 'package.json'))) fail(`updated package not found at ${plan.packageRoot}.`);
+  const latest = JSON.parse(fs.readFileSync(path.join(plan.packageRoot, 'package.json'), 'utf8'));
+  for (const runtime of config.runtimes) info(`✓ ${runtime.type}: ${path.relative(root, installRuntimeSkill(root, runtime, plan.packageRoot))}`);
   const text = fs.readFileSync(configPath(root), 'utf8');
   fs.writeFileSync(configPath(root), text.replace(/(^framework:\s*\n(?:.*\n)*?\s+version:\s*)[^\n]+/m, `$1${latest.version}`), 'utf8');
   info(`Flow updated to ${latest.version}.`);
 }
 
 function help() {
-  info(`Flow ${VERSION}\n\nUsage:\n  flow init [--path <project>] [--runtime codex,claude]\n  flow update [--path <project>]\n  flow --version\n\nflow init creates only .flow/config.yaml and installs the project-local /flow skill for selected coding agents.\nIf .flow already exists, init only adds coding-agent integrations.\nThere is no flow install command and no automatic/background update mechanism.`);
+  info(`Flow ${VERSION}\n\nUsage:\n  flow init [--path <project>] [--runtime codex,claude]\n  flow update [--path <project>]\n  flow --version\n\nflow init creates only .flow/config.yaml and installs the project-local /flow skill for selected coding agents.\nIf .flow already exists, init only adds coding-agent integrations and exits without prompting when all built-in integrations are already configured.\nflow update updates the installation that provides the Flow CLI (project-local or global) and refreshes every configured project-local skill.\nThere is no flow install command and no automatic/background update mechanism.`);
 }
 
 if (!args.length || hasFlag('--help') || hasFlag('-h')) help();
