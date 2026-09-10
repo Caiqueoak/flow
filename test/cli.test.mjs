@@ -10,6 +10,7 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(root, 'src', 'cli.mjs');
+const packageJson = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
 
 async function tempDir() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'flow-cli-'));
@@ -25,7 +26,7 @@ async function run(args, cwd) {
 
 test('reports the package version', async () => {
   const result = await run(['--version'], root);
-  assert.equal(result.stdout.trim(), '0.2.0');
+  assert.equal(result.stdout.trim(), packageJson.version);
 });
 
 test('initializes the Flow project state without replacing existing templates', async () => {
