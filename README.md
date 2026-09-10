@@ -54,6 +54,12 @@ On Windows, npm is invoked through the command shell so `npm.cmd` can be execute
 
 There is no background update check or automatic update mechanism.
 
+## Releases
+
+Merges to `main` are released automatically after the test matrix passes. The release pipeline uses npm Trusted Publishing (OIDC), creates a signed npm provenance record, and tags the release; no npm token or manual version bump is needed.
+
+Use Conventional Commit prefixes in the PR title (and retained commits): `fix:` produces a patch, `feat:` a minor, and `feat!:` or a `BREAKING CHANGE:` footer a major release. `docs:`, `test:`, `chore:`, and `ci:` do not publish a package.
+
 ## CLI
 
 ```text

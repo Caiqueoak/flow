@@ -29,6 +29,30 @@ function projectRoot() { return path.resolve(valueAfter('--path') || process.cwd
 function configPath(root) { return path.join(root, '.flow', 'config.yaml'); }
 function packagePath(root) { return path.join(root, 'node_modules', '@caiqueoak', 'flow'); }
 
+function abortedPromptError() {
+  const error = new Error('Prompt aborted.');
+  error.code = 'ABORT_ERR';
+  return error;
+}
+
+function question(rl, message) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      rl.removeListener('close', onClose);
+      callback(value);
+    };
+    const onClose = () => finish(reject, abortedPromptError());
+    rl.once('close', onClose);
+    rl.question(message).then(
+      (answer) => finish(resolve, answer),
+      (error) => finish(reject, error)
+    );
+  });
+}
+
 function runNpm(npmArgs, options = {}) {
   return execFileSync(npmCommand(), npmArgs, {
     ...options,
@@ -105,7 +129,7 @@ async function promptMultiSelect(existing) {
   const rl = readline.createInterface({ input: inputStream, output: outputStream });
   try {
     while (true) {
-      const answer = (await rl.question('Selection: ')).trim();
+      const answer = (await question(rl, 'Selection: ')).trim();
       const indices = [...new Set(answer.split(',').map((v) => Number.parseInt(v.trim(), 10)).filter(Number.isInteger))];
       if (indices.length && indices.every((n) => n >= 1 && n <= options.length)) return indices.map((n) => options[n - 1].value);
       info('Choose one or more valid numbers.');
@@ -116,7 +140,7 @@ async function promptMultiSelect(existing) {
 async function promptText(message, defaultValue = '') {
   const rl = readline.createInterface({ input: inputStream, output: outputStream });
   try {
-    const answer = (await rl.question(`${message}${defaultValue ? ` [${defaultValue}]` : ''}: `)).trim();
+    const answer = (await question(rl, `${message}${defaultValue ? ` [${defaultValue}]` : ''}: `)).trim();
     return answer || defaultValue;
   } finally { rl.close(); }
 }
@@ -248,8 +272,17 @@ function help() {
   info(`Flow ${VERSION}\n\nUsage:\n  flow init [--path <project>] [--runtime codex,claude]\n  flow update [--path <project>]\n  flow --version\n\nflow init creates only .flow/config.yaml and installs the project-local /flow skill for selected coding agents.\nIf .flow already exists, init only adds coding-agent integrations and exits without prompting when all built-in integrations are already configured.\nflow update updates the installation that provides the Flow CLI (project-local or global) and refreshes every configured project-local skill.\nThere is no flow install command and no automatic/background update mechanism.`);
 }
 
-if (!args.length || hasFlag('--help') || hasFlag('-h')) help();
-else if (hasFlag('--version') || hasFlag('-v')) info(VERSION);
-else if (args[0] === 'init') await initProject();
-else if (args[0] === 'update') update();
-else fail(`unknown command '${args[0]}'. Run flow --help.`);
+try {
+  if (!args.length || hasFlag('--help') || hasFlag('-h')) help();
+  else if (hasFlag('--version') || hasFlag('-v')) info(VERSION);
+  else if (args[0] === 'init') await initProject();
+  else if (args[0] === 'update') update();
+  else fail(`unknown command '${args[0]}'. Run flow --help.`);
+} catch (error) {
+  if (error?.code === 'ABORT_ERR') {
+    info('\nFlow command canceled.');
+    process.exitCode = 130;
+  } else {
+    throw error;
+  }
+}
