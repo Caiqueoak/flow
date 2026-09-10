@@ -10,4 +10,6 @@ Resolve only consequential global decisions affecting the problem, users, MVP, b
 
 ## Outputs
 
-Create or update only valid canonical artifacts: `PRD.md`, `ENGINEERING.md`, `DECISIONS.md`, `BACKLOG.yaml`, `STATE.md`, `SUMMARY.md`, and approved gate definitions. Discovery ends when no unresolved global decision is needed for a coherent production-capable MVP and initial work-item DAG.
+Update valid canonical artifacts when their truth changes. Create `PRD.md`, `ENGINEERING.md`, `DECISIONS.md`, `BACKLOG.yaml`, `STATE.md`, `GRAPH.md`, work-item artifacts, or gate definitions only when the developer explicitly requested or authorized creation of that artifact class. Never create substitute, progress, summary, handoff, or ad-hoc documents to capture information that belongs in an existing approved artifact.
+
+`GRAPH.md` is a derived human-readable projection of `BACKLOG.yaml`, not an independent source of truth. Discovery ends when no unresolved global decision is needed for a coherent production-capable MVP and initial work-item DAG.
