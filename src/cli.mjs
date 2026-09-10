@@ -54,9 +54,11 @@ function question(rl, message) {
 }
 
 function runNpm(npmArgs, options = {}) {
+  if (process.platform === 'win32') {
+    return execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', npmCommand(), ...npmArgs], options);
+  }
   return execFileSync(npmCommand(), npmArgs, {
-    ...options,
-    shell: process.platform === 'win32'
+    ...options
   });
 }
 
@@ -190,17 +192,6 @@ async function initProject() {
   else { info(); info('Flow is ready. Open a configured coding agent and invoke /flow.'); }
 }
 
-function dependencySection(root) {
-  const file = path.join(root, 'package.json');
-  if (!fs.existsSync(file)) return '--save-dev';
-  try {
-    const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (pkg.dependencies?.[PACKAGE_NAME]) return '--save';
-    if (pkg.optionalDependencies?.[PACKAGE_NAME]) return '--save-optional';
-  } catch { /* use default */ }
-  return '--save-dev';
-}
-
 function containingNodeModules(packageRoot) {
   let current = path.resolve(packageRoot);
   while (true) {
@@ -211,42 +202,86 @@ function containingNodeModules(packageRoot) {
   }
 }
 
-function updatePlan(root) {
-  const projectPackageRoot = packagePath(root);
-  if (fs.existsSync(path.join(projectPackageRoot, 'package.json'))) {
-    return {
-      npmArgs: ['install', dependencySection(root), `${PACKAGE_NAME}@latest`],
-      cwd: root,
-      packageRoot: projectPackageRoot,
-      mode: 'project'
-    };
-  }
+function installedPackageVersion(packageRoot) {
+  const manifest = path.join(packageRoot, 'package.json');
+  if (!fs.existsSync(manifest)) return null;
+  return JSON.parse(fs.readFileSync(manifest, 'utf8')).version || null;
+}
 
+function lockedPackageVersion(root) {
+  const lockfile = path.join(root, 'package-lock.json');
+  if (!fs.existsSync(lockfile)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(lockfile, 'utf8')).packages?.[`node_modules/${PACKAGE_NAME}`]?.version || null;
+  } catch { return null; }
+}
+
+function globalUpdatePlan(root) {
   try {
     const globalNodeModules = path.resolve(runNpm(['root', '--global'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
     const globalPackageRoot = path.join(globalNodeModules, '@caiqueoak', 'flow');
     if (path.resolve(ROOT).startsWith(`${globalNodeModules}${path.sep}`) && fs.existsSync(path.join(globalPackageRoot, 'package.json'))) {
       return {
-        npmArgs: ['install', '--global', `${PACKAGE_NAME}@latest`],
+        npmArgs: ['update', '--global', PACKAGE_NAME],
         cwd: root,
         packageRoot: globalPackageRoot,
         mode: 'global'
       };
     }
   } catch { /* fall through to local installation detection */ }
+  return null;
+}
+
+function updatePlan(root) {
+  const global = globalUpdatePlan(root);
+  if (global) return global;
 
   const nodeModules = containingNodeModules(ROOT);
   if (nodeModules) {
     const installRoot = path.dirname(nodeModules);
     return {
-      npmArgs: ['install', dependencySection(installRoot), `${PACKAGE_NAME}@latest`],
+      npmArgs: ['update', PACKAGE_NAME],
       cwd: installRoot,
       packageRoot: ROOT,
       mode: 'local'
     };
   }
 
+  const projectPackageRoot = packagePath(root);
+  if (fs.existsSync(path.join(projectPackageRoot, 'package.json'))) {
+    return {
+      npmArgs: ['update', PACKAGE_NAME],
+      cwd: root,
+      packageRoot: projectPackageRoot,
+      mode: 'project'
+    };
+  }
+
   fail('cannot determine how this Flow CLI was installed. Reinstall @caiqueoak/flow with npm, then run flow update again.');
+}
+
+function repairDivergentProjectInstall(plan) {
+  if (plan.mode === 'global') return;
+  const expected = lockedPackageVersion(plan.cwd);
+  const actual = installedPackageVersion(plan.packageRoot);
+  if (!expected || !actual || expected === actual) return;
+
+  const backup = path.join(plan.cwd, `.flow-update-backup-${process.pid}-${Date.now()}`);
+  info(`Repairing divergent ${PACKAGE_NAME} installation (${actual} on disk, ${expected} in package-lock.json)...`);
+  fs.renameSync(plan.packageRoot, backup);
+  try {
+    runNpm(['install'], { cwd: plan.cwd, stdio: 'inherit' });
+    if (installedPackageVersion(plan.packageRoot) !== expected) {
+      throw new Error(`npm install did not restore ${PACKAGE_NAME}@${expected}.`);
+    }
+    fs.rmSync(backup, { recursive: true, force: true });
+  } catch (error) {
+    try {
+      fs.rmSync(plan.packageRoot, { recursive: true, force: true });
+      fs.renameSync(backup, plan.packageRoot);
+    } catch { /* preserve the original npm error below */ }
+    throw error;
+  }
 }
 
 function update() {
@@ -257,8 +292,10 @@ function update() {
 
   const plan = updatePlan(root);
   info(`Updating ${PACKAGE_NAME} (${plan.mode} installation)...`);
-  try { runNpm(plan.npmArgs, { cwd: plan.cwd, stdio: 'inherit' }); }
-  catch { fail('npm update failed. Existing project state and installed skills were not intentionally removed.'); }
+  try {
+    repairDivergentProjectInstall(plan);
+    runNpm(plan.npmArgs, { cwd: plan.cwd, stdio: 'inherit' });
+  } catch { fail('npm update failed. Existing project state and installed skills were not intentionally removed.'); }
 
   if (!fs.existsSync(path.join(plan.packageRoot, 'package.json'))) fail(`updated package not found at ${plan.packageRoot}.`);
   const latest = JSON.parse(fs.readFileSync(path.join(plan.packageRoot, 'package.json'), 'utf8'));
