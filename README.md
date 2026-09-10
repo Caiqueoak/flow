@@ -48,7 +48,7 @@ Updates are explicit:
 flow update
 ```
 
-`flow update` detects how the active Flow CLI is installed. If the project contains `@caiqueoak/flow`, it updates that project dependency using npm's update operation; if the CLI is globally installed, it updates the global package instead. It then refreshes `/flow` for every coding agent configured in `.flow/config.yaml` without modifying canonical project state.
+`flow update` updates the installation that provides the active CLI: the global package for `flow update`, or the project dependency for `npx flow update`. It uses npm's update operation and refreshes `/flow` for every coding agent configured in `.flow/config.yaml` without modifying canonical project state. If the project lockfile and the package on disk disagree, Flow safely reinstalls only its own package before updating.
 
 On Windows, npm is invoked through `cmd.exe` without Node's `shell: true` option, so `npm.cmd` executes without the `DEP0190` warning. When Flow is installed as a project dependency, `npx flow update` is equivalent.
 
