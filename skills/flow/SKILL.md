@@ -47,7 +47,7 @@ Graph/control data is YAML:
 
 Do not create `SUMMARY.md`, completion logs, ad-hoc progress documents, handoff documents, reports, or any other new project artifact unless the developer explicitly requests or authorizes them. Completed `SPEC.md` files retain concise Overview and Validation sections.
 
-`GRAPH.md` is derived only. It must never become an independent source of truth and must be reconciled whenever work-item existence, dependencies, or status change. Preserve its established visual style and conventions while updating it.
+`GRAPH.md` is derived only. It must never become an independent source of truth and must be reconciled whenever work-item existence, title, dependencies, or status change. Before creating or changing it, read `references/graph.md` and follow that contract exactly; do not preserve an established style that conflicts with it.
 
 ## Work item model
 
@@ -121,6 +121,7 @@ Load only the reference needed for current state:
 - Ready planned tasks: `references/build.md`
 - Completed implementation awaiting validation: `references/review.md`
 - Decision impact or inconsistent artifacts: `references/reconcile.md`
+- Creating or updating `GRAPH.md`: additionally load `references/graph.md`
 
 ## Orchestration loop
 
