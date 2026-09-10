@@ -54,7 +54,7 @@ jobs:
 
   publish:
     name: publish npm
-    needs: test
+    needs: [test, publish-preflight]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: npm-publish
