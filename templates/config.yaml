@@ -1,0 +1,29 @@
+schema_version: 1
+framework_version: 0.2.0
+
+workflow:
+  autonomous_until:
+    - consequential_decision
+    - external_approval
+    - unrecoverable_blocker
+    - no_ready_work
+  continue_across_work_items: true
+
+parallelism:
+  strategy: maximum_safe
+  max_concurrent_work_items: auto
+  max_concurrent_tasks_per_work_item: auto
+  delegation: allowed
+
+execution:
+  primary_orchestrator: true
+
+commands:
+  test: null
+  lint: null
+  typecheck: null
+  build: null
+
+updates:
+  check_on_run: true
+  auto_update: false

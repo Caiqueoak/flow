@@ -1,0 +1,11 @@
+stage: initialized
+active_work_items: []
+pending_decisions: []
+last_completed_work_item: null
+recommended_action: flow-new
+
+execution:
+  current_run_id: null
+  effective_parallelism:
+    work_items: 0
+    tasks: {}

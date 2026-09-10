@@ -1,0 +1,15 @@
+work_items: []
+
+# Work item example:
+# - id: W001
+#   sequence: 1
+#   kind: feature | technical | maintenance
+#   title: Example
+#   slug: example
+#   folder: 001F-example  # F=feature, T=technical, M=maintenance
+#   mvp: true
+#   priority: high
+#   status: pending | ready | in_progress | blocked | needs_reconciliation | done
+#   depends_on: []
+#   impacted_by: []
+#   execution_id: null

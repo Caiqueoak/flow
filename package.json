@@ -1,0 +1,39 @@
+{
+  "name": "@caiqueoak/flow",
+  "version": "0.2.0",
+  "description": "Readability-first, agent-agnostic software development workflow for coding agents.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "bin": {
+    "flow": "./src/cli.mjs"
+  },
+  "files": [
+    "src",
+    "skills",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "coding-agent",
+    "agentic-development",
+    "workflow",
+    "skills",
+    "software-engineering"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Caiqueoak/flow.git"
+  },
+  "homepage": "https://github.com/Caiqueoak/flow#readme",
+  "bugs": {
+    "url": "https://github.com/Caiqueoak/flow/issues"
+  },
+  "license": "MIT"
+}
