@@ -54,6 +54,15 @@ test('initializes Codex with only Flow configuration and the public skill', asyn
   await assert.rejects(fs.stat(path.join(project, '.flow', 'PRD.md')));
 });
 
+test('installs the mandatory graph projection contract with the public skill', async () => {
+  const project = await tempDir();
+  await run(['init', '--path', project, '--runtime', 'codex']);
+  const rules = await fs.readFile(path.join(project, '.codex', 'skills', 'flow', 'references', 'graph.md'), 'utf8');
+  assert.match(rules, /Each Mermaid card contains exactly two lines/);
+  assert.match(rules, /Every outgoing arrow inherits the color and line style of its source card/);
+  assert.match(rules, /Blocked/);
+});
+
 test('adds a second configured runtime without replacing canonical artifacts', async () => {
   const project = await tempDir();
   await run(['init', '--path', project, '--runtime', 'codex']);
