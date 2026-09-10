@@ -131,4 +131,4 @@ npx @caiqueoak/flow init
 
 ## Releases
 
-Flow follows [Semantic Versioning](https://semver.org/). Public releases are made from an annotated `vX.Y.Z` tag whose version exactly matches `package.json`; GitHub Actions runs the test and packaging checks, then publishes the package to npm with provenance.
+Flow follows [Semantic Versioning](https://semver.org/). A merge to `main` publishes only when the version in `package.json` does not already exist on npm. GitHub Actions runs the test and packaging checks, then publishes the package with provenance. Release PRs must update both `package.json` and `package-lock.json`.
