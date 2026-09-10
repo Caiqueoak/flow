@@ -13,9 +13,16 @@ const cli = path.join(root, 'src', 'cli.mjs');
 const packageJson = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
 
 async function tempDir() { return fs.mkdtemp(path.join(os.tmpdir(), 'flow-cli-')); }
-async function run(args, cwd = root) {
-  try { return await execFileAsync(process.execPath, [cli, ...args], { cwd }); }
-  catch (error) { return { code: error.code, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }; }
+async function run(args, cwd = root, options = {}) {
+  try {
+    return await execFileAsync(process.execPath, [cli, ...args], {
+      cwd,
+      ...options,
+      env: { ...process.env, ...(options.env || {}) }
+    });
+  } catch (error) {
+    return { code: error.code, stdout: error.stdout ?? '', stderr: error.stderr ?? '' };
+  }
 }
 
 test('reports the package version', async () => {
@@ -45,6 +52,41 @@ test('adds a second configured runtime without replacing canonical artifacts', a
   assert.match(config, /type: claude/);
   assert.equal(await fs.readFile(path.join(project, '.flow', 'PRD.md'), 'utf8'), 'existing project truth');
   assert.match(await fs.readFile(path.join(project, '.claude', 'skills', 'flow', 'SKILL.md'), 'utf8'), /# Flow/);
+});
+
+test('existing project with all built-in runtimes exits without prompting', async () => {
+  const project = await tempDir();
+  await run(['init', '--path', project, '--runtime', 'codex,claude']);
+  const result = await run(['init', '--path', project]);
+  assert.match(result.stdout, /already exists/);
+  assert.match(result.stdout, /All built-in coding agents are already configured/);
+  assert.doesNotMatch(result.stdout, /Selection:/);
+});
+
+test('updates a project-local Flow installation and refreshes configured skills', async () => {
+  const project = await tempDir();
+  await run(['init', '--path', project, '--runtime', 'codex']);
+
+  const installed = path.join(project, 'node_modules', '@caiqueoak', 'flow');
+  await fs.mkdir(path.join(installed, 'skills', 'flow'), { recursive: true });
+  await fs.writeFile(path.join(installed, 'package.json'), JSON.stringify({ name: '@caiqueoak/flow', version: '9.9.9' }));
+  await fs.writeFile(path.join(installed, 'skills', 'flow', 'SKILL.md'), '# Flow\n\nupdated skill');
+
+  const bin = path.join(project, 'fake-bin');
+  await fs.mkdir(bin, { recursive: true });
+  if (process.platform === 'win32') {
+    await fs.writeFile(path.join(bin, 'npm.cmd'), '@echo off\r\nexit /b 0\r\n');
+  } else {
+    const npm = path.join(bin, 'npm');
+    await fs.writeFile(npm, '#!/bin/sh\nexit 0\n');
+    await fs.chmod(npm, 0o755);
+  }
+
+  const result = await run(['update', '--path', project], project, { env: { PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+  assert.match(result.stdout, /project installation/);
+  assert.match(result.stdout, /Flow updated to 9.9.9/);
+  assert.match(await fs.readFile(path.join(project, '.codex', 'skills', 'flow', 'SKILL.md'), 'utf8'), /updated skill/);
+  assert.match(await fs.readFile(path.join(project, '.flow', 'config.yaml'), 'utf8'), /version: 9.9.9/);
 });
 
 test('rejects unsupported runtimes passed by flag', async () => {
