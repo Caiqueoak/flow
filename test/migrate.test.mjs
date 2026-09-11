@@ -36,7 +36,7 @@ test('normalizes 0.4-style paths, IDs and lifecycle states without preserving ta
   await fs.stat(path.join(root, '.flow', 'state.yaml'));
   const config = await fs.readFile(path.join(root, '.flow', 'config.yaml'), 'utf8');
   assert.match(config, /schema_version: 2/);
-  assert.doesNotMatch(config, /framework:|version:/);
+  assert.doesNotMatch(config, /^framework:|^\s+version:/m);
 });
 
 test('migration is idempotent for already-migrated structural artifacts', async () => {

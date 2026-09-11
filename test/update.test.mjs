@@ -63,7 +63,7 @@ test('updates a project installation, refreshes skills, and keeps package versio
   assert.match(result.stdout, /Flow updated to 9.9.9/);
   assert.match(await fs.readFile(npm.invocation, 'utf8'), /update @caiqueoak\/flow/);
   assert.match(await fs.readFile(path.join(project, '.codex', 'skills', 'flow', 'SKILL.md'), 'utf8'), /updated skill/);
-  assert.doesNotMatch(await fs.readFile(path.join(project, '.flow', 'config.yaml'), 'utf8'), /framework:|version:/);
+  assert.doesNotMatch(await fs.readFile(path.join(project, '.flow', 'config.yaml'), 'utf8'), /^framework:|^\s+version:/m);
 });
 
 test('repairs a project package that diverges from package-lock before updating', async () => {
