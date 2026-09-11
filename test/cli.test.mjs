@@ -62,6 +62,8 @@ test('installs the mandatory graph projection contract with the public skill', a
   assert.match(rules, /Each Mermaid card contains exactly two lines/);
   assert.match(rules, /Every outgoing arrow inherits the color and line style of its source card/);
   assert.match(rules, /Blocked/);
+  assert.match(rules, /flow graph --path \./);
+  assert.match(rules, /curve: 'linear'/);
 });
 
 test('adds a second configured runtime without replacing canonical artifacts', async () => {

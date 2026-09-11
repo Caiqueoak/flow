@@ -3,6 +3,18 @@
 Every Flow `GRAPH.md` must be a derived, human-readable projection of
 `.flow/BACKLOG.yaml`. It never becomes an independent source of truth.
 
+## Generation
+
+After every change to work-item existence, title, status, or dependencies, run:
+
+```text
+flow graph --path .
+```
+
+The command validates the backlog DAG and regenerates the complete file. Do
+not edit `GRAPH.md` directly. It always emits Mermaid with `curve: 'linear'`;
+do not replace that setting or introduce curved arrows.
+
 ## Card content
 
 Each Mermaid card contains exactly two lines:

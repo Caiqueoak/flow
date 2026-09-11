@@ -38,7 +38,7 @@ Flow internally loads only the guidance needed for discovery, planning, build, r
 
 When authorized, Flow keeps a concise artifact model: product truth in `PRD.md`, engineering truth in `ENGINEERING.md`, decisions in `DECISIONS.md`, execution context in `STATE.md`, the canonical work-item DAG in `BACKLOG.yaml`, and a human-readable derived projection in `GRAPH.md`. Work items use `SPEC.md` plus `TASKS.yaml`. `SUMMARY.md` is not part of the model.
 
-In `GRAPH.md`, work-item states are consistent: complete is green, in progress is blue, blocked is red when unfinished dependencies remain, and pending is yellow when all dependencies are complete and the item is ready to execute. Each Mermaid card contains only the work-item ID and canonical title. Every dependency arrow goes from dependency to dependent item and uses the color and line style of its source card.
+In `GRAPH.md`, work-item states are consistent: complete is green, in progress is blue, blocked is red when unfinished dependencies remain, and pending is yellow when all dependencies are complete and the item is ready to execute. Each Mermaid card contains only the work-item ID and canonical title. Every dependency arrow goes from dependency to dependent item and uses the color and line style of its source card. `flow graph` deterministically regenerates this projection from `BACKLOG.yaml`, using straight Mermaid arrows only.
 
 ## Update
 
@@ -65,6 +65,7 @@ Use Conventional Commit prefixes in the PR title (and retained commits): `fix:` 
 ```text
 flow init
 flow update
+flow graph
 flow --version
 flow --help
 ```

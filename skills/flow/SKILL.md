@@ -47,7 +47,7 @@ Graph/control data is YAML:
 
 Do not create `SUMMARY.md`, completion logs, ad-hoc progress documents, handoff documents, reports, or any other new project artifact unless the developer explicitly requests or authorizes them. Completed `SPEC.md` files retain concise Overview and Validation sections.
 
-`GRAPH.md` is derived only. It must never become an independent source of truth and must be reconciled whenever work-item existence, title, dependencies, or status change. Before creating or changing it, read `references/graph.md` and follow that contract exactly; do not preserve an established style that conflicts with it.
+`GRAPH.md` is derived only. It must never become an independent source of truth. Whenever work-item existence, title, dependencies, or status change, update `BACKLOG.yaml` first and then run `flow graph --path .` to regenerate it. Never edit `GRAPH.md` manually. Before changing the backlog, read `references/graph.md` and follow that contract exactly.
 
 ## Work item model
 
@@ -132,7 +132,7 @@ Load only the reference needed for current state:
 5. Route to the minimal internal reference.
 6. Claim selected work before parallel execution.
 7. Continue planning, build, gates, review, fixes/reconciliation, and completion without another invocation.
-8. Recompute work-item states and readiness after every meaningful transition, synchronize `BACKLOG.yaml`, `STATE.md`, and `GRAPH.md`, and continue if ready work exists.
+8. Recompute work-item states and readiness after every meaningful transition, synchronize `BACKLOG.yaml`, run `flow graph --path .`, then synchronize `STATE.md`, and continue if ready work exists.
 9. Do not stop or return control merely to announce that a task/work item completed or to describe the next step. Stop only when developer input is required for a consequential decision, an external approval is required, an unrecoverable blocker prevents useful progress, or no ready work remains.
 
 When execution stops, report the stopping reason and the smallest relevant status summary. During uninterrupted execution, avoid progress-only messages.
