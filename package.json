@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
+    "lint": "eslint .",
+    "format": "prettier --write src test package.json package-lock.json README.md eslint.config.js prettier.config.mjs",
+    "format:check": "prettier --check src test package.json package-lock.json README.md eslint.config.js prettier.config.mjs",
     "pack:check": "npm pack --dry-run"
   },
   "bin": {
@@ -13,6 +16,12 @@
   "dependencies": {
     "yaml": "^2.9.0"
   },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "eslint": "^9.36.0",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2"
+  },
   "files": [
     "src",
     "skills",
@@ -20,7 +29,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=18.18"
   },
   "keywords": [
     "coding-agent",
