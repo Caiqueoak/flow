@@ -305,8 +305,14 @@ function update() {
   info(`Flow updated to ${latest.version}.`);
 }
 
+async function graph() {
+  const { writeGraph } = await import('./graph.mjs');
+  const result = writeGraph(projectRoot());
+  info(`Generated ${result.graphPath}`);
+}
+
 function help() {
-  info(`Flow ${VERSION}\n\nUsage:\n  flow init [--path <project>] [--runtime codex,claude]\n  flow update [--path <project>]\n  flow --version\n\nflow init creates only .flow/config.yaml and installs the project-local /flow skill for selected coding agents.\nIf .flow already exists, init only adds coding-agent integrations and exits without prompting when all built-in integrations are already configured.\nflow update updates the installation that provides the Flow CLI (project-local or global) and refreshes every configured project-local skill.\nThere is no flow install command and no automatic/background update mechanism.`);
+  info(`Flow ${VERSION}\n\nUsage:\n  flow init [--path <project>] [--runtime codex,claude]\n  flow update [--path <project>]\n  flow graph [--path <project>]\n  flow --version\n\nflow init creates only .flow/config.yaml and installs the project-local /flow skill for selected coding agents.\nIf .flow already exists, init only adds coding-agent integrations and exits without prompting when all built-in integrations are already configured.\nflow update updates the installation that provides the Flow CLI (project-local or global) and refreshes every configured project-local skill.\nflow graph deterministically projects .flow/BACKLOG.yaml into .flow/GRAPH.md. There is no flow install command and no automatic/background update mechanism.`);
 }
 
 try {
@@ -314,6 +320,7 @@ try {
   else if (hasFlag('--version') || hasFlag('-v')) info(VERSION);
   else if (args[0] === 'init') await initProject();
   else if (args[0] === 'update') update();
+  else if (args[0] === 'graph') await graph();
   else fail(`unknown command '${args[0]}'. Run flow --help.`);
 } catch (error) {
   if (error?.code === 'ABORT_ERR') {

@@ -10,6 +10,9 @@
   "bin": {
     "flow": "./src/cli.mjs"
   },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  },
   "files": [
     "src",
     "skills",
