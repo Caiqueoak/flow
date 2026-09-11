@@ -1,148 +1,90 @@
 ---
 name: flow
-description: Autonomous, readability-first software delivery workflow. Continue from project state or incorporate new intent, ask only for consequential decisions, then plan, build, validate, reconcile, and continue as far as safely possible.
+description: Autonomous, readability-first software delivery workflow. Use /flow to bootstrap or continue a project from repository state, establish engineering rules before implementation, and continue through planning, build, review, reconciliation, and completion until a real stop condition exists.
 ---
 
 # Flow
 
-## Public contract
+`/flow` is the only public workflow command. The repository is the source of truth; chat history is never required to resume.
 
-`/flow` is the only public workflow skill.
+## Intent intake
 
-- `/flow` with no additional intent continues from `.flow/STATE.md` as far as safely possible.
-- `/flow <freeform intent>` incorporates the intent into current project context and continues appropriately.
-- If `.flow/STATE.md` does not exist, begin global discovery using the idea, repository, or source documents supplied.
+Before the first route of an invocation, incorporate any new freeform developer intent into canonical project state. If the repository is stopped on a consequential decision and the developer message resolves it, update the active spec and any affected authoritative artifacts, clear `state.yaml` `stop_reason`, and continue routing. If new intent changes existing scope or completed truth, route it through reconciliation rather than discarding it. Repository-driven routing never means ignoring the current developer message.
 
-Do not require the developer to know or invoke internal workflow phases.
-
-## Core principles
-
-1. **Readability first.** Canonical artifacts must be understandable without Flow internals.
-2. **Decision ownership.** The developer owns consequential product and engineering decisions; the agent executes within approved rules and obvious conventions.
-3. **Autonomy by default.** Continue until a consequential decision requiring developer input, external approval, unrecoverable blocker, or no-ready-work condition.
-4. **Just-in-time detail.** Resolve global decisions during discovery and work-item detail only when that item becomes active.
-5. **Production-aware MVP.** MVP includes product capability plus the technical, infrastructure, quality, deployment, and operational work needed to run it.
-6. **Parallelism first.** Execute the largest safe independent set while preserving correctness and token efficiency.
-7. **Automatic synchronization.** Keep state, decisions, PRD, engineering definition, backlog, graph, specs, and tasks aligned.
-8. **Artifact restraint.** Never create a new project document or artifact unless the developer explicitly requests or authorizes it. Update existing approved artifacts instead whenever possible.
-9. **Execution continuity.** Do not pause execution merely to report progress, completion, or next steps. Continue automatically while ready work exists. Surface status only when execution has actually stopped or when developer input is required.
-
-## Canonical project artifacts
-
-Create artifacts only when they become valid and only when the developer has explicitly requested or authorized their creation. `flow init` creates only `.flow/config.yaml`.
-
-Developer-facing knowledge is Markdown:
-
-- `.flow/PRD.md` - current global product truth and MVP boundary.
-- `.flow/ENGINEERING.md` - global engineering truth.
-- `.flow/DECISIONS.md` - consequential decision record and rationale.
-- `.flow/STATE.md` - concise current execution/navigation checkpoint and resume context.
-- `.flow/GRAPH.md` - human-readable derived projection of the work-item dependency graph and current readiness state.
-- `.flow/work-items/<folder>/SPEC.md` - readable lifecycle/specification of one work item.
-
-Graph/control data is YAML:
-
-- `.flow/BACKLOG.yaml` - canonical work-item DAG and work-item state.
-- `.flow/work-items/<folder>/TASKS.yaml` - task DAG and execution ownership.
-
-Do not create `SUMMARY.md`, completion logs, ad-hoc progress documents, handoff documents, reports, or any other new project artifact unless the developer explicitly requests or authorizes them. Completed `SPEC.md` files retain concise Overview and Validation sections.
-
-`GRAPH.md` is derived only. It must never become an independent source of truth. Whenever work-item existence, title, dependencies, or status change, update `BACKLOG.yaml` first and then run `flow graph --path .` to regenerate it. Never edit `GRAPH.md` manually. Before changing the backlog, read `references/graph.md` and follow that contract exactly.
-
-## Work item model
-
-- `feature` (`F`) - product/user capability.
-- `technical` (`T`) - architecture, infrastructure, platform, quality, deployment, or enabling work.
-- `maintenance` (`M`) - reconciliation, migration, refactor, or corrective work.
-
-Folder format is `<three-digit-sequence><kind-code>-<slug>` (for example, `001F-user-profile`). The sequence is a stable readability aid, never execution order. Dependencies determine readiness.
-
-Work-item states are derived consistently:
-
-- `complete` (`✅`, green) - the item is completed.
-- `in_progress` (`🔵`, blue) - the item has active execution.
-- `blocked` (`🔴`, red) - the item is neither complete nor in progress and at least one work-item dependency is not complete.
-- `pending` (`🟡`, yellow) - the item is neither complete nor in progress and every work-item dependency is complete; it is ready to execute.
-
-The graph must use these meanings consistently for nodes and outgoing dependency-line styling.
-
-## Decision authority
-
-Apply low-impact and conventional choices automatically. A decision requires developer approval when materially different choices affect product behavior or scope; architecture/public contracts; production infrastructure or cost; persistent data; security/privacy; testing strategy or gates; project-wide conventions; or other work-item assumptions.
-
-## Decision presentation protocol
-
-Every requested decision must use this readable structure:
-
-### Decision
-
-What needs to be chosen.
-
-### Problem
-
-The concrete uncertainty.
-
-### Context
-
-Relevant product, engineering, production, and existing-decision context.
-
-### Options
-
-Realistic alternatives and trade-offs.
-
-### Recommended option
-
-Exactly one recommendation when evidence permits.
-
-### Why recommended
-
-Concise justification grounded in current goals and constraints.
-
-### Approach
-
-The high-level direction following the recommendation.
-
-### Impact
-
-Affected definitions, rules, gates, work items, tasks, or implementation.
-
-Never hide a consequential choice inside an implementation plan. Batch the largest currently-known set of independent decisions; do not invent hypothetical questions.
-
-## Decision lifecycle and impact
-
-Decision states are `candidate`, `pending_user`, `accepted`, `rejected`, and `superseded`. Preserve the rationale in `DECISIONS.md`. Reconcile pending work before execution, stop only affected in-progress paths, and create maintenance work rather than rewriting completed history.
-
-## Internal workflow routing
-
-Load only the reference needed for current state:
-
-- Missing state or global definition: `references/discovery.md`
-- Ready/unplanned work: `references/planning.md`
-- Ready planned tasks: `references/build.md`
-- Completed implementation awaiting validation: `references/review.md`
-- Decision impact or inconsistent artifacts: `references/reconcile.md`
-- Creating or updating `GRAPH.md`: additionally load `references/graph.md`
-
-## Orchestration loop
+## Execution loop
 
 1. Read `.flow/config.yaml`.
-2. Read only the minimum navigation context from `.flow/STATE.md` when present.
-3. Classify new intent and its impact on canonical truth, backlog, active work, or execution detail.
-4. Respect work/tasks already `in_progress` under another execution ID.
-5. Route to the minimal internal reference.
-6. Claim selected work before parallel execution.
-7. Continue planning, build, gates, review, fixes/reconciliation, and completion without another invocation.
-8. Recompute work-item states and readiness after every meaningful transition, synchronize `BACKLOG.yaml`, run `flow graph --path .`, then synchronize `STATE.md`, and continue if ready work exists.
-9. Do not stop or return control merely to announce that a task/work item completed or to describe the next step. Stop only when developer input is required for a consequential decision, an external approval is required, an unrecoverable blocker prevents useful progress, or no ready work remains.
+2. Run `flow route --path . --json`.
+3. If `action=continue`, load **only** the returned instruction file from this skill and execute it completely.
+4. Persist the step's required state/artifact changes.
+5. Run the validations required by that step.
+6. Return to step 2 without yielding control merely to report status.
+7. Return control to the developer only when `flow route` returns `action=stop`.
 
-When execution stops, report the stopping reason and the smallest relevant status summary. During uninterrupted execution, avoid progress-only messages.
+Read `invariants.md` before the first routed step of a run. Do not preload future steps.
 
-## Parallelism and gates
+## Artifact authority
 
-`auto` means the largest safe concurrency the orchestrator can reliably coordinate, considering dependencies, shared decisions/files/contracts, integration risk, available capacity, context complexity, and token overhead. It is not unlimited. Prefer one primary orchestrator and delegate only where independent substantial work justifies it.
+Flow invocation authorizes creation and update of canonical Flow artifacts. Noncanonical reports, handoffs, summaries, scratch documents, and extra project artifacts still require an explicit need.
 
-Gates may be deterministic commands or agentic policy checks. Define/refine them during discovery or planning when relevant. Build agents know applicable gates before implementation; review validates requirements, integration, and blocking gates.
+Canonical project layout:
 
-## Git and token efficiency
+```text
+.flow/
+├── config.yaml
+├── backlog.yaml
+├── state.yaml
+├── gates.yaml
+├── docs/
+│   ├── prd.md
+│   ├── engineering.md
+│   └── graph.md
+└── work-items/
+    └── w015-example/
+        ├── spec.md
+        ├── tasks.yaml
+        └── artifacts/     # optional durable work-item outputs only
+```
 
-Follow the approved Git strategy in `ENGINEERING.md`; by default create one atomic commit per completed task. Read the minimum relevant canonical context, avoid repeated large-document ingestion and duplicate prose, reuse accepted decisions, prefer deterministic checks, and delegate only with narrow ownership/context packets.
+`docs/graph.md` is derived only. Regenerate it with `flow graph --path .` after backlog changes.
+
+## Work-item model
+
+- IDs are `W001`, `W002`, ...; the number is creation sequence only.
+- Kind is data: `feature`, `technical`, or `maintenance`; it is not encoded in the ID.
+- Folder format is `w###-kebab-case`.
+- Persisted lifecycle state is exactly `pending`, `in_progress`, or `completed`.
+- Human execution status is derived: pending + blockers => Blocked; pending + no blockers => Ready; otherwise In Progress/Completed.
+- Work-item dependencies are represented only in `depends_on`. If W017 requires W003 and W015, both must be dependency edges and both must appear in the graph.
+
+## Task/Git model
+
+- Task IDs are local `T001`, `T002`, ...; externally qualify them as `W015-T003`.
+- A completed code-changing task has exactly one reachable primary implementation commit with trailers:
+
+```text
+Flow-Work-Item: W015
+Flow-Task: W015-T003
+```
+
+- SHA is derived with `flow trace`; never persist it in `tasks.yaml`.
+- Do not squash Flow task commits when task-level traceability must survive.
+- Completed work is immutable history: review fixes become new tasks; completed work-item changes become maintenance work.
+- One shared worktree may have at most one mutating Flow task. Mutating parallelism requires isolated Git worktrees. Read-only analysis/review may run concurrently.
+- Worker agents must not mutate shared control-plane files (`backlog.yaml`, `state.yaml`, `docs/graph.md`); the orchestrator owns them.
+
+## Engineering bootstrap
+
+No application implementation may begin until `.flow/docs/engineering.md` is approved and `.flow/gates.yaml` is valid.
+
+The engineering bootstrap must recommend a complete architecture rather than expecting an inexperienced developer to design one. Inspect technology and constraints, apply the configured profile and brownfield policy, resolve every required architecture dimension, choose technology-appropriate conventions, design enforcement, review the recommendation, then present the complete proposal for developer argument/approval.
+
+Flow has a permanent simplicity bias: implement architecture only while its present or credible near-term value exceeds its ongoing complexity. Reject speculative abstraction.
+
+## Decisions
+
+Consequential decisions live in the active work item's `spec.md` under `## Decisions` or `## Open Decisions`. Do not create a global decision log. When a work-item decision establishes global product or engineering truth, distill the accepted result into `docs/prd.md` or `docs/engineering.md` while retaining rationale in the originating spec.
+
+## Gates
+
+Prefer deterministic enforcement whenever possible. A blocking engineering rule must map to a command, builtin, or versioned agentic gate. Agentic gates are for judgment that static tooling cannot reliably decide. The baseline maintainability policy prioritizes readability, cohesion, appropriate SOLID use, YAGNI, proportional complexity, and no speculative abstractions.
