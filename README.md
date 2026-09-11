@@ -71,3 +71,7 @@ flow --help
 ```
 
 The CLI bootstraps project-local integrations and configuration. The coding agent plus `/flow` owns discovery, planning, scheduling, delegation, build, gates, review, reconciliation, and state synchronization.
+
+## Architecture
+
+The CLI is organized as vertical slices: each command owns its use case end-to-end. Shared modules exist only for project configuration, skill installation, CLI I/O, and project-path parsing because those concepts have multiple command consumers. Avoid generic helper or handler layers; extract a module only when it has a distinct responsibility and at least two consumers.

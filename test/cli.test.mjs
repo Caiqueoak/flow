@@ -12,7 +12,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(root, 'src', 'cli.mjs');
 const packageJson = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
 
-async function tempDir() { return fs.mkdtemp(path.join(os.tmpdir(), 'flow-cli-')); }
+async function tempDir() {
+  return fs.mkdtemp(path.join(os.tmpdir(), 'flow-cli-'));
+}
 async function run(args, cwd = root, options = {}) {
   const { cliPath = cli, ...execOptions } = options;
   try {
@@ -31,8 +33,12 @@ async function runWithClosedInput(args, cwd = root) {
     const child = spawn(process.execPath, [cli, ...args], { cwd });
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (chunk) => { stdout += chunk; });
-    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, stdout, stderr }));
     child.stdin.end('\n');
@@ -53,6 +59,15 @@ test('initializes Codex with only Flow configuration and the public skill', asyn
   assert.match(config, /skills_path: .codex\/skills/);
   assert.match(await fs.readFile(path.join(project, '.codex', 'skills', 'flow', 'SKILL.md'), 'utf8'), /# Flow/);
   await assert.rejects(fs.stat(path.join(project, '.flow', 'PRD.md')));
+});
+
+test('routes help and unknown commands through the entrypoint', async () => {
+  const help = await run(['--help']);
+  assert.match(help.stdout, /flow graph/);
+
+  const unknown = await run(['unknown']);
+  assert.equal(unknown.code, 1);
+  assert.match(unknown.stderr, /unknown command 'unknown'/);
 });
 
 test('installs the mandatory graph projection contract with the public skill', async () => {
@@ -94,21 +109,29 @@ test('updates a project-local Flow installation and refreshes configured skills'
 
   const installed = path.join(project, 'node_modules', '@caiqueoak', 'flow');
   await fs.mkdir(path.join(installed, 'skills', 'flow'), { recursive: true });
-  await fs.writeFile(path.join(installed, 'package.json'), JSON.stringify({ name: '@caiqueoak/flow', version: '9.9.9' }));
+  await fs.writeFile(
+    path.join(installed, 'package.json'),
+    JSON.stringify({ name: '@caiqueoak/flow', version: '9.9.9' })
+  );
   await fs.writeFile(path.join(installed, 'skills', 'flow', 'SKILL.md'), '# Flow\n\nupdated skill');
 
   const bin = path.join(project, 'fake-bin');
   const invocation = path.join(project, 'npm-invocation.txt');
   await fs.mkdir(bin, { recursive: true });
   if (process.platform === 'win32') {
-    await fs.writeFile(path.join(bin, 'npm.cmd'), '@echo off\r\necho %* > "%FLOW_TEST_NPM_INVOCATION%"\r\nexit /b 0\r\n');
+    await fs.writeFile(
+      path.join(bin, 'npm.cmd'),
+      '@echo off\r\necho %* > "%FLOW_TEST_NPM_INVOCATION%"\r\nexit /b 0\r\n'
+    );
   } else {
     const npm = path.join(bin, 'npm');
     await fs.writeFile(npm, '#!/bin/sh\nprintf "%s" "$*" > "$FLOW_TEST_NPM_INVOCATION"\nexit 0\n');
     await fs.chmod(npm, 0o755);
   }
 
-  const result = await run(['update', '--path', project], project, { env: { PATH: `${bin}${path.delimiter}${process.env.PATH}`, FLOW_TEST_NPM_INVOCATION: invocation } });
+  const result = await run(['update', '--path', project], project, {
+    env: { PATH: `${bin}${path.delimiter}${process.env.PATH}`, FLOW_TEST_NPM_INVOCATION: invocation }
+  });
   assert.match(result.stdout, /project installation/);
   assert.match(result.stdout, /Flow updated to 9.9.9/);
   assert.match(await fs.readFile(invocation, 'utf8'), /^update @caiqueoak\/flow\s*$/);
@@ -122,27 +145,48 @@ test('repairs a Flow package that diverges from its lockfile before updating', a
   await run(['init', '--path', project, '--runtime', 'codex']);
   const installed = path.join(project, 'node_modules', '@caiqueoak', 'flow');
   await fs.mkdir(path.join(installed, 'skills', 'flow'), { recursive: true });
-  await fs.writeFile(path.join(installed, 'package.json'), JSON.stringify({ name: '@caiqueoak/flow', version: '9.9.8' }));
+  await fs.writeFile(
+    path.join(installed, 'package.json'),
+    JSON.stringify({ name: '@caiqueoak/flow', version: '9.9.8' })
+  );
   await fs.writeFile(path.join(installed, 'skills', 'flow', 'SKILL.md'), '# Flow\n\nstale skill');
-  await fs.writeFile(path.join(project, 'package-lock.json'), JSON.stringify({ lockfileVersion: 3, packages: { 'node_modules/@caiqueoak/flow': { version: '9.9.9' } } }));
+  await fs.writeFile(
+    path.join(project, 'package-lock.json'),
+    JSON.stringify({ lockfileVersion: 3, packages: { 'node_modules/@caiqueoak/flow': { version: '9.9.9' } } })
+  );
 
   const bin = path.join(project, 'fake-bin');
   const invocation = path.join(project, 'npm-invocation.txt');
   await fs.mkdir(bin, { recursive: true });
   if (process.platform === 'win32') {
-    await fs.writeFile(path.join(bin, 'npm.cmd'), '@echo off\r\necho %*>> "%FLOW_TEST_NPM_INVOCATION%"\r\nif "%1"=="install" (\r\n  mkdir "%FLOW_TEST_PACKAGE_ROOT%\\skills\\flow" 2>NUL\r\n  > "%FLOW_TEST_PACKAGE_ROOT%\\package.json" echo {"name":"@caiqueoak/flow","version":"9.9.9"}\r\n  > "%FLOW_TEST_PACKAGE_ROOT%\\skills\\flow\\SKILL.md" echo # Flow updated skill\r\n)\r\nexit /b 0\r\n');
+    await fs.writeFile(
+      path.join(bin, 'npm.cmd'),
+      '@echo off\r\necho %*>> "%FLOW_TEST_NPM_INVOCATION%"\r\nif "%1"=="install" (\r\n  mkdir "%FLOW_TEST_PACKAGE_ROOT%\\skills\\flow" 2>NUL\r\n  > "%FLOW_TEST_PACKAGE_ROOT%\\package.json" echo {"name":"@caiqueoak/flow","version":"9.9.9"}\r\n  > "%FLOW_TEST_PACKAGE_ROOT%\\skills\\flow\\SKILL.md" echo # Flow updated skill\r\n)\r\nexit /b 0\r\n'
+    );
   } else {
     const npm = path.join(bin, 'npm');
-    await fs.writeFile(npm, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$FLOW_TEST_NPM_INVOCATION"\nif [ "$1" = install ]; then\n  mkdir -p "$FLOW_TEST_PACKAGE_ROOT/skills/flow"\n  printf "%s" \'{"name":"@caiqueoak/flow","version":"9.9.9"}\' > "$FLOW_TEST_PACKAGE_ROOT/package.json"\n  printf "%s" "# Flow updated skill" > "$FLOW_TEST_PACKAGE_ROOT/skills/flow/SKILL.md"\nfi\nexit 0\n');
+    await fs.writeFile(
+      npm,
+      '#!/bin/sh\nprintf "%s\\n" "$*" >> "$FLOW_TEST_NPM_INVOCATION"\nif [ "$1" = install ]; then\n  mkdir -p "$FLOW_TEST_PACKAGE_ROOT/skills/flow"\n  printf "%s" \'{"name":"@caiqueoak/flow","version":"9.9.9"}\' > "$FLOW_TEST_PACKAGE_ROOT/package.json"\n  printf "%s" "# Flow updated skill" > "$FLOW_TEST_PACKAGE_ROOT/skills/flow/SKILL.md"\nfi\nexit 0\n'
+    );
     await fs.chmod(npm, 0o755);
   }
 
-  const result = await run(['update', '--path', project], project, { env: { PATH: `${bin}${path.delimiter}${process.env.PATH}`, FLOW_TEST_NPM_INVOCATION: invocation, FLOW_TEST_PACKAGE_ROOT: installed } });
+  const result = await run(['update', '--path', project], project, {
+    env: {
+      PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+      FLOW_TEST_NPM_INVOCATION: invocation,
+      FLOW_TEST_PACKAGE_ROOT: installed
+    }
+  });
   assert.match(result.stdout, /Repairing divergent/);
   assert.match(await fs.readFile(invocation, 'utf8'), /install[\r\n]+update @caiqueoak\/flow/);
   assert.equal(JSON.parse(await fs.readFile(path.join(installed, 'package.json'), 'utf8')).version, '9.9.9');
   assert.match(await fs.readFile(path.join(installed, 'skills', 'flow', 'SKILL.md'), 'utf8'), /updated skill/);
-  assert.equal((await fs.readdir(project)).some((entry) => entry.startsWith('.flow-update-backup-')), false);
+  assert.equal(
+    (await fs.readdir(project)).some((entry) => entry.startsWith('.flow-update-backup-')),
+    false
+  );
 });
 
 test('updates the global installation when the invoked CLI is global', async () => {
@@ -159,14 +203,27 @@ test('updates the global installation when the invoked CLI is global', async () 
   const invocation = path.join(project, 'npm-invocation.txt');
   await fs.mkdir(bin, { recursive: true });
   if (process.platform === 'win32') {
-    await fs.writeFile(path.join(bin, 'npm.cmd'), '@echo off\r\nif "%1"=="root" (\r\n  echo %FLOW_TEST_GLOBAL_NODE_MODULES%\r\n  exit /b 0\r\n)\r\necho %* > "%FLOW_TEST_NPM_INVOCATION%"\r\nexit /b 0\r\n');
+    await fs.writeFile(
+      path.join(bin, 'npm.cmd'),
+      '@echo off\r\nif "%1"=="root" (\r\n  echo %FLOW_TEST_GLOBAL_NODE_MODULES%\r\n  exit /b 0\r\n)\r\necho %* > "%FLOW_TEST_NPM_INVOCATION%"\r\nexit /b 0\r\n'
+    );
   } else {
     const npm = path.join(bin, 'npm');
-    await fs.writeFile(npm, '#!/bin/sh\nif [ "$1" = root ]; then\n  printf "%s" "$FLOW_TEST_GLOBAL_NODE_MODULES"\n  exit 0\nfi\nprintf "%s" "$*" > "$FLOW_TEST_NPM_INVOCATION"\n');
+    await fs.writeFile(
+      npm,
+      '#!/bin/sh\nif [ "$1" = root ]; then\n  printf "%s" "$FLOW_TEST_GLOBAL_NODE_MODULES"\n  exit 0\nfi\nprintf "%s" "$*" > "$FLOW_TEST_NPM_INVOCATION"\n'
+    );
     await fs.chmod(npm, 0o755);
   }
 
-  const result = await run(['update', '--path', project], project, { cliPath: path.join(globalPackage, 'src', 'cli.mjs'), env: { PATH: `${bin}${path.delimiter}${process.env.PATH}`, FLOW_TEST_GLOBAL_NODE_MODULES: globalNodeModules, FLOW_TEST_NPM_INVOCATION: invocation } });
+  const result = await run(['update', '--path', project], project, {
+    cliPath: path.join(globalPackage, 'src', 'cli.mjs'),
+    env: {
+      PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+      FLOW_TEST_GLOBAL_NODE_MODULES: globalNodeModules,
+      FLOW_TEST_NPM_INVOCATION: invocation
+    }
+  });
   assert.match(result.stdout, /global installation/);
   assert.match(await fs.readFile(invocation, 'utf8'), /^update --global @caiqueoak\/flow\s*$/);
 });

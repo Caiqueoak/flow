@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseDocument } from 'yaml';
+import { info } from '../shared/cli-io.mjs';
+import { projectRoot } from '../shared/project-path.mjs';
 
 const KINDS = new Set(['feature', 'technical', 'maintenance']);
 const STATUSES = new Set(['completed', 'in_progress', 'pending', 'blocked']);
@@ -12,12 +14,19 @@ export class GraphValidationError extends Error {
   }
 }
 
-function compareIds(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
-function fail(message) { throw new GraphValidationError(message); }
+function compareIds(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function fail(message) {
+  throw new GraphValidationError(message);
+}
+
 function requireString(value, label) {
   if (typeof value !== 'string' || !value.trim()) fail(`${label} must be a non-empty string.`);
   return value;
 }
+
 function requireObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${label} must be a mapping.`);
   return value;
@@ -44,18 +53,28 @@ function parseBacklog(text) {
     if (!STATUSES.has(item.status)) fail(`${label}.status must be completed, in_progress, pending, or blocked.`);
     if (!Number.isInteger(item.priority) || item.priority < 1) fail(`${label}.priority must be a positive integer.`);
     if (!Array.isArray(item.depends_on)) fail(`${label}.depends_on must be a list.`);
-    const dependencySet = new Set();
+    const dependencies = new Set();
     for (const dependency of item.depends_on) {
       requireString(dependency, `${label}.depends_on entry`);
       if (dependency === id) fail(`Work item '${id}' cannot depend on itself.`);
-      if (dependencySet.has(dependency)) fail(`Work item '${id}' lists dependency '${dependency}' more than once.`);
-      dependencySet.add(dependency);
+      if (dependencies.has(dependency)) fail(`Work item '${id}' lists dependency '${dependency}' more than once.`);
+      dependencies.add(dependency);
     }
-    return { id, folder, kind: item.kind, title, status: item.status, priority: item.priority, depends_on: [...dependencySet] };
+    return {
+      id,
+      folder,
+      kind: item.kind,
+      title,
+      status: item.status,
+      priority: item.priority,
+      depends_on: [...dependencies]
+    };
   });
   const byId = new Map(items.map((item) => [item.id, item]));
-  for (const item of items) for (const dependency of item.depends_on) {
-    if (!byId.has(dependency)) fail(`Work item '${item.id}' depends on unknown work item '${dependency}'.`);
+  for (const item of items) {
+    for (const dependency of item.depends_on) {
+      if (!byId.has(dependency)) fail(`Work item '${item.id}' depends on unknown work item '${dependency}'.`);
+    }
   }
   return items;
 }
@@ -64,9 +83,14 @@ function topology(items) {
   const byId = new Map(items.map((item) => [item.id, item]));
   const remaining = new Map(items.map((item) => [item.id, item.depends_on.length]));
   const dependents = new Map(items.map((item) => [item.id, []]));
-  for (const item of items) for (const dependency of item.depends_on) dependents.get(dependency).push(item.id);
+  for (const item of items) {
+    for (const dependency of item.depends_on) dependents.get(dependency).push(item.id);
+  }
   for (const ids of dependents.values()) ids.sort(compareIds);
-  const ready = items.filter((item) => item.depends_on.length === 0).map((item) => item.id).sort(compareIds);
+  const ready = items
+    .filter((item) => item.depends_on.length === 0)
+    .map((item) => item.id)
+    .sort(compareIds);
   const levels = new Map(ready.map((id) => [id, 0]));
   const orderedIds = [];
   while (ready.length) {
@@ -76,11 +100,16 @@ function topology(items) {
       levels.set(dependent, Math.max(levels.get(dependent) ?? 0, levels.get(id) + 1));
       const count = remaining.get(dependent) - 1;
       remaining.set(dependent, count);
-      if (count === 0) { ready.push(dependent); ready.sort(compareIds); }
+      if (count === 0) {
+        ready.push(dependent);
+        ready.sort(compareIds);
+      }
     }
   }
   if (orderedIds.length !== items.length) fail('BACKLOG.yaml work-item dependencies contain a cycle.');
-  const ordered = orderedIds.map((id) => byId.get(id)).sort((left, right) => (levels.get(left.id) - levels.get(right.id)) || compareIds(left.id, right.id));
+  const ordered = orderedIds
+    .map((id) => byId.get(id))
+    .sort((left, right) => levels.get(left.id) - levels.get(right.id) || compareIds(left.id, right.id));
   return { ordered, byId };
 }
 
@@ -113,16 +142,22 @@ export function generateGraphMarkdown(backlogText) {
   const items = parseBacklog(backlogText);
   const { ordered, byId } = topology(items);
   const statuses = new Map(ordered.map((item) => [item.id, displayStatus(item, byId)]));
-  const edges = ordered.flatMap((source) => ordered
-    .filter((target) => target.depends_on.includes(source.id))
-    .map((target) => ({ source: source.id, target: target.id, status: statuses.get(source.id) })));
+  const edges = ordered.flatMap((source) =>
+    ordered
+      .filter((target) => target.depends_on.includes(source.id))
+      .map((target) => ({ source: source.id, target: target.id, status: statuses.get(source.id) }))
+  );
   const lines = [
-    '# Work-item dependency graph', '', '## Status', '',
+    '# Work-item dependency graph',
+    '',
+    '## Status',
+    '',
     '- <span style="color:#16a34a">Complete</span> — all work accepted.',
     '- <span style="color:#2563eb">In progress</span> — active delivery path.',
     '- <span style="color:#d97706">Pending</span> — all dependencies complete; ready to start.',
     '- <span style="color:#dc2626">Blocked</span> — one or more dependencies remain incomplete.',
-    '', '```mermaid',
+    '',
+    '```mermaid',
     "%%{init: {'flowchart': {'curve': 'linear', 'nodeSpacing': 32, 'rankSpacing': 54}} }%%",
     'flowchart TD'
   ];
@@ -135,27 +170,36 @@ export function generateGraphMarkdown(backlogText) {
     if (ids.length) lines.push(`  class ${ids.join(',')} ${status};`);
   }
   for (const status of ['complete', 'active', 'pending', 'blocked']) {
-    const indices = edges.map((edge, index) => edge.status === status ? index : null).filter((index) => index !== null);
+    const indices = edges
+      .map((edge, index) => (edge.status === status ? index : null))
+      .filter((index) => index !== null);
     if (indices.length) lines.push(`  linkStyle ${indices.join(',')} ${LINK_STYLES[status]};`);
   }
   lines.push(
-    '```', '',
+    '```',
+    '',
     'Cards in the same vertical rank have no dependency between them and can be',
     'worked in parallel. Arrow color and line style are inherited from the source',
     'card: solid green for complete, solid blue for active, dashed yellow for',
-    'pending, and dotted red for blocked.', ''
+    'pending, and dotted red for blocked.',
+    ''
   );
   return lines.join('\n');
 }
 
-export function writeGraph(projectRoot) {
-  const flowDir = path.join(projectRoot, '.flow');
-  const backlogPath = path.join(flowDir, 'BACKLOG.yaml');
+export function writeGraph(root) {
+  const flowDirectory = path.join(root, '.flow');
+  const backlogPath = path.join(flowDirectory, 'BACKLOG.yaml');
   if (!fs.existsSync(backlogPath)) fail(`Backlog not found: ${backlogPath}`);
   const markdown = generateGraphMarkdown(fs.readFileSync(backlogPath, 'utf8'));
-  const graphPath = path.join(flowDir, 'GRAPH.md');
-  const temporaryPath = path.join(flowDir, `.GRAPH.md.${process.pid}.${Date.now()}.tmp`);
+  const graphPath = path.join(flowDirectory, 'GRAPH.md');
+  const temporaryPath = path.join(flowDirectory, `.GRAPH.md.${process.pid}.${Date.now()}.tmp`);
   fs.writeFileSync(temporaryPath, markdown, 'utf8');
   fs.renameSync(temporaryPath, graphPath);
   return { graphPath, markdown };
+}
+
+export function runGraph({ args }) {
+  const result = writeGraph(projectRoot(args));
+  info(`Generated ${result.graphPath}`);
 }

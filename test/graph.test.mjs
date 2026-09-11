@@ -7,7 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { stringify } from 'yaml';
-import { GraphValidationError, generateGraphMarkdown, writeGraph } from '../src/graph.mjs';
+import { GraphValidationError, generateGraphMarkdown, writeGraph } from '../src/commands/graph.mjs';
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,11 +24,51 @@ function backlog(items) {
 }
 
 const representativeItems = [
-  { id: 'F001', folder: '001F-foundation', kind: 'feature', title: 'Foundation', status: 'completed', priority: 1, depends_on: [] },
-  { id: 'T002', folder: '002T-active', kind: 'technical', title: 'Active work', status: 'in_progress', priority: 1, depends_on: ['F001'] },
-  { id: 'F003', folder: '003F-ready', kind: 'feature', title: 'Ready work', status: 'pending', priority: 1, depends_on: ['F001'] },
-  { id: 'M004', folder: '004M-blocked', kind: 'maintenance', title: 'Blocked by active work', status: 'blocked', priority: 2, depends_on: ['T002'] },
-  { id: 'F005', folder: '005F-downstream', kind: 'feature', title: 'Downstream', status: 'blocked', priority: 3, depends_on: ['F003', 'M004'] }
+  {
+    id: 'F001',
+    folder: '001F-foundation',
+    kind: 'feature',
+    title: 'Foundation',
+    status: 'completed',
+    priority: 1,
+    depends_on: []
+  },
+  {
+    id: 'T002',
+    folder: '002T-active',
+    kind: 'technical',
+    title: 'Active work',
+    status: 'in_progress',
+    priority: 1,
+    depends_on: ['F001']
+  },
+  {
+    id: 'F003',
+    folder: '003F-ready',
+    kind: 'feature',
+    title: 'Ready work',
+    status: 'pending',
+    priority: 1,
+    depends_on: ['F001']
+  },
+  {
+    id: 'M004',
+    folder: '004M-blocked',
+    kind: 'maintenance',
+    title: 'Blocked by active work',
+    status: 'blocked',
+    priority: 2,
+    depends_on: ['T002']
+  },
+  {
+    id: 'F005',
+    folder: '005F-downstream',
+    kind: 'feature',
+    title: 'Downstream',
+    status: 'blocked',
+    priority: 3,
+    depends_on: ['F003', 'M004']
+  }
 ];
 
 test('renders a stable complete graph with the established straight-arrow styling', () => {
@@ -36,8 +76,10 @@ test('renders a stable complete graph with the established straight-arrow stylin
   assert.match(graph, /# Work-item dependency graph/);
   assert.match(graph, /'curve': 'linear'/);
   assert.doesNotMatch(graph, /curve': '(?!linear)/);
-  for (const item of representativeItems) assert.match(graph, new RegExp(`${item.id}\\["${item.id}<br/>${item.title}"\\]`));
-  for (const edge of ['F001 --> F003', 'F001 --> T002', 'F003 --> F005', 'T002 --> M004', 'M004 --> F005']) assert.match(graph, new RegExp(edge));
+  for (const item of representativeItems)
+    assert.match(graph, new RegExp(`${item.id}\\["${item.id}<br/>${item.title}"\\]`));
+  for (const edge of ['F001 --> F003', 'F001 --> T002', 'F003 --> F005', 'T002 --> M004', 'M004 --> F005'])
+    assert.match(graph, new RegExp(edge));
   assert.match(graph, /class F001 complete;/);
   assert.match(graph, /class T002 active;/);
   assert.match(graph, /class F003 pending;/);
@@ -49,7 +91,10 @@ test('renders a stable complete graph with the established straight-arrow stylin
 });
 
 test('is deterministic when work items and dependency lists are reordered', () => {
-  const shuffled = representativeItems.slice().reverse().map((item) => ({ ...item, depends_on: [...item.depends_on].reverse() }));
+  const shuffled = representativeItems
+    .slice()
+    .reverse()
+    .map((item) => ({ ...item, depends_on: [...item.depends_on].reverse() }));
   assert.equal(generateGraphMarkdown(backlog(representativeItems)), generateGraphMarkdown(backlog(shuffled)));
 });
 
@@ -99,7 +144,10 @@ test('rejects malformed graphs and preserves a valid projection on failure', asy
     backlog([{ ...representativeItems[0], depends_on: ['F001'] }]),
     backlog([{ ...representativeItems[0] }, { ...representativeItems[1], depends_on: ['F001', 'F001'] }]),
     backlog([{ ...representativeItems[0], depends_on: ['T002'] }, representativeItems[1]]),
-    backlog([{ ...representativeItems[0], id: 'F001' }, { ...representativeItems[0], id: 'F001' }]),
+    backlog([
+      { ...representativeItems[0], id: 'F001' },
+      { ...representativeItems[0], id: 'F001' }
+    ]),
     backlog([{ ...representativeItems[0], status: 'blocked' }])
   ];
   for (const invalid of invalidCases) {
