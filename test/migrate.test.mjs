@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import { stringify, parse } from 'yaml';
 import { migrateProject } from '../src/commands/migrate.mjs';
 import { routeProject } from '../src/commands/route.mjs';
@@ -76,6 +77,112 @@ test('migration is idempotent for already-migrated structural artifacts', async 
   migrateProject(root);
   assert.equal(await fs.readFile(path.join(root, '.flow', 'backlog.yaml'), 'utf8'), before);
 });
+
+test('migrates casing-only artifact and work-item names without losing content', async () => {
+  const root = await legacyProject();
+  const flow = path.join(root, '.flow');
+  const previousFolder = path.join(flow, 'work-items', '001F-foundation');
+  const casingOnlyFolder = path.join(flow, 'work-items', 'W001-Foundation');
+  const backlog = parse(await fs.readFile(path.join(flow, 'BACKLOG.yaml'), 'utf8'));
+  backlog.work_items[0].folder = 'W001-Foundation';
+  await fs.rename(previousFolder, casingOnlyFolder);
+  await fs.writeFile(path.join(flow, 'BACKLOG.yaml'), stringify(backlog));
+
+  migrateProject(root);
+
+  const folder = path.join(flow, 'work-items', 'W001-foundation');
+  assert.equal(await fs.readFile(path.join(folder, 'spec.md'), 'utf8'), '# Spec');
+  assert.equal(parse(await fs.readFile(path.join(folder, 'tasks.yaml'), 'utf8')).tasks[0].legacy_commit, 'deadbeef');
+  const entries = await fs.readdir(folder);
+  assert.ok(entries.includes('spec.md'));
+  assert.ok(entries.includes('tasks.yaml'));
+  assert.equal(entries.includes('SPEC.md'), false);
+  assert.equal(entries.includes('TASKS.yaml'), false);
+});
+
+test('rejects a distinct migration destination without modifying the live project', async () => {
+  const root = await legacyProject();
+  const folder = path.join(root, '.flow', 'work-items', '001F-foundation');
+  const source = path.join(folder, 'DECISIONS.md');
+  const destination = path.join(folder, 'legacy-decisions.md');
+  await fs.writeFile(source, 'legacy decisions');
+  await fs.writeFile(destination, 'existing decisions');
+
+  assert.throws(() => migrateProject(root), /destination already exists/);
+  assert.equal(await fs.readFile(source, 'utf8'), 'legacy decisions');
+  assert.equal(await fs.readFile(destination, 'utf8'), 'existing decisions');
+  assert.ok(await fs.stat(path.join(root, '.flow', 'BACKLOG.yaml')));
+});
+
+test(
+  'does not treat distinct case-sensitive entries as a casing alias',
+  { skip: process.platform === 'win32' },
+  async () => {
+    const root = await legacyProject();
+    const folder = path.join(root, '.flow', 'work-items', '001F-foundation');
+    await fs.writeFile(path.join(folder, 'spec.md'), 'existing lowercase spec');
+
+    assert.throws(() => migrateProject(root), /destination already exists/);
+    assert.equal(await fs.readFile(path.join(folder, 'SPEC.md'), 'utf8'), '# Spec');
+    assert.equal(await fs.readFile(path.join(folder, 'spec.md'), 'utf8'), 'existing lowercase spec');
+  }
+);
+
+test(
+  'restores a casing-only source when its intermediate rename fails',
+  { skip: process.platform !== 'win32' },
+  async () => {
+    const root = await legacyProject();
+    const source = path.join(root, '.flow', 'work-items', '001F-foundation', 'SPEC.md');
+    const rename = fsSync.renameSync;
+    const renameMock = mock.method(fsSync, 'renameSync', (from, to) => {
+      if (path.basename(from).startsWith('.SPEC.md.flow-migration-') && path.basename(to) === 'spec.md')
+        throw new Error('simulated intermediate rename failure');
+      return rename(from, to);
+    });
+    try {
+      assert.throws(() => migrateProject(root), /simulated intermediate rename failure/);
+    } finally {
+      renameMock.mock.restore();
+    }
+
+    assert.equal(await fs.readFile(source, 'utf8'), '# Spec');
+    assert.deepEqual(
+      (await fs.readdir(root)).filter((entry) => entry.startsWith('.flow-migration-')),
+      []
+    );
+  }
+);
+
+test(
+  'retains staged recovery data when casing-only rename restoration fails',
+  { skip: process.platform !== 'win32' },
+  async () => {
+    const root = await legacyProject();
+    const source = path.join(root, '.flow', 'work-items', '001F-foundation', 'SPEC.md');
+    const rename = fsSync.renameSync;
+    const renameMock = mock.method(fsSync, 'renameSync', (from, to) => {
+      if (
+        path.basename(from).startsWith('.SPEC.md.flow-migration-') &&
+        ['spec.md', 'SPEC.md'].includes(path.basename(to))
+      )
+        throw new Error('simulated intermediate rename failure');
+      return rename(from, to);
+    });
+    try {
+      assert.throws(() => migrateProject(root), /simulated intermediate rename failure/);
+    } finally {
+      renameMock.mock.restore();
+    }
+
+    assert.equal(await fs.readFile(source, 'utf8'), '# Spec');
+    const staging = (await fs.readdir(root)).find((entry) => entry.startsWith('.flow-migration-'));
+    assert.ok(staging);
+    const recoveredFolder = path.join(root, staging, '.flow', 'work-items', 'W001-foundation');
+    assert.ok((await fs.readdir(recoveredFolder)).some((entry) => entry.startsWith('.SPEC.md.flow-migration-')));
+    await fs.rm(path.join(root, staging), { recursive: true, force: true });
+  }
+);
 
 test('migration preserves guardrails and routes reconciliation before normal work', async () => {
   const root = await legacyProject();
