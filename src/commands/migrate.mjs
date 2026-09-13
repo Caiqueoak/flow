@@ -1,96 +1,189 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
-import { info, fail } from '../shared/cli-io.mjs';
+import { info } from '../shared/cli-io.mjs';
 import { projectRoot } from '../shared/project-path.mjs';
 import { emptyState, stringifyState } from '../artifacts/state.mjs';
+import { parseBacklog } from '../artifacts/backlog.mjs';
+import { parseTasks } from '../artifacts/tasks.mjs';
 import { generateGraphMarkdown } from './graph.mjs';
-import { readConfig, writeConfig } from '../shared/project-config.mjs';
+import { readConfig, writeConfig, defaultConfig } from '../shared/project-config.mjs';
 
-const LEGACY_STATES = { done: 'completed', complete: 'completed', completed: 'completed', in_progress: 'in_progress', blocked: 'pending', pending: 'pending' };
-function moveIfExists(from, to) { if (!fs.existsSync(from)) return; fs.mkdirSync(path.dirname(to), { recursive: true }); if (!fs.existsSync(to)) fs.renameSync(from, to); }
-function numericPart(value) { return String(value).match(/\d+/)?.[0]?.padStart(3, '0') ?? null; }
-
+const STATES = {
+  done: 'completed',
+  complete: 'completed',
+  completed: 'completed',
+  in_progress: 'in_progress',
+  blocked: 'pending',
+  pending: 'pending',
+  todo: 'pending'
+};
+function lifecycle(value) {
+  if (!STATES[value]) throw new Error(`Unknown legacy state '${value}'.`);
+  return STATES[value];
+}
+function number(value) {
+  const match = String(value).match(/\d+/);
+  if (!match) throw new Error(`Cannot normalize ID '${value}'.`);
+  return match[0].padStart(3, '0');
+}
+function move(from, to) {
+  if (!fs.existsSync(from)) return;
+  if (fs.existsSync(to)) throw new Error(`Migration destination already exists: ${to}`);
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  fs.renameSync(from, to);
+}
+function normalizeTasks(file, item) {
+  const raw = parse(fs.readFileSync(file, 'utf8'));
+  const mapping = new Map();
+  const ids = new Set();
+  for (const task of raw.tasks ?? []) {
+    const match = String(task.id).match(/^(?:([A-Z]\d+)-)?T(\d+)$/);
+    if (!match || (match[1] && number(match[1]) !== item.id.slice(1)))
+      throw new Error(`Invalid/cross-work-item task ID '${task.id}'.`);
+    const id = `T${match[2].padStart(3, '0')}`;
+    if (ids.has(id)) throw new Error(`Task ID collision: ${id}`);
+    ids.add(id);
+    mapping.set(task.id, id);
+  }
+  const tasks = (raw.tasks ?? []).map((task) => {
+    const state = lifecycle(task.state ?? task.status ?? 'pending');
+    const result = {
+      ...task,
+      id: mapping.get(task.id),
+      state,
+      depends_on: (task.depends_on ?? []).map((dep) => {
+        if (!mapping.has(dep)) throw new Error(`Unknown task dependency '${dep}'.`);
+        return mapping.get(dep);
+      }),
+      implementation: state === 'completed' ? 'legacy' : task.implementation === 'none' ? 'none' : 'commit'
+    };
+    if (task.commit) result.legacy_commit = task.commit;
+    delete result.commit;
+    delete result.status;
+    delete result.execution_id;
+    return result;
+  });
+  const text = stringify({ schema_version: 1, work_item: item.id, tasks }, { lineWidth: 0 });
+  parseTasks(text, { expectedWorkItem: item.id });
+  fs.writeFileSync(file, text);
+}
+function migrateStaged(root) {
+  const flow = path.join(root, '.flow');
+  const oldConfig = readConfig(root);
+  const oldFile = path.join(flow, fs.existsSync(path.join(flow, 'BACKLOG.yaml')) ? 'BACKLOG.yaml' : 'backlog.yaml');
+  const raw = parse(fs.readFileSync(oldFile, 'utf8'));
+  const mapping = new Map();
+  const ids = new Set();
+  for (const item of raw.work_items ?? []) {
+    const id = `W${number(item.id)}`;
+    if (ids.has(id)) throw new Error(`Work-item ID collision: ${id}`);
+    ids.add(id);
+    mapping.set(item.id, id);
+  }
+  const original = new Map();
+  const work_items = (raw.work_items ?? []).map((item) => {
+    const id = mapping.get(item.id);
+    const folder = `${id}-${
+      String(item.folder ?? item.title)
+        .replace(/^(?:\d+[A-Za-z]|[A-Za-z]\d+)-?/, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'work-item'
+    }`;
+    original.set(id, item.folder);
+    return {
+      id,
+      folder,
+      title: item.title,
+      kind: item.kind,
+      state: lifecycle(item.state ?? item.status ?? 'pending'),
+      priority: item.priority ?? 1,
+      depends_on: (item.depends_on ?? []).map((dep) => {
+        if (!mapping.has(dep)) throw new Error(`Unknown work-item dependency '${dep}'.`);
+        return mapping.get(dep);
+      }),
+      blockers: []
+    };
+  });
+  const text = stringify({ schema_version: 2, work_items }, { lineWidth: 0 });
+  parseBacklog(text);
+  const workRoot = path.join(flow, 'work-items');
+  for (const item of work_items) {
+    const previous = path.join(workRoot, original.get(item.id) ?? item.folder);
+    const folder = path.join(workRoot, item.folder);
+    if (previous !== folder && fs.existsSync(previous)) move(previous, folder);
+    if (!fs.existsSync(folder)) {
+      if (item.state !== 'pending') throw new Error(`${item.id}: nonpending legacy work has no folder.`);
+      continue;
+    }
+    for (const [old, next] of [
+      ['SPEC.md', 'spec.md'],
+      ['TASKS.yaml', 'tasks.yaml'],
+      ['DECISIONS.md', 'legacy-decisions.md']
+    ])
+      move(path.join(folder, old), path.join(folder, next));
+    if (fs.existsSync(path.join(folder, 'tasks.yaml'))) normalizeTasks(path.join(folder, 'tasks.yaml'), item);
+  }
+  fs.mkdirSync(path.join(flow, 'docs'), { recursive: true });
+  fs.writeFileSync(path.join(flow, 'docs', 'legacy-backlog.yaml'), stringify(raw, { lineWidth: 0 }));
+  for (const [old, next] of [
+    ['PRD.md', 'prd.md'],
+    ['ENGINEERING.md', 'legacy-engineering.md'],
+    ['STATE.md', 'legacy-state.md'],
+    ['DECISIONS.md', 'legacy-decisions.md'],
+    ['SUMMARY.md', 'legacy-summary.md']
+  ])
+    move(path.join(flow, old), path.join(flow, 'docs', next));
+  if (fs.existsSync(path.join(flow, 'GRAPH.md'))) fs.unlinkSync(path.join(flow, 'GRAPH.md'));
+  if (oldFile.endsWith('BACKLOG.yaml')) fs.unlinkSync(oldFile);
+  fs.writeFileSync(path.join(flow, 'backlog.yaml'), text);
+  fs.writeFileSync(path.join(flow, 'docs', 'graph.md'), generateGraphMarkdown(text));
+  const state = emptyState();
+  state.execution.phase = 'migration_reconciliation';
+  state.migration.status = 'pending_reconciliation';
+  fs.writeFileSync(path.join(flow, 'state.yaml'), stringifyState(state));
+  if (!fs.existsSync(path.join(flow, 'gates.yaml')))
+    fs.writeFileSync(path.join(flow, 'gates.yaml'), 'schema_version: 1\ngates: []\n');
+  const config = defaultConfig();
+  config.runtimes = oldConfig?.runtimes ?? [];
+  config.engineering.existing_code_policy = 'improve';
+  writeConfig(root, config);
+}
 export function migrateProject(root) {
   const flow = path.join(root, '.flow');
-  if (!fs.existsSync(flow)) fail('.flow does not exist.');
+  if (!fs.existsSync(flow)) throw new Error('.flow does not exist.');
   const config = readConfig(root);
-  if (config) writeConfig(root, config);
-  fs.mkdirSync(path.join(flow, 'docs'), { recursive: true });
-  moveIfExists(path.join(flow, 'PRD.md'), path.join(flow, 'docs', 'prd.md'));
-  moveIfExists(path.join(flow, 'ENGINEERING.md'), path.join(flow, 'docs', 'engineering.md'));
-  moveIfExists(path.join(flow, 'GRAPH.md'), path.join(flow, 'docs', 'graph.md'));
-
-  const oldBacklog = path.join(flow, 'BACKLOG.yaml');
-  const newBacklog = path.join(flow, 'backlog.yaml');
-  const mapping = new Map();
-  if (fs.existsSync(oldBacklog) && !fs.existsSync(newBacklog)) {
-    const raw = parse(fs.readFileSync(oldBacklog, 'utf8'));
-    for (const item of raw.work_items ?? []) {
-      const number = numericPart(item.id ?? item.folder);
-      if (!number) fail(`Cannot migrate work-item ID '${item.id}'.`);
-      mapping.set(item.id, `W${number}`);
+  if (
+    config?.schema_version === 2 &&
+    fs.existsSync(path.join(flow, 'backlog.yaml')) &&
+    parse(fs.readFileSync(path.join(flow, 'backlog.yaml'), 'utf8')).schema_version === 2
+  )
+    return { unresolved: [], unchanged: true };
+  const staging = fs.mkdtempSync(path.join(root, '.flow-migration-'));
+  const backup = path.join(staging, 'backup');
+  const staged = path.join(staging, '.flow');
+  try {
+    fs.cpSync(flow, staged, { recursive: true });
+    migrateStaged(staging);
+    fs.renameSync(flow, backup);
+    try {
+      fs.renameSync(staged, flow);
+    } catch (error) {
+      fs.renameSync(backup, flow);
+      throw error;
     }
-    const migrated = {
-      schema_version: 1,
-      work_items: (raw.work_items ?? []).map((item) => {
-        const id = mapping.get(item.id);
-        const number = id.slice(1);
-        const slug = String(item.folder ?? item.title).replace(/^\d+[A-Za-z]-?/, '').replace(/^[A-Za-z]\d+-?/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'work-item';
-        return {
-          id,
-          folder: `w${number}-${slug}`,
-          kind: item.kind,
-          title: item.title,
-          state: LEGACY_STATES[item.state ?? item.status] ?? 'pending',
-          priority: item.priority ?? 1,
-          depends_on: (item.depends_on ?? []).map((dep) => mapping.get(dep) ?? dep),
-          blockers: []
-        };
-      })
-    };
-    fs.writeFileSync(newBacklog, stringify(migrated, { lineWidth: 0 }));
-    fs.unlinkSync(oldBacklog);
+    return { unresolved: ['semantic reconciliation'], unchanged: false };
+  } finally {
+    // Retain the original backup if even rollback failed; never delete the only copy.
+    if (!fs.existsSync(backup) || fs.existsSync(flow)) fs.rmSync(staging, { recursive: true, force: true });
   }
-
-  if (fs.existsSync(newBacklog)) {
-    const backlog = parse(fs.readFileSync(newBacklog, 'utf8'));
-    const workRoot = path.join(flow, 'work-items');
-    if (fs.existsSync(workRoot)) {
-      const entries = fs.readdirSync(workRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory());
-      for (const item of backlog.work_items ?? []) {
-        const number = item.id.slice(1);
-        const old = entries.find((entry) => numericPart(entry.name) === number && entry.name !== item.folder);
-        if (old && !fs.existsSync(path.join(workRoot, item.folder))) fs.renameSync(path.join(workRoot, old.name), path.join(workRoot, item.folder));
-        const folder = path.join(workRoot, item.folder);
-        moveIfExists(path.join(folder, 'SPEC.md'), path.join(folder, 'spec.md'));
-        moveIfExists(path.join(folder, 'TASKS.yaml'), path.join(folder, 'tasks.yaml'));
-        const tasksPath = path.join(folder, 'tasks.yaml');
-        if (fs.existsSync(tasksPath)) {
-          const tasks = parse(fs.readFileSync(tasksPath, 'utf8'));
-          tasks.schema_version = 1;
-          tasks.work_item = item.id;
-          for (const task of tasks.tasks ?? []) {
-            task.state = LEGACY_STATES[task.state ?? task.status] ?? 'pending';
-            delete task.status; delete task.commit; delete task.execution_id;
-            task.implementation ??= 'commit';
-          }
-          fs.writeFileSync(tasksPath, stringify(tasks, { lineWidth: 0 }));
-        }
-      }
-    }
-    fs.mkdirSync(path.join(flow, 'docs'), { recursive: true });
-    fs.writeFileSync(path.join(flow, 'docs', 'graph.md'), generateGraphMarkdown(fs.readFileSync(newBacklog, 'utf8')));
-  }
-  if (!fs.existsSync(path.join(flow, 'state.yaml'))) fs.writeFileSync(path.join(flow, 'state.yaml'), stringifyState(emptyState()));
-  if (fs.existsSync(path.join(flow, 'STATE.md'))) fs.unlinkSync(path.join(flow, 'STATE.md'));
-
-  const unresolved = ['DECISIONS.md', 'SUMMARY.md'].filter((name) => fs.existsSync(path.join(flow, name)));
-  return { unresolved };
 }
-
 export function runMigrate({ args }) {
   const result = migrateProject(projectRoot(args));
-  info('Migrated Flow artifact paths and lifecycle states.');
-  if (result.unresolved.length) info(`Manual reconciliation required before validation: ${result.unresolved.join(', ')}.`);
+  info(
+    result.unchanged
+      ? 'Already migrated; no files changed.'
+      : 'Structural migration complete. Invoke /flow for semantic reconciliation before implementation.'
+  );
 }

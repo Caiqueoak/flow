@@ -1,148 +1,74 @@
 # Flow
 
-Flow is a readability-first, agent-agnostic software delivery workflow for coding agents. It keeps software decisions with the agent/developer while moving workflow legality, state transitions, traceability, synchronization, and enforceable quality rules into deterministic code.
+Repository-resumable software delivery with deterministic workflow checks and explicit human approval.
 
-## Install
+## Install and use
 
 ```bash
 npm install --save-dev @caiqueoak/flow
-npx flow init
+npx --no-install flow init --runtime codex
 ```
 
-`flow init` configures project-local runtime integrations and asks for an engineering baseline. It does **not** create the project backlog, PRD, engineering contract, or work items; `/flow` creates canonical artifacts as they become valid.
+Invoke `/flow` to start or continue. The agent routes from repository state, reads the returned instruction/context, executes one step, persists artifacts, validates and routes again. Consequential decisions require explicit human input; status updates alone are not terminal stops.
 
-Built-in engineering profiles:
+## Engineering preferences
 
-- **Pragmatic** — recommended; production-minded quality with a strong simplicity bias.
-- **Strict** — stronger boundaries and verification for large/long-lived systems.
-- **Prototype** — minimal structure while retaining baseline safety.
+The single built-in template is **Readability First**, ID `flow/readability-first@1`. It covers Clean Code, SOLID, mandatory SRP, semantic naming, low coupling, high cohesion, vertical slices, modular ownership, locality and complexity justified by demonstrable value.
 
-Existing repositories can use **Rebaseline** (recommended for AI/vibe-coded projects: existing code is evidence, not a standard) or **Preserve** (consistent existing patterns are candidates to retain).
+The agent-readable template ships with the npm package and is installed with the runtime skill. It is loaded when generating or explicitly revising engineering, not on every task. The approved `.flow/docs/engineering.md` is the project engineering source of truth and must be read in full before planning, implementation and review. Package/profile updates never silently change that contract.
 
-## One public workflow
+For existing code, `--existing-code improve` (**Improve existing structure**) treats current style as evidence, not authority; `preserve` (**Keep existing structure**) gives consistent conventions stronger weight. Both preserve behavior and external contracts; neither authorizes automatic refactoring. New projects use `not_applicable` when no meaningful code exists.
 
-```text
-/flow
-```
+## Lifecycle and approval
 
-A fresh chat can resume from repository state. `/flow` repeatedly asks the deterministic router what step is legal, loads only that micro-step, executes it, validates, persists the transition, and continues until a real stop condition exists.
+Discovery → PRD approval → engineering approval → complete backlog planning → implementation-plan approval → serial implementation → review.
 
-Valid terminal reasons are consequential developer input, an external action, an unrecoverable blocker, or finished work. Task/work-item completion and progress reporting are not stop conditions.
+After product and engineering are approved, create every known work item's directory, `spec.md` and `tasks.yaml` before implementation. Then draft a concrete `implementation-plan.md` per selected work item and request human validation. It identifies exact paths, symbols/contracts, ordered changes, task mapping, engineering compliance, tests, risks, rollback and exclusions. Approval is tied to SHA256 revisions of the exact engineering and spec documents; stale plans return to drafting.
 
-## Canonical project model
+PRD, engineering and plans use YAML frontmatter with `schema_version: 1`, `status: draft|approved`, and `approved_at` when approved. Engineering records baseline profile and existing-code policy. Plans record work_item, engineering_revision and spec_revision. Completed work retains its historical approval; later outcome records or engineering changes do not retroactively invalidate completed delivery.
 
-```text
-.flow/
-├── config.yaml
-├── backlog.yaml
-├── state.yaml
-├── gates.yaml
-├── docs/
-│   ├── prd.md
-│   ├── engineering.md
-│   └── graph.md
-└── work-items/
-    └── w015-learner-web-application/
-        ├── spec.md
-        ├── tasks.yaml
-        └── artifacts/          # optional durable outputs only
-```
+## Canonical artifacts
 
-Each fact has one owner:
+- `config.yaml`: runtime/bootstrap preferences; installed package metadata owns version.
+- `docs/prd.md`: product truth; `docs/engineering.md`: approved engineering truth.
+- `backlog.yaml`: schema 2, W### IDs, W###-kebab-case folders, kinds, priority, dependency DAG and lifecycle.
+- `work-items/W###-slug/spec.md`: bounded scope and decisions; `tasks.yaml`: schema 1, work_item, local T### task DAG.
+- `implementation-plan.md`: human-approved implementation approach.
+- `state.yaml`: resume cursor and migration reconciliation status.
+- `gates.yaml`: schema 1, command/builtin checks only; qualitative judgment remains review instructions.
+- `docs/graph.md`: deterministic derived projection; regenerate rather than hand-edit.
 
-- package metadata: installed Flow version
-- `config.yaml`: runtime/bootstrap configuration
-- `docs/prd.md`: global product truth
-- `docs/engineering.md`: approved engineering contract
-- `gates.yaml`: enforcement contract
-- `backlog.yaml`: work-item existence, dependency DAG, priority and lifecycle
-- `spec.md`: one work item's intent, decisions, implementation outcome and validation
-- `tasks.yaml`: task DAG and lifecycle
-- Git trailers: task → implementation commit identity
-- `state.yaml`: current execution cursor/stop reason
-- `docs/graph.md`: derived human projection only
+Persist only pending, in_progress and completed. Ready/Blocked are derived from dependency edges and explicit blockers. Blockers use `{id, type: external_action|consequential_decision, description, status: unresolved|resolved}`. Only one mutating work item/task may be active across the project. Read-only analysis may be parallel; automatic concurrent worktrees are out of scope.
 
-`SUMMARY.md` and a global `DECISIONS.md` are not part of the model.
+## CLI
 
-## Work items and execution status
+All commands use the local installation:
 
-Work-item IDs are `W001`, `W002`, ...; the number is **creation sequence only**. Kind is separate metadata (`feature`, `technical`, `maintenance`). Folder names use lowercase `w###-kebab-case`.
+| Command                                 | Purpose                                                                     |
+| --------------------------------------- | --------------------------------------------------------------------------- |
+| `npx --no-install flow init`            | Configure or add/refresh runtime integrations.                              |
+| `npx --no-install flow migrate`         | Atomic structural migration, followed by semantic reconciliation via /flow. |
+| `npx --no-install flow status`          | Progress and dependency/external blockers.                                  |
+| `npx --no-install flow validate`        | Artifact integrity, approvals, DAGs, traceability and deterministic gates.  |
+| `npx --no-install flow route --json`    | Next legal step and required context.                                       |
+| `npx --no-install flow graph`           | Regenerate dependency graph.                                                |
+| `npx --no-install flow trace W015-T003` | Resolve a task's implementation commit.                                     |
 
-Persisted lifecycle is intentionally small:
+Use `--help` for options; `--path` selects a project. Existing managed projects cannot change engineering through init; use /flow and approval. Older config is refused without mutation and must be migrated first. Update with your package manager, then rerun init to refresh integrations; there is no separate update/config/gates workflow command.
+
+## Git and migration
+
+New completed code tasks have exactly one HEAD-reachable implementation commit with both trailers:
 
 ```text
-pending | in_progress | completed
-```
-
-Flow derives the human/execution view:
-
-- **Ready** — pending and all dependencies/external blockers are satisfied.
-- **Blocked** — pending with an incomplete dependency or explicit external blocker.
-- **In Progress** — lifecycle is `in_progress`.
-- **Completed** — lifecycle is `completed`.
-
-Dependencies remain explicit DAG edges. If W017 depends on W003 and W015, `graph.md` renders both arrows. The same readiness function powers graph, status and routing so they cannot disagree.
-
-## Engineering bootstrap before implementation
-
-If no approved engineering contract exists, `/flow` enters engineering bootstrap before application code is written.
-
-Flow inspects the technology and constraints, applies the selected profile/brownfield policy, and recommends a complete architecture rather than asking inexperienced developers to design one from scratch. The recommendation must explicitly resolve system shape, module boundaries, code organization, data/state ownership, external boundaries, conventions/naming, engineering principles, quality strategy, operations, and enforcement.
-
-Flow has a permanent simplicity bias: choose the least complex design that satisfies current requirements and credible near-term growth. Speculative abstractions are rejected.
-
-After deterministic breadth/proportionality checks and independent review, Flow presents the recommendation for developer approval. Approved rules receive stable `ENG-*` IDs and blocking rules must map to real enforcement.
-
-## Gates
-
-Flow prefers mechanical enforcement:
-
-1. framework integrity (`flow validate`, DAG/state/traceability invariants),
-2. deterministic project gates (tests, lint, typecheck, format, naming, dependency rules),
-3. versioned agentic gates only for judgment such as readability, cohesion, appropriate SOLID use and unnecessary complexity.
-
-The project engineering contract says **what/why**; `gates.yaml` says **how it is proven**.
-
-## Git traceability and parallelism
-
-A completed code-changing task has one primary implementation commit with structured trailers:
-
-```text
-feat: connect submissions to Worker API
-
 Flow-Work-Item: W015
 Flow-Task: W015-T003
 ```
 
-The task ID is stable identity. The SHA is derived from reachable Git history:
+Non-code tasks use implementation: none. SHA is derived, not canonical task identity. Pre-commit verification uses `validate --pre-commit W015-T003`; normal validation checks the integrated commit. Avoid squashing task commits when preserving task traceability.
 
-```bash
-flow trace W015-T003
-```
-
-Rebase/cherry-pick may change SHA without breaking traceability. Do not squash Flow task commits when task-level traceability must survive.
-
-One shared worktree may contain at most one mutating Flow task. Parallel code-writing requires isolated Git worktrees; otherwise Flow serializes mutation. Read-only analysis/review may still run in parallel.
-
-## CLI
-
-```text
-flow init
-flow update
-flow migrate
-flow validate
-flow route --json
-flow status
-flow gates
-flow graph
-flow trace W015-T003
-flow --version
-```
-
-`flow validate --pre-commit W015-T003` checks task completion postconditions before the primary task commit exists; normal `flow validate` then verifies the reachable trailer.
-
-`flow migrate` performs deterministic 0.4-style path/state normalization and reports legacy decision/summary artifacts that still require semantic reconciliation.
+Migration stages transformations before swapping artifacts, rejects collisions/invalid DAGs before mutation, preserves legacy documents and commit evidence, normalizes qualified task IDs/dependencies, and routes first to semantic reconciliation. Completed migrated tasks use implementation: legacy and optional legacy_commit; they do not require invented Git trailers or rewritten historical spec headings. Pending legacy folders may be absent during reconciliation, but complete backlog planning must materialize them before native implementation. Private project artifacts are not committed as fixtures.
 
 ## Releases
 
-Merges to `main` are released automatically after the test matrix passes. Conventional Commit PR titles drive semantic-release (`feat:` minor, `fix:` patch). The installed package metadata is the Flow version source of truth; project config does not duplicate it.
+Merges to main are released automatically after the test matrix passes. Conventional Commit PR titles drive semantic-release. Installed package metadata is the Flow version source of truth; project config does not duplicate it.

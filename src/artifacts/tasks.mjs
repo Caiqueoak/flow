@@ -22,7 +22,8 @@ export function parseTasks(text, { source = 'tasks.yaml', expectedWorkItem = nul
   const value = requireObject(document.toJS(), source);
   if (value.schema_version !== 1) fail(`${source} schema_version must be 1.`);
   const workItem = requireString(value.work_item, `${source} work_item`);
-  if (expectedWorkItem && workItem !== expectedWorkItem) fail(`${source} belongs to ${workItem}, expected ${expectedWorkItem}.`);
+  if (expectedWorkItem && workItem !== expectedWorkItem)
+    fail(`${source} belongs to ${workItem}, expected ${expectedWorkItem}.`);
   if (!Array.isArray(value.tasks)) fail(`${source} tasks must be a list.`);
   const ids = new Set();
   const tasks = value.tasks.map((raw, index) => {
@@ -43,12 +44,26 @@ export function parseTasks(text, { source = 'tasks.yaml', expectedWorkItem = nul
       if (dependency === id) fail(`${id} cannot depend on itself.`);
     }
     const implementation = task.implementation ?? 'commit';
-    if (!['commit', 'none'].includes(implementation)) fail(`${id}.implementation must be commit or none.`);
-    return { id, title, state, depends_on: dependencies, implementation };
+    if (!['commit', 'none', 'legacy'].includes(implementation))
+      fail(`${id}.implementation must be commit, none or legacy.`);
+    if (implementation === 'legacy' && state !== 'completed')
+      fail(`${id}: legacy is reserved for completed migrated tasks.`);
+    return {
+      id,
+      title,
+      state,
+      depends_on: dependencies,
+      implementation,
+      ...(task.legacy_commit ? { legacy_commit: task.legacy_commit } : {})
+    };
   });
   const byId = new Map(tasks.map((task) => [task.id, task]));
-  for (const task of tasks) for (const dependency of task.depends_on) if (!byId.has(dependency)) fail(`${task.id} depends on unknown task '${dependency}'.`);
+  for (const task of tasks)
+    for (const dependency of task.depends_on)
+      if (!byId.has(dependency)) fail(`${task.id} depends on unknown task '${dependency}'.`);
   validateTaskDag(tasks);
+  if (tasks.filter((task) => task.state === 'in_progress').length > 1)
+    fail('Only one mutating task may be in_progress.');
   return { schema_version: 1, work_item: workItem, tasks };
 }
 

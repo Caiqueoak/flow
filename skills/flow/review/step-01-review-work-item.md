@@ -1,9 +1,5 @@
-# Review — validate work item
+# Review — verify delivery
 
-Review the implementation against the frozen work-item contract, engineering rules, required gates, integration behavior, and regressions.
+Reread FULL engineering.md, frozen scope, tasks and approved plan. Review acceptance, regressions, SRP, semantic naming, low coupling/high cohesion, vertical-slice locality and complexity ROI. Explain concrete defects, not stylistic alternatives. Run actual tests and npx --no-install flow validate; never write fake gate evidence.
 
-Run `flow gates --json` and execute all returned `agent_required` profiles. Deterministic blocking gates are re-run by `flow validate`; agentic gates must be recorded in the spec Validation section as a `gate-id: passed` bullet only after review. For each real defect, create a new fix task rather than rewriting a completed task's history; execute fixes through normal build routing.
-
-A work item may become `completed` only when all tasks are completed and traceable, acceptance criteria pass, blocking gates pass, review passes, `spec.md` Final outcome / Implementation / Validation are populated, backlog/graph/state are synchronized, and `flow validate` succeeds.
-
-After completion route again; do not stop if other work is ready.
+Defects become new fix tasks. Material approach changes require revised plan approval; never rewrite completed task history. Complete only after all tasks, acceptance, gates, qualitative review and traceability pass. Populate spec outcome/implementation/validation; synchronize backlog/state/graph, validate and route again.

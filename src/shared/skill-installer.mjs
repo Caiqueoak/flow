@@ -12,7 +12,23 @@ function copyDirectory(source, target) {
 }
 
 export function installRuntimeSkill(root, runtime, packageRoot) {
+  if (
+    typeof runtime.skills_path !== 'string' ||
+    !runtime.skills_path ||
+    path.isAbsolute(runtime.skills_path) ||
+    runtime.skills_path.split(/[\\/]/).includes('..')
+  )
+    throw new Error('Runtime skills_path must remain project-local.');
   const target = path.join(root, runtime.skills_path, 'flow');
+  let ancestor = root;
+  for (const segment of path.relative(root, target).split(path.sep)) {
+    ancestor = path.join(ancestor, segment);
+    if (fs.existsSync(ancestor) && fs.lstatSync(ancestor).isSymbolicLink())
+      throw new Error('Refusing a symlinked runtime path.');
+  }
+  if (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink())
+    throw new Error('Refusing to overwrite a symlinked skill.');
+  fs.rmSync(target, { recursive: true, force: true });
   copyDirectory(path.join(packageRoot, 'skills', 'flow'), target);
   return target;
 }

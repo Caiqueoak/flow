@@ -1,36 +1,37 @@
-# Engineering bootstrap — synthesize
+# Engineering — recommend a contract
 
-## Objective
-Draft the complete recommended engineering contract.
+Read the approved PRD, config, full existing engineering evidence, repository tooling/contracts, profiles/readability-first.md and technology-defaults.md. Use existing_code_policy improve to critique accidental structure while preserving behavior; preserve gives consistent patterns stronger weight. Neither authorizes refactoring.
 
-## Required architecture scope
-Resolve each dimension as `defined`, `not_applicable`, or `deferred`:
+Recommend a complete but proportional contract. Frontmatter: schema_version: 1, status: draft, baseline.profile: flow/readability-first@1, baseline.existing_code_policy: improve|preserve|not_applicable. Include exact headings:
 
-1. system shape
-2. module architecture and dependency direction
-3. code organization
-4. data/state ownership
-5. external boundaries
-6. language/framework conventions and naming
-7. engineering principles
-8. quality/testing strategy
-9. operational/environment conventions
-10. enforcement
+# Engineering
 
-## Decision policy
-Recommend rather than quiz. Read `technology-defaults.md` and infer ecosystem conventions where defensible. Deviate from ecosystem defaults only for a concrete project reason.
+## System shape
 
-Apply the complexity test to every architectural mechanism:
-- required now? if no,
-- credible near-term growth needs it? if no, reject;
-- expensive/risky to add later? if no, defer;
-- does ongoing complexity exceed avoided migration cost? if yes, defer.
+## Modules and ownership
 
-## Contract
-Draft `.flow/docs/engineering.md` with structured frontmatter and stable rules such as `ENG-ARCH-001`, `ENG-NAME-001`, `ENG-CODE-001`.
-Do not mark it approved yet.
+## Dependency direction and boundaries
 
-Before leaving this step, create/update `.flow/state.yaml` with `execution.phase: engineering_bootstrap`, `execution.step: enforcement`, and `stop_reason: null`.
+## Vertical slices and code organization
 
-## NEXT
-Continue to enforcement design; do not return to the user yet.
+## Naming and readability conventions
+
+## Data ownership and persistence
+
+## Error handling
+
+## Testing and verification
+
+## Dependencies and external services
+
+## Security and operations
+
+## Deterministic gates
+
+## Deferred complexity
+
+## Exceptions
+
+Materialize concrete paths, responsibilities, dependency direction, naming examples, stack conventions, tests and justified exceptions. Explicitly state not applicable/deferred areas and why. Review SRP, low coupling/high cohesion, colocated vertical slices, readability and complexity ROI. Do not mandate ceremony or speculative abstraction.
+
+Draft gates.yaml schema_version: 1 with only command/builtin gates using real project tooling. Qualitative review stays instructions, not agentic gates or regex coverage. Do not install tooling or change application code before approval. Route to approval.

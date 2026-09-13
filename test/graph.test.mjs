@@ -6,17 +6,56 @@ import test from 'node:test';
 import { stringify } from 'yaml';
 import { generateGraphMarkdown, writeGraph } from '../src/commands/graph.mjs';
 
-function backlog(items) { return stringify({ schema_version: 1, work_items: items }); }
+function backlog(items) {
+  return stringify({ schema_version: 2, work_items: items });
+}
 const items = [
-  { id: 'W001', folder: 'w001-foundation', kind: 'feature', title: 'Foundation', state: 'completed', priority: 1, depends_on: [], blockers: [] },
-  { id: 'W002', folder: 'w002-api', kind: 'technical', title: 'API', state: 'in_progress', priority: 1, depends_on: ['W001'], blockers: [] },
-  { id: 'W003', folder: 'w003-ui', kind: 'feature', title: 'UI', state: 'pending', priority: 1, depends_on: ['W001'], blockers: [] },
-  { id: 'W004', folder: 'w004-integration', kind: 'feature', title: 'Integration', state: 'pending', priority: 2, depends_on: ['W002', 'W003'], blockers: [] }
+  {
+    id: 'W001',
+    folder: 'W001-foundation',
+    kind: 'feature',
+    title: 'Foundation',
+    state: 'completed',
+    priority: 1,
+    depends_on: [],
+    blockers: []
+  },
+  {
+    id: 'W002',
+    folder: 'W002-api',
+    kind: 'technical',
+    title: 'API',
+    state: 'in_progress',
+    priority: 1,
+    depends_on: ['W001'],
+    blockers: []
+  },
+  {
+    id: 'W003',
+    folder: 'W003-ui',
+    kind: 'feature',
+    title: 'UI',
+    state: 'pending',
+    priority: 1,
+    depends_on: ['W001'],
+    blockers: []
+  },
+  {
+    id: 'W004',
+    folder: 'W004-integration',
+    kind: 'feature',
+    title: 'Integration',
+    state: 'pending',
+    priority: 2,
+    depends_on: ['W002', 'W003'],
+    blockers: []
+  }
 ];
 
 test('renders every dependency edge and derives ready/blocked without persisting blocked', () => {
   const graph = generateGraphMarkdown(backlog(items));
-  for (const edge of ['W001 --> W002', 'W001 --> W003', 'W002 --> W004', 'W003 --> W004']) assert.match(graph, new RegExp(edge));
+  for (const edge of ['W001 --> W002', 'W001 --> W003', 'W002 --> W004', 'W003 --> W004'])
+    assert.match(graph, new RegExp(edge));
   assert.match(graph, /class W001 completed;/);
   assert.match(graph, /class W002 in_progress;/);
   assert.match(graph, /class W003 ready;/);
@@ -26,7 +65,10 @@ test('renders every dependency edge and derives ready/blocked without persisting
 });
 
 test('is deterministic independent of input ordering', () => {
-  const shuffled = items.slice().reverse().map((item) => ({ ...item, depends_on: [...item.depends_on].reverse() }));
+  const shuffled = items
+    .slice()
+    .reverse()
+    .map((item) => ({ ...item, depends_on: [...item.depends_on].reverse() }));
   assert.equal(generateGraphMarkdown(backlog(items)), generateGraphMarkdown(backlog(shuffled)));
 });
 

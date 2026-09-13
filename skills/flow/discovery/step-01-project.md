@@ -1,7 +1,5 @@
-# Discovery — define project truth
+# Discovery — define product
 
-Establish or update `.flow/docs/prd.md`, `.flow/backlog.yaml`, `.flow/state.yaml`, and the minimum initial work items required by current intent. Canonical Flow artifacts are authorized by `/flow`; do not ask permission merely to create them.
+Read current intent and existing product evidence. Create .flow/docs/prd.md as a coherent proposal, not architecture. Frontmatter: schema_version: 1, status: draft. Headings: # Product Requirements; ## Purpose; ## Users; ## Scope; ## Requirements; ## Constraints; ## Non-goals.
 
-Use `W###` IDs in creation order. Kind is separate metadata. Represent every work-item prerequisite in `depends_on`. Keep implementation details just-in-time.
-
-After backlog changes run `flow graph --path .`, then route again. Do not stop for a status report.
+Create state.yaml with schema_version: 1, execution.phase: discovery, active.work_item/task: null, stop_reason: null, migration.status: not_required. Do not create incomplete work-item folders or implement code. Present scope and ask PRD approval through the next routed step.

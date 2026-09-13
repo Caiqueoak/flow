@@ -10,7 +10,7 @@ export class ArtifactValidationError extends Error {
 const KINDS = new Set(['feature', 'technical', 'maintenance']);
 const STATES = new Set(['pending', 'in_progress', 'completed']);
 const WORK_ITEM_ID = /^W\d{3,}$/;
-const WORK_ITEM_FOLDER = /^w\d{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const WORK_ITEM_FOLDER = /^W\d{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function fail(message) {
   throw new ArtifactValidationError(message);
@@ -30,7 +30,7 @@ export function parseBacklog(text, { source = 'backlog.yaml' } = {}) {
   const document = parseDocument(text, { prettyErrors: false, uniqueKeys: true });
   if (document.errors.length) fail(`${source} is invalid: ${document.errors[0].message}`);
   const backlog = requireObject(document.toJS(), source);
-  if (backlog.schema_version !== 1) fail(`${source} schema_version must be 1.`);
+  if (backlog.schema_version !== 2) fail(`${source} schema_version must be 2.`);
   if (!Array.isArray(backlog.work_items)) fail(`${source} work_items must be a list.`);
 
   const ids = new Set();
@@ -43,9 +43,10 @@ export function parseBacklog(text, { source = 'backlog.yaml' } = {}) {
     ids.add(id);
 
     const folder = requireString(item.folder ?? item.path, `${label}.folder`);
-    if (!WORK_ITEM_FOLDER.test(folder)) fail(`${label}.folder must use lowercase w###-kebab-case, e.g. w015-learner-web-application.`);
+    if (!WORK_ITEM_FOLDER.test(folder))
+      fail(`${label}.folder must use W###-kebab-case, e.g. W015-learner-web-application.`);
     const numericId = id.slice(1);
-    if (!folder.startsWith(`w${numericId}-`)) fail(`${label}.folder must preserve the numeric sequence from ${id}.`);
+    if (!folder.startsWith(`W${numericId}-`)) fail(`${label}.folder must preserve the numeric sequence from ${id}.`);
 
     if (!KINDS.has(item.kind)) fail(`${label}.kind must be feature, technical, or maintenance.`);
     const title = requireString(item.title, `${label}.title`);
@@ -74,7 +75,15 @@ export function parseBacklog(text, { source = 'backlog.yaml' } = {}) {
       state,
       priority: item.priority,
       depends_on: dependencies,
-      blockers: item.blockers ?? []
+      blockers: (item.blockers ?? []).map((blocker) => {
+        requireObject(blocker, `${id} blocker`);
+        if (!/^[a-z][a-z0-9-]*$/.test(blocker.id ?? '')) fail(`${id} blocker.id must be stable kebab-case.`);
+        if (!['external_action', 'consequential_decision'].includes(blocker.type))
+          fail(`${id} blocker.type is invalid.`);
+        requireString(blocker.description, `${id} blocker.description`);
+        if (!['unresolved', 'resolved'].includes(blocker.status)) fail(`${id} blocker.status is invalid.`);
+        return blocker;
+      })
     };
   });
 
@@ -85,7 +94,9 @@ export function parseBacklog(text, { source = 'backlog.yaml' } = {}) {
     }
   }
   validateAcyclic(items);
-  return { schema_version: 1, work_items: items };
+  if (items.filter((item) => item.state === 'in_progress').length > 1)
+    fail('Only one mutating work item may be in_progress.');
+  return { schema_version: 2, work_items: items };
 }
 
 export function validateAcyclic(items) {
@@ -108,19 +119,15 @@ export function validateAcyclic(items) {
 
 export function deriveExecutionStatus(item, byId) {
   if (item.state === 'completed') return { status: 'completed', reasons: [] };
-  if (item.state === 'in_progress') return { status: 'in_progress', reasons: [] };
   const incompleteDependencies = item.depends_on.filter((id) => byId.get(id)?.state !== 'completed');
-  const explicitBlockers = item.blockers ?? [];
+  const explicitBlockers = (item.blockers ?? []).filter((blocker) => blocker.status !== 'resolved');
   if (incompleteDependencies.length || explicitBlockers.length) {
     return {
       status: 'blocked',
-      reasons: [
-        ...incompleteDependencies.map((id) => ({ type: 'dependency', ref: id })),
-        ...explicitBlockers
-      ]
+      reasons: [...incompleteDependencies.map((id) => ({ type: 'dependency', ref: id })), ...explicitBlockers]
     };
   }
-  return { status: 'ready', reasons: [] };
+  return { status: item.state === 'in_progress' ? 'in_progress' : 'ready', reasons: [] };
 }
 
 export function topologicalOrder(items) {
@@ -130,7 +137,10 @@ export function topologicalOrder(items) {
   for (const item of items) for (const dependency of item.depends_on) dependents.get(dependency).push(item.id);
   const compare = (a, b) => a.localeCompare(b);
   for (const ids of dependents.values()) ids.sort(compare);
-  const ready = items.filter((item) => item.depends_on.length === 0).map((item) => item.id).sort(compare);
+  const ready = items
+    .filter((item) => item.depends_on.length === 0)
+    .map((item) => item.id)
+    .sort(compare);
   const levels = new Map(ready.map((id) => [id, 0]));
   const orderedIds = [];
   while (ready.length) {
@@ -146,5 +156,7 @@ export function topologicalOrder(items) {
       }
     }
   }
-  return orderedIds.map((id) => byId.get(id)).sort((a, b) => (levels.get(a.id) - levels.get(b.id)) || compare(a.id, b.id));
+  return orderedIds
+    .map((id) => byId.get(id))
+    .sort((a, b) => levels.get(a.id) - levels.get(b.id) || compare(a.id, b.id));
 }

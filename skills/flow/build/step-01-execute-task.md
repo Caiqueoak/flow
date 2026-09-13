@@ -1,24 +1,9 @@
-# Build — execute one task
+# Build — execute one approved task
 
-## Preconditions
-- Load the active spec, task, relevant engineering rules, and required gates.
-- Claim/persist the task as `in_progress` before edits.
-- One shared worktree may have only one mutating Flow task. Parallel mutating tasks require isolated Git worktrees; otherwise serialize.
-- Worker agents do not edit shared Flow control files.
+Read the FULL engineering.md, spec, tasks and approved current implementation plan. Verify current route and approval hashes before application edits. Persist both selected work item and task in_progress; no other mutating task may be active.
 
-## Implementation
-Implement the smallest readable solution satisfying the task and approved engineering contract. Prefer present needs over speculative architecture. Run targeted verification, deterministic applicable gates, then agentic gates.
+Implement the bounded approved change for readability: semantic naming, mandatory SRP, low coupling, high cohesion, locality and justified complexity. If the approach must change materially, revise the plan and ask approval before continuing.
 
-Before completion run `flow validate --pre-commit <qualified-task>` when the project is fully bootstrapped. Mark task completed only after checks pass. Create one primary commit:
+Run targeted tests and npx --no-install flow validate --pre-commit W###-T###. Mark completed only after checks pass. Code tasks get exactly one primary implementation commit with separate trailers Flow-Work-Item: W### and Flow-Task: W###-T###. Non-code tasks use none. Do not assign legacy to new work.
 
-```text
-<conventional subject>
-
-Flow-Work-Item: W015
-Flow-Task: W015-T003
-```
-
-After integration, the orchestrator synchronizes task/backlog/spec/state/graph metadata and validates the reachable trailer with `flow trace` / `flow validate`.
-
-## Invalid exits
-Implementation done, tests passed, or “review is next” are not reasons to yield control. Route again.
+Synchronize metadata and graph, validate traceability with npx --no-install flow trace W###-T###, validate again and route to the next task/review. Do not yield merely for status.

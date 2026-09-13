@@ -1,52 +1,22 @@
+import fs from 'node:fs';
+import { parse } from 'yaml';
+const text = fs.readFileSync(
+  new URL('../../skills/flow/engineering/profiles/readability-first.md', import.meta.url),
+  'utf8'
+);
+export const READABILITY_FIRST_PROFILE = parse(text.match(/^---\n([\s\S]*?)\n---/)[1]);
 export const ENGINEERING_PROFILES = {
-  pragmatic: {
-    id: 'flow/pragmatic@1',
-    label: 'Pragmatic — Recommended',
-    description: 'Production-minded readability, testing and automated quality checks without unjustified architecture.',
-    principles: {
-      simplicity_bias: 'strong',
-      readability_over_cleverness: true,
-      speculative_abstraction: 'reject',
-      automated_enforcement: 'prefer',
-      type_safety: 'strong',
-      behavior_tests: 'required'
-    }
-  },
-  strict: {
-    id: 'flow/strict@1',
-    label: 'Strict',
-    description: 'Stronger architectural boundaries and verification for larger or long-lived systems.',
-    principles: {
-      simplicity_bias: 'moderate',
-      readability_over_cleverness: true,
-      speculative_abstraction: 'reject',
-      automated_enforcement: 'require',
-      type_safety: 'strong',
-      behavior_tests: 'required'
-    }
-  },
-  prototype: {
-    id: 'flow/prototype@1',
-    label: 'Prototype',
-    description: 'Minimal structure for rapid validation while retaining baseline safety and deterministic formatting.',
-    principles: {
-      simplicity_bias: 'maximum',
-      readability_over_cleverness: true,
-      speculative_abstraction: 'reject',
-      automated_enforcement: 'baseline',
-      type_safety: 'ecosystem_default',
-      behavior_tests: 'critical_paths'
-    }
-  }
+  'readability-first': READABILITY_FIRST_PROFILE,
+  [READABILITY_FIRST_PROFILE.id]: READABILITY_FIRST_PROFILE
 };
-
 export const BROWNFIELD_POLICIES = {
-  rebaseline: {
-    label: 'Rebaseline — Recommended for AI/vibe-coded projects',
-    description: 'Existing code is evidence of behavior and constraints, not an engineering standard.'
+  improve: {
+    label: 'Improve existing structure — Recommended',
+    description:
+      'Preserve behavior and external contracts; recommend clearer structure where justified. Does not authorize refactoring.'
   },
   preserve: {
-    label: 'Preserve',
-    description: 'Consistent existing patterns are presumed intentional unless they conflict with stronger requirements.'
+    label: 'Keep existing structure',
+    description: 'Retain consistent conventions unless a concrete problem warrants an approved change.'
   }
 };

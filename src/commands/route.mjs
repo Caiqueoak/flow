@@ -2,59 +2,134 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { info } from '../shared/cli-io.mjs';
 import { projectRoot } from '../shared/project-path.mjs';
+import { readConfig } from '../shared/project-config.mjs';
 import { parseBacklog, deriveExecutionStatus } from '../artifacts/backlog.mjs';
 import { parseTasks, qualifiedTaskId } from '../artifacts/tasks.mjs';
 import { validateEngineeringDocument } from '../artifacts/engineering.mjs';
+import { validatePrdDocument } from '../artifacts/prd.mjs';
+import { validateImplementationPlan } from '../artifacts/implementation-plan.mjs';
 import { parseState } from '../artifacts/state.mjs';
 
-function result(value, json) {
-  info(json ? JSON.stringify(value, null, 2) : `${value.action}: ${value.phase ?? value.reason}${value.work_item ? ` ${value.work_item}` : ''}${value.task ? ` ${value.task}` : ''}`);
+function step(phase, instruction, extra = {}) {
+  return { action: 'continue', phase, instruction, ...extra };
 }
-
+function awaitApproval(phase, instruction, extra = {}) {
+  return { action: 'stop', reason: 'consequential_decision', phase, instruction, ...extra };
+}
+function artifactApproval(file, validator, phase, draftInstruction, approvalInstruction) {
+  if (!fs.existsSync(file)) return step(phase, draftInstruction);
+  const result = validator(fs.readFileSync(file, 'utf8'));
+  if (result.errors.length) return step(phase, draftInstruction, { details: result.errors });
+  if (result.status !== 'approved') return awaitApproval(phase, approvalInstruction);
+  return null;
+}
 export function routeProject(root) {
-  const flowDir = path.join(root, '.flow');
-  if (!fs.existsSync(path.join(flowDir, 'config.yaml'))) return { action: 'stop', reason: 'unrecoverable_blocker', details: 'Flow is not initialized. Run flow init first.' };
-  const statePath = path.join(flowDir, 'state.yaml');
-  const state = fs.existsSync(statePath) ? parseState(fs.readFileSync(statePath, 'utf8')) : null;
-  if (state?.stop_reason) return { action: 'stop', reason: state.stop_reason, phase: state.execution.phase, step: state.execution.step };
-  const engineeringPath = path.join(flowDir, 'docs', 'engineering.md');
-  if (!fs.existsSync(engineeringPath)) {
-    const step = state?.execution?.phase === 'engineering_bootstrap' ? state.execution.step ?? 'inspect' : 'inspect';
-    const files = { inspect: 'engineering/step-01-inspect.md', synthesize: 'engineering/step-02-synthesize.md', enforcement: 'engineering/step-03-enforcement.md', review: 'engineering/step-04-review.md', present: 'engineering/step-05-present.md' };
-    return { action: 'continue', phase: 'engineering_bootstrap', step, instruction: files[step] ?? files.inspect };
+  const flow = path.join(root, '.flow');
+  const config = readConfig(root);
+  if (!config) return { action: 'stop', reason: 'unrecoverable_blocker', details: 'Run npx --no-install flow init.' };
+  if (config.schema_version !== 2)
+    return { action: 'stop', reason: 'unrecoverable_blocker', details: 'Run npx --no-install flow migrate.' };
+  const read = (relative) => fs.readFileSync(path.join(flow, relative), 'utf8');
+  const exists = (relative) => fs.existsSync(path.join(flow, relative));
+  const state = exists('state.yaml') ? parseState(read('state.yaml')) : null;
+  if (state?.migration.status === 'pending_reconciliation')
+    return step('migration_reconciliation', 'migration/step-01-reconcile.md', {
+      required_context: [
+        'backlog.yaml',
+        'docs/prd.md',
+        'docs/legacy-state.md',
+        'docs/legacy-decisions.md',
+        'docs/legacy-engineering.md'
+      ]
+        .filter(exists)
+        .map((file) => `.flow/${file}`)
+    });
+  if (state?.stop_reason && state.stop_reason !== 'finished')
+    return { action: 'stop', reason: state.stop_reason, phase: state.execution.phase, step: state.execution.step };
+  const productRoute = artifactApproval(
+    path.join(flow, 'docs/prd.md'),
+    validatePrdDocument,
+    'discovery',
+    'discovery/step-01-project.md',
+    'discovery/step-02-await-approval.md'
+  );
+  if (productRoute) return productRoute;
+  const engineeringRoute = artifactApproval(
+    path.join(flow, 'docs/engineering.md'),
+    validateEngineeringDocument,
+    'engineering',
+    'engineering/step-02-synthesize.md',
+    'engineering/step-05-present.md'
+  );
+  if (engineeringRoute) return engineeringRoute;
+  const engineeringText = read('docs/engineering.md');
+  const planning = () =>
+    step('backlog_planning', 'planning/step-01-plan-work-item.md', {
+      required_context: ['.flow/docs/prd.md', '.flow/docs/engineering.md']
+    });
+  if (!exists('backlog.yaml')) return planning();
+  const backlog = parseBacklog(read('backlog.yaml'));
+  for (const item of backlog.work_items) {
+    if (!exists(`work-items/${item.folder}/spec.md`) || !exists(`work-items/${item.folder}/tasks.yaml`))
+      return planning();
+    parseTasks(read(`work-items/${item.folder}/tasks.yaml`), { expectedWorkItem: item.id });
   }
-  const engineering = validateEngineeringDocument(fs.readFileSync(engineeringPath, 'utf8'));
-  if (engineering.status !== 'approved' || engineering.errors.length) {
-    const step = state?.execution?.phase === 'engineering_bootstrap' ? state.execution.step ?? 'synthesize' : 'synthesize';
-    const files = { inspect: 'engineering/step-01-inspect.md', synthesize: 'engineering/step-02-synthesize.md', enforcement: 'engineering/step-03-enforcement.md', review: 'engineering/step-04-review.md', present: 'engineering/step-05-present.md' };
-    return { action: 'continue', phase: 'engineering_bootstrap', step, instruction: files[step] ?? files.synthesize };
-  }
-
-  const backlogPath = path.join(flowDir, 'backlog.yaml');
-  if (!fs.existsSync(backlogPath)) return { action: 'continue', phase: 'discovery', step: 'define_project', instruction: 'discovery/step-01-project.md' };
-  const backlog = parseBacklog(fs.readFileSync(backlogPath, 'utf8'));
   const byId = new Map(backlog.work_items.map((item) => [item.id, item]));
   const active = backlog.work_items.find((item) => item.state === 'in_progress');
-  const candidates = active ? [active] : backlog.work_items.filter((item) => deriveExecutionStatus(item, byId).status === 'ready').sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
-  if (!candidates.length) {
-    if (backlog.work_items.every((item) => item.state === 'completed')) return { action: 'stop', reason: 'finished' };
-    return { action: 'stop', reason: 'external_action', details: 'No ready work item. Inspect dependency/external blockers.' };
-  }
-  const item = candidates[0];
-  const folder = path.join(flowDir, 'work-items', item.folder);
-  const spec = path.join(folder, 'spec.md');
-  const tasksFile = path.join(folder, 'tasks.yaml');
-  if (!fs.existsSync(spec) || !fs.existsSync(tasksFile)) return { action: 'continue', phase: 'planning', step: 'plan_work_item', work_item: item.id, instruction: 'planning/step-01-plan-work-item.md' };
-  const tasks = parseTasks(fs.readFileSync(tasksFile, 'utf8'), { expectedWorkItem: item.id });
+  if (active && deriveExecutionStatus(active, byId).status === 'blocked')
+    return {
+      action: 'stop',
+      reason: 'external_action',
+      work_item: active.id,
+      details: deriveExecutionStatus(active, byId).reasons
+    };
+  const item =
+    active ??
+    backlog.work_items
+      .filter((item) => deriveExecutionStatus(item, byId).status === 'ready')
+      .sort((a, b) => a.priority - b.priority || Number(a.id.slice(1)) - Number(b.id.slice(1)))[0];
+  if (!item)
+    return {
+      action: 'stop',
+      reason: backlog.work_items.every((item) => item.state === 'completed') ? 'finished' : 'external_action'
+    };
+  const base = `work-items/${item.folder}`;
+  const context = ['.flow/docs/engineering.md', `.flow/${base}/spec.md`, `.flow/${base}/tasks.yaml`];
+  const tasks = parseTasks(read(`${base}/tasks.yaml`), { expectedWorkItem: item.id });
+  const extra = { work_item: item.id, required_context: context };
+  const prepare = () => step('work_item_plan_approval', 'planning/step-02-prepare-plan.md', extra);
+  if (!exists(`${base}/implementation-plan.md`)) return prepare();
+  const plan = validateImplementationPlan(read(`${base}/implementation-plan.md`), {
+    workItem: item.id,
+    engineeringText,
+    specText: read(`${base}/spec.md`)
+  });
+  if (plan.errors.length) return prepare();
+  if (plan.status !== 'approved')
+    return awaitApproval('work_item_plan_approval', 'planning/step-03-await-approval.md', extra);
+  context.push(`.flow/${base}/implementation-plan.md`);
   const taskById = new Map(tasks.tasks.map((task) => [task.id, task]));
-  const activeTask = tasks.tasks.find((task) => task.state === 'in_progress');
-  const readyTasks = tasks.tasks.filter((task) => task.state === 'pending' && task.depends_on.every((id) => taskById.get(id).state === 'completed'));
-  const task = activeTask ?? readyTasks[0];
-  if (task) return { action: 'continue', phase: 'build', step: 'execute_task', work_item: item.id, task: qualifiedTaskId(item.id, task.id), instruction: 'build/step-01-execute-task.md' };
-  if (tasks.tasks.every((task) => task.state === 'completed') && item.state !== 'completed') return { action: 'continue', phase: 'review', step: 'review_work_item', work_item: item.id, instruction: 'review/step-01-review-work-item.md' };
-  return { action: 'continue', phase: 'reconcile', step: 'reconcile', work_item: item.id, instruction: 'reconcile/step-01-reconcile.md' };
+  const task =
+    tasks.tasks.find((task) => task.state === 'in_progress') ??
+    tasks.tasks
+      .filter(
+        (task) => task.state === 'pending' && task.depends_on.every((id) => taskById.get(id).state === 'completed')
+      )
+      .sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)))[0];
+  if (task)
+    return step('implementation', 'build/step-01-execute-task.md', {
+      ...extra,
+      task: qualifiedTaskId(item.id, task.id)
+    });
+  if (tasks.tasks.every((task) => task.state === 'completed'))
+    return step('work_item_review', 'review/step-01-review-work-item.md', extra);
+  return step('reconcile', 'reconcile/step-01-reconcile.md', extra);
 }
-
 export function runRoute({ args }) {
-  result(routeProject(projectRoot(args)), args.includes('--json'));
+  const result = routeProject(projectRoot(args));
+  info(
+    args.includes('--json')
+      ? JSON.stringify(result, null, 2)
+      : `${result.action}: ${result.phase ?? result.reason}${result.work_item ? ` ${result.work_item}` : ''}`
+  );
 }

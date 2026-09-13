@@ -1,27 +1,43 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { info, fail } from '../shared/cli-io.mjs';
-import { projectRoot } from '../shared/project-path.mjs';
+import { fail } from '../shared/cli-io.mjs';
 import { parseGates } from '../artifacts/gates.mjs';
-import { AGENTIC_GATE_PROFILES } from '../shared/gate-profiles.mjs';
 
 function runCommandGate(root, gate) {
-  const shell = process.platform === 'win32' ? (process.env.ComSpec || 'cmd.exe') : '/bin/sh';
+  const shell = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : '/bin/sh';
   const args = process.platform === 'win32' ? ['/d', '/s', '/c', gate.command] : ['-lc', gate.command];
   const result = spawnSync(shell, args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  return { id: gate.id, kind: gate.kind, blocking: gate.blocking, status: result.status === 0 ? 'passed' : 'failed', exit_code: result.status, stdout: result.stdout, stderr: result.stderr };
+  return {
+    id: gate.id,
+    kind: gate.kind,
+    blocking: gate.blocking,
+    status: result.status === 0 ? 'passed' : 'failed',
+    exit_code: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr
+  };
 }
 
 function runBuiltinGate(root, gate) {
-  if (gate.rule !== 'kebab-case-files') return { id: gate.id, kind: gate.kind, blocking: gate.blocking, status: 'unsupported', message: `Unknown builtin rule '${gate.rule}'.` };
+  if (gate.rule !== 'kebab-case-files')
+    return {
+      id: gate.id,
+      kind: gate.kind,
+      blocking: gate.blocking,
+      status: 'unsupported',
+      message: `Unknown builtin rule '${gate.rule}'.`
+    };
   const excluded = new Set(['.git', '.flow', 'node_modules']);
   const violations = [];
   function walk(directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       if (excluded.has(entry.name)) continue;
       const full = path.join(directory, entry.name);
-      if (entry.isDirectory()) { walk(full); continue; }
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
       if (entry.name.startsWith('.')) continue;
       const ext = path.extname(entry.name);
       const stem = ext ? entry.name.slice(0, -ext.length) : entry.name;
@@ -31,7 +47,13 @@ function runBuiltinGate(root, gate) {
     }
   }
   walk(root);
-  return { id: gate.id, kind: gate.kind, blocking: gate.blocking, status: violations.length ? 'failed' : 'passed', violations };
+  return {
+    id: gate.id,
+    kind: gate.kind,
+    blocking: gate.blocking,
+    status: violations.length ? 'failed' : 'passed',
+    violations
+  };
 }
 
 export function evaluateGates(root) {
@@ -41,14 +63,6 @@ export function evaluateGates(root) {
   return gates.map((gate) => {
     if (gate.kind === 'command') return runCommandGate(root, gate);
     if (gate.kind === 'builtin') return runBuiltinGate(root, gate);
-    return { id: gate.id, kind: gate.kind, blocking: gate.blocking, status: 'agent_required', profile: AGENTIC_GATE_PROFILES[gate.profile] };
+    throw new Error(`Unsupported gate kind '${gate.kind}'.`);
   });
-}
-
-export function runGates({ args }) {
-  const results = evaluateGates(projectRoot(args));
-  if (args.includes('--json')) info(JSON.stringify({ results }, null, 2));
-  else for (const result of results) info(`${result.id}: ${result.status}`);
-  const failed = results.filter((result) => result.blocking && ['failed', 'unsupported'].includes(result.status));
-  if (failed.length) fail(`${failed.length} blocking deterministic gate(s) failed.`);
 }

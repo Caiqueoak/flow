@@ -1,48 +1,75 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
-import fs from 'node:fs/promises';
+import { execFileSync, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const cli = path.join(root, 'src', 'cli.mjs');
-const packageJson = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
-async function tempDir() { return fs.mkdtemp(path.join(os.tmpdir(), 'flow-cli-')); }
-async function run(args, cwd = root) { try { return await execFileAsync(process.execPath, [cli, ...args], { cwd }); } catch (error) { return { code: error.code, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }; } }
-
-test('reports package version and exposes deterministic workflow commands', async () => {
-  assert.equal((await run(['--version'])).stdout.trim(), packageJson.version);
-  const help = await run(['--help']);
-  for (const command of ['flow validate', 'flow route', 'flow status', 'flow graph', 'flow trace', 'flow migrate']) assert.match(help.stdout, new RegExp(command));
+import { parse } from 'yaml';
+const cli = path.resolve('src/cli.mjs');
+function run(args) {
+  return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
+}
+function root() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'flow-cli-'));
+}
+test('version source and simplified command help', () => {
+  assert.equal(
+    execFileSync(process.execPath, [cli, '--version'], { encoding: 'utf8' }).trim(),
+    JSON.parse(fs.readFileSync('package.json', 'utf8')).version
+  );
+  const help = run(['--help']);
+  assert.match(help.stdout, /npx --no-install flow/);
+  assert.match(help.stdout, /Readability First/);
+  for (const cmd of ['update', 'gates', 'config']) assert.equal(run([cmd]).status, 1);
 });
-
-test('noninteractive init records profile/policy without duplicating framework version', async () => {
-  const project = await tempDir();
-  const result = await run(['init', '--path', project, '--runtime', 'codex', '--profile', 'pragmatic', '--brownfield', 'rebaseline']);
-  assert.match(result.stdout, /Engineering profile/);
-  const config = await fs.readFile(path.join(project, '.flow', 'config.yaml'), 'utf8');
-  assert.match(config, /profile: pragmatic/);
-  assert.match(config, /brownfield_policy: rebaseline/);
-  assert.doesNotMatch(config, /framework:/);
-  assert.match(await fs.readFile(path.join(project, '.codex', 'skills', 'flow', 'SKILL.md'), 'utf8'), /Execution loop/);
-  await assert.rejects(fs.stat(path.join(project, '.flow', 'backlog.yaml')));
+test('init writes the one profile and installs its agent-readable template', () => {
+  const value = root();
+  const result = run(['init', '--path', value, '--runtime', 'codex', '--existing-code', 'improve']);
+  assert.equal(result.status, 0, result.stderr);
+  const config = parse(fs.readFileSync(path.join(value, '.flow/config.yaml'), 'utf8'));
+  assert.equal(config.engineering.profile, 'flow/readability-first@1');
+  assert.equal(config.engineering.existing_code_policy, 'improve');
+  assert.equal(config.parallelism, undefined);
+  assert.equal(config.framework, undefined);
+  assert.ok(fs.existsSync(path.join(value, '.codex/skills/flow/engineering/profiles/readability-first.md')));
 });
-
-test('init preserves existing canonical project artifacts while adding runtime', async () => {
-  const project = await tempDir();
-  await run(['init', '--path', project, '--runtime', 'codex', '--profile', 'pragmatic']);
-  await fs.writeFile(path.join(project, '.flow', 'backlog.yaml'), 'sentinel');
-  await run(['init', '--path', project, '--runtime', 'claude']);
-  assert.equal(await fs.readFile(path.join(project, '.flow', 'backlog.yaml'), 'utf8'), 'sentinel');
-  assert.match(await fs.readFile(path.join(project, '.claude', 'skills', 'flow', 'invariants.md'), 'utf8'), /No status-only stop/);
+test('init refuses old config with zero mutation', () => {
+  const value = root();
+  fs.mkdirSync(path.join(value, '.flow'));
+  const old = 'schema_version: 1\nruntimes: []\n';
+  fs.writeFileSync(path.join(value, '.flow/config.yaml'), old);
+  const result = run(['init', '--path', value, '--runtime', 'codex']);
+  assert.equal(result.status, 1);
+  assert.equal(fs.readFileSync(path.join(value, '.flow/config.yaml'), 'utf8'), old);
+  assert.deepEqual(fs.readdirSync(path.join(value, '.flow')), ['config.yaml']);
 });
-
-test('rejects unknown profile and runtime', async () => {
-  const project = await tempDir();
-  assert.match((await run(['init', '--path', project, '--runtime', 'codex', '--profile', 'magic'])).stderr, /unknown engineering profile/);
-  assert.match((await run(['init', '--path', project, '--runtime', 'unknown', '--profile', 'pragmatic'])).stderr, /unsupported runtime/);
+test('established engineering cannot change through init; runtimes can be added', () => {
+  const value = root();
+  assert.equal(run(['init', '--path', value, '--runtime', 'codex']).status, 0);
+  const file = path.join(value, '.flow/config.yaml');
+  const before = fs.readFileSync(file, 'utf8');
+  assert.equal(run(['init', '--path', value, '--runtime', 'claude', '--existing-code', 'preserve']).status, 1);
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.equal(run(['init', '--path', value, '--runtime', 'claude']).status, 0);
+  assert.ok(fs.existsSync(path.join(value, '.claude/skills/flow/SKILL.md')));
+});
+test('init refreshes configured skills and removes obsolete instructions', () => {
+  const value = root();
+  run(['init', '--path', value, '--runtime', 'codex']);
+  const old = path.join(value, '.codex/skills/flow/obsolete.md');
+  fs.writeFileSync(old, 'old');
+  assert.equal(run(['init', '--path', value, '--runtime', 'codex']).status, 0);
+  assert.equal(fs.existsSync(old), false);
+});
+test('unknown profile, runtime and old brownfield flag fail safely', () => {
+  for (const args of [
+    ['--profile', 'magic'],
+    ['--runtime', 'unknown'],
+    ['--brownfield', 'rebaseline']
+  ]) {
+    const value = root();
+    const result = run(['init', '--path', value, ...(args[0] === '--runtime' ? [] : ['--runtime', 'codex']), ...args]);
+    assert.equal(result.status, 1);
+    assert.equal(fs.existsSync(path.join(value, '.flow/config.yaml')), false);
+  }
 });
