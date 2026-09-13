@@ -1,77 +1,74 @@
 # Flow
 
-Flow is a readability-first, agent-agnostic software delivery workflow for coding agents. It maximizes autonomous execution while keeping consequential product and engineering decisions under developer control.
+Repository-resumable software delivery with deterministic workflow checks and explicit human approval.
 
-## Install
+## Install and use
 
 ```bash
 npm install --save-dev @caiqueoak/flow
-npx flow init
+npx --no-install flow init --runtime codex
 ```
 
-`flow init` is interactive, or use `--runtime codex,claude` in automation. Built-in adapters install the public `/flow` skill in `.codex/skills/flow/` or `.claude/skills/flow/`; a custom project-local skills directory is also available interactively.
+Invoke `/flow` to start or continue. The agent routes from repository state, reads the returned instruction/context, executes one step, persists artifacts, validates and routes again. Consequential decisions require explicit human input; status updates alone are not terminal stops.
 
-Skills are always installed inside the current project. Runtime integration directories never contain project state. If `.flow/` already exists, `flow init` only adds missing coding-agent integrations and updates `.flow/config.yaml`. If all built-in integrations are already configured, it exits without prompting. It does not modify canonical project artifacts.
+## Engineering preferences
 
-## Project bootstrap
+The single built-in template is **Readability First**, ID `flow/readability-first@1`. It covers Clean Code, SOLID, mandatory SRP, semantic naming, low coupling, high cohesion, vertical slices, modular ownership, locality and complexity justified by demonstrable value.
 
-`flow init` creates only:
+The agent-readable template ships with the npm package and is installed with the runtime skill. It is loaded when generating or explicitly revising engineering, not on every task. The approved `.flow/docs/engineering.md` is the project engineering source of truth and must be read in full before planning, implementation and review. Package/profile updates never silently change that contract.
 
-```text
-.flow/
-└── config.yaml
-```
+For existing code, `--existing-code improve` (**Improve existing structure**) treats current style as evidence, not authority; `preserve` (**Keep existing structure**) gives consistent conventions stronger weight. Both preserve behavior and external contracts; neither authorizes automatic refactoring. New projects use `not_applicable` when no meaningful code exists.
 
-It does not create a PRD, engineering guide, backlog, graph, state, decisions, work items, gates, or templates. During `/flow`, new project documents and artifacts are created only when the developer explicitly requests or authorizes them. Flow updates existing approved artifacts instead of inventing ad-hoc progress, summary, handoff, or status documents.
+## Lifecycle and approval
 
-## Workflow
+Discovery → PRD approval → engineering approval → complete backlog planning → implementation-plan approval → serial implementation → review.
 
-There is one public skill:
+After product and engineering are approved, create every known work item's directory, `spec.md` and `tasks.yaml` before implementation. Then draft a concrete `implementation-plan.md` per selected work item and request human validation. It identifies exact paths, symbols/contracts, ordered changes, task mapping, engineering compliance, tests, risks, rollback and exclusions. Approval is tied to SHA256 revisions of the exact engineering and spec documents; stale plans return to drafting.
 
-```text
-/flow
-```
+PRD, engineering and plans use YAML frontmatter with `schema_version: 1`, `status: draft|approved`, and `approved_at` when approved. Engineering records baseline profile and existing-code policy. Plans record work_item, engineering_revision and spec_revision. Completed work retains its historical approval; later outcome records or engineering changes do not retroactively invalidate completed delivery.
 
-Use `/flow <intent>` to start or change work, for example `/flow I want to build a diet app`. Use `/flow` with no extra input to continue from `.flow/STATE.md`.
+## Canonical artifacts
 
-Flow internally loads only the guidance needed for discovery, planning, build, review, or reconciliation. It asks only for consequential decisions and uses the largest safe degree of parallelism. Once execution is underway, it does not stop merely to announce completed tasks, progress, or next steps; it continues automatically until developer input, external approval, an unrecoverable blocker, or no ready work requires a real stop.
+- `config.yaml`: runtime/bootstrap preferences; installed package metadata owns version.
+- `docs/prd.md`: product truth; `docs/engineering.md`: approved engineering truth.
+- `backlog.yaml`: schema 2, W### IDs, W###-kebab-case folders, kinds, priority, dependency DAG and lifecycle.
+- `work-items/W###-slug/spec.md`: bounded scope and decisions; `tasks.yaml`: schema 1, work_item, local T### task DAG.
+- `implementation-plan.md`: human-approved implementation approach.
+- `state.yaml`: resume cursor and migration reconciliation status.
+- `gates.yaml`: schema 1, command/builtin checks only; qualitative judgment remains review instructions.
+- `docs/graph.md`: deterministic derived projection; regenerate rather than hand-edit.
 
-When authorized, Flow keeps a concise artifact model: product truth in `PRD.md`, engineering truth in `ENGINEERING.md`, decisions in `DECISIONS.md`, execution context in `STATE.md`, the canonical work-item DAG in `BACKLOG.yaml`, and a human-readable derived projection in `GRAPH.md`. Work items use `SPEC.md` plus `TASKS.yaml`. `SUMMARY.md` is not part of the model.
-
-In `GRAPH.md`, work-item states are consistent: complete is green, in progress is blue, blocked is red when unfinished dependencies remain, and pending is yellow when all dependencies are complete and the item is ready to execute. Each Mermaid card contains only the work-item ID and canonical title. Every dependency arrow goes from dependency to dependent item and uses the color and line style of its source card. `flow graph` deterministically regenerates this projection from `BACKLOG.yaml`, using straight Mermaid arrows only.
-
-## Update
-
-Updates are explicit:
-
-```bash
-flow update
-```
-
-`flow update` updates the installation that provides the active CLI: the global package for `flow update`, or the project dependency for `npx flow update`. It uses npm's update operation and refreshes `/flow` for every coding agent configured in `.flow/config.yaml` without modifying canonical project state. If the project lockfile and the package on disk disagree, Flow safely reinstalls only its own package before updating.
-
-On Windows, npm is invoked through `cmd.exe` without Node's `shell: true` option, so `npm.cmd` executes without the `DEP0190` warning. When Flow is installed as a project dependency, `npx flow update` is equivalent.
-
-There is no background update check or automatic update mechanism.
-
-## Releases
-
-Merges to `main` are released automatically after the test matrix passes. The release pipeline uses npm Trusted Publishing (OIDC), creates a signed npm provenance record, and tags the release; no npm token or manual version bump is needed.
-
-Use Conventional Commit prefixes in the PR title (and retained commits): `fix:` produces a patch, `feat:` a minor, and `feat!:` or a `BREAKING CHANGE:` footer a major release. `docs:`, `test:`, `chore:`, and `ci:` do not publish a package.
+Persist only pending, in_progress and completed. Ready/Blocked are derived from dependency edges and explicit blockers. Blockers use `{id, type: external_action|consequential_decision, description, status: unresolved|resolved}`. Only one mutating work item/task may be active across the project. Read-only analysis may be parallel; automatic concurrent worktrees are out of scope.
 
 ## CLI
 
+All commands use the local installation:
+
+| Command                                 | Purpose                                                                     |
+| --------------------------------------- | --------------------------------------------------------------------------- |
+| `npx --no-install flow init`            | Configure or add/refresh runtime integrations.                              |
+| `npx --no-install flow migrate`         | Atomic structural migration, followed by semantic reconciliation via /flow. |
+| `npx --no-install flow status`          | Progress and dependency/external blockers.                                  |
+| `npx --no-install flow validate`        | Artifact integrity, approvals, DAGs, traceability and deterministic gates.  |
+| `npx --no-install flow route --json`    | Next legal step and required context.                                       |
+| `npx --no-install flow graph`           | Regenerate dependency graph.                                                |
+| `npx --no-install flow trace W015-T003` | Resolve a task's implementation commit.                                     |
+
+Use `--help` for options; `--path` selects a project. Existing managed projects cannot change engineering through init; use /flow and approval. Older config is refused without mutation and must be migrated first. Update with your package manager, then rerun init to refresh integrations; there is no separate update/config/gates workflow command.
+
+## Git and migration
+
+New completed code tasks have exactly one HEAD-reachable implementation commit with both trailers:
+
 ```text
-flow init
-flow update
-flow graph
-flow --version
-flow --help
+Flow-Work-Item: W015
+Flow-Task: W015-T003
 ```
 
-The CLI bootstraps project-local integrations and configuration. The coding agent plus `/flow` owns discovery, planning, scheduling, delegation, build, gates, review, reconciliation, and state synchronization.
+Non-code tasks use implementation: none. SHA is derived, not canonical task identity. Pre-commit verification uses `validate --pre-commit W015-T003`; normal validation checks the integrated commit. Avoid squashing task commits when preserving task traceability.
 
-## Architecture
+Migration stages transformations before swapping artifacts, rejects collisions/invalid DAGs before mutation, preserves legacy documents and commit evidence, normalizes qualified task IDs/dependencies, and routes first to semantic reconciliation. Completed migrated tasks use implementation: legacy and optional legacy_commit; they do not require invented Git trailers or rewritten historical spec headings. Pending legacy folders may be absent during reconciliation, but complete backlog planning must materialize them before native implementation. Private project artifacts are not committed as fixtures.
 
-The CLI is organized as vertical slices: each command owns its use case end-to-end. Shared modules exist only for project configuration, skill installation, CLI I/O, and project-path parsing because those concepts have multiple command consumers. Avoid generic helper or handler layers; extract a module only when it has a distinct responsibility and at least two consumers.
+## Releases
+
+Merges to main are released automatically after the test matrix passes. Conventional Commit PR titles drive semantic-release. Installed package metadata is the Flow version source of truth; project config does not duplicate it.
