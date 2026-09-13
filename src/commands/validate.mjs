@@ -19,6 +19,7 @@ export function validateProject(root, { preCommitTask = null, skipTrace = false 
   const error = (code, message) => findings.push({ level: 'error', code, message });
   const flow = path.join(root, '.flow');
   const exists = (relative) => fs.existsSync(path.join(flow, relative));
+  const hasExactRootEntry = (name) => fs.readdirSync(flow).includes(name);
   const read = (relative) => fs.readFileSync(path.join(flow, relative), 'utf8');
   let config;
   try {
@@ -36,7 +37,7 @@ export function validateProject(root, { preCommitTask = null, skipTrace = false 
   )
     error('CONFIG', 'Invalid engineering bootstrap preferences.');
   for (const name of ['STATE.md', 'DECISIONS.md', 'SUMMARY.md', 'BACKLOG.yaml', 'PRD.md', 'ENGINEERING.md', 'GRAPH.md'])
-    if (exists(name)) error('LEGACY', `${name} must be migrated.`);
+    if (hasExactRootEntry(name)) error('LEGACY', `${name} must be migrated.`);
   let state;
   try {
     state = exists('state.yaml') ? parseState(read('state.yaml')) : null;
