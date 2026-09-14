@@ -1,0 +1,50 @@
+schema_version: 2
+work_items:
+  - id: W001
+    folder: W001-foundation
+    kind: feature
+    title: Foundation
+    state: completed
+    priority: 1
+    depends_on: []
+    blockers: []
+  - id: W002
+    folder: W002-api
+    kind: technical
+    title: API
+    state: in_progress
+    priority: 1
+    depends_on: [W001]
+    blockers: []
+  - id: W003
+    folder: W003-ui
+    kind: feature
+    title: UI
+    state: pending
+    priority: 1
+    depends_on: [W001]
+    blockers: []
+  - id: W004
+    folder: W004-integration
+    kind: feature
+    title: Integration
+    state: pending
+    priority: 2
+    depends_on: [W001, W002, W003]
+    blockers: []
+  - id: W005
+    folder: W005-blocked-source
+    kind: maintenance
+    title: Blocked source
+    state: pending
+    priority: 2
+    depends_on: [W004]
+    blockers: []
+  - id: W006
+    folder: W006-blocked-target
+    kind: maintenance
+    title: Blocked target
+    state: pending
+    priority: 3
+    depends_on: [W005]
+    blockers: []

@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { stringify } from 'yaml';
 import { routeProject } from '../src/commands/route.mjs';
+import { runStatus } from '../src/commands/status.mjs';
 import { validateProject } from '../src/commands/validate.mjs';
 import { parseBacklog, deriveExecutionStatus } from '../src/artifacts/backlog.mjs';
 import { parseTasks } from '../src/artifacts/tasks.mjs';
@@ -57,7 +58,7 @@ test('numeric task order, review and final completion', () => {
   backlog(root, [item('W001', { state: 'completed' })]);
   assert.equal(routeProject(root).reason, 'finished');
 });
-test('blockers are structured, resolved blockers do not block', () => {
+test('explicit blockers are context and do not block work-item status or routing', () => {
   const blocker = {
     id: 'vendor-approval',
     type: 'external_action',
@@ -66,7 +67,21 @@ test('blockers are structured, resolved blockers do not block', () => {
   };
   const root = project([item('W001', { blockers: [blocker] })]);
   artifacts(root);
-  assert.equal(routeProject(root).reason, 'external_action');
+  assert.equal(routeProject(root).phase, 'work_item_plan_approval');
+  const output = [];
+  const originalLog = console.log;
+  console.log = (message) => output.push(message);
+  try {
+    runStatus({ args: ['--path', root] });
+  } finally {
+    console.log = originalLog;
+  }
+  assert.match(output.join('\n'), /Ready[\s\S]*W001[\s\S]*blocker: Vendor must approve \[vendor-approval\]/);
+  const parsed = parseBacklog(fs.readFileSync(path.join(root, '.flow', 'backlog.yaml'), 'utf8'));
+  assert.equal(
+    deriveExecutionStatus(parsed.work_items[0], new Map(parsed.work_items.map((item) => [item.id, item]))).status,
+    'ready'
+  );
   backlog(root, [item('W001', { blockers: [{ ...blocker, status: 'resolved' }] })]);
   assert.equal(routeProject(root).phase, 'work_item_plan_approval');
   assert.throws(
