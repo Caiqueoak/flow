@@ -38,7 +38,7 @@ PRD, engineering and plans use YAML frontmatter with `schema_version: 1`, `statu
 - `gates.yaml`: schema 1, command/builtin checks only; qualitative judgment remains review instructions.
 - `docs/graph.md`: deterministic derived projection; regenerate rather than hand-edit.
 
-Persist only pending, in_progress and completed. Ready/Blocked are derived from dependency edges and explicit blockers. Blockers use `{id, type: external_action|consequential_decision, description, status: unresolved|resolved}`. Only one mutating work item/task may be active across the project. Read-only analysis may be parallel; automatic concurrent worktrees are out of scope.
+Persist only pending, in_progress and completed. Ready/Blocked are derived exclusively from work-item dependency edges. Blockers use `{id, type: external_action|consequential_decision, description, status: unresolved|resolved}` as context for the agent to address within the work item; they do not change execution status. Only one mutating work item/task may be active across the project. Read-only analysis may be parallel; automatic concurrent worktrees are out of scope.
 
 ## CLI
 

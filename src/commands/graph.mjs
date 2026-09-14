@@ -22,6 +22,13 @@ const CLASSES = [
   '  classDef blocked fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;'
 ];
 
+const LINK_STYLES = {
+  completed: 'stroke:#16a34a,stroke-width:2px',
+  in_progress: 'stroke:#2563eb,stroke-width:3px',
+  ready: 'stroke:#d97706,stroke-width:2px,stroke-dasharray:6 4',
+  blocked: 'stroke:#dc2626,stroke-width:2px,stroke-dasharray:2 3'
+};
+
 export function generateGraphMarkdown(backlogText) {
   const { work_items: items } = parseBacklog(backlogText);
   const ordered = topologicalOrder(items);
@@ -39,10 +46,10 @@ export function generateGraphMarkdown(backlogText) {
     '',
     '## Status',
     '',
-    '- **Completed** — accepted work.',
-    '- **In Progress** — currently executing.',
-    '- **Ready** — pending work with all dependencies satisfied.',
-    '- **Blocked** — pending work with at least one incomplete dependency or explicit external blocker.',
+    '- 🟩 **Completed** — accepted work.',
+    '- 🟦 **In Progress** — currently executing.',
+    '- 🟨 **Ready** — pending work with all dependencies satisfied.',
+    '- 🟥 **Blocked** — pending work with at least one incomplete work-item dependency.',
     '',
     '```mermaid',
     "%%{init: {'flowchart': {'curve': 'linear', 'nodeSpacing': 32, 'rankSpacing': 54}} }%%",
@@ -51,6 +58,8 @@ export function generateGraphMarkdown(backlogText) {
   for (const item of ordered) lines.push(`  ${item.id}["${escapeMermaid(item.id)}<br/>${escapeMermaid(item.title)}"]`);
   lines.push('');
   for (const edge of edges) lines.push(`  ${edge.source} --> ${edge.target}`);
+  lines.push('');
+  edges.forEach((edge, index) => lines.push(`  linkStyle ${index} ${LINK_STYLES[statuses.get(edge.source)]};`));
   lines.push('', ...CLASSES);
   for (const status of ['completed', 'in_progress', 'ready', 'blocked']) {
     const ids = ordered.filter((item) => statuses.get(item.id) === status).map((item) => item.id);
