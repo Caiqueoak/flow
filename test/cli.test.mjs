@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
 import { parseProfileFrontmatter } from '../src/shared/profiles.mjs';
+import { artifacts, plan, project, write } from './helpers.mjs';
 const cli = path.resolve('src/cli.mjs');
 function run(args) {
   return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
@@ -27,7 +28,22 @@ test('version source and simplified command help', () => {
   const help = run(['--help']);
   assert.match(help.stdout, /npx --no-install flow/);
   assert.match(help.stdout, /Readability First/);
+  assert.match(help.stdout, /--gates/);
   for (const cmd of ['update', 'gates', 'config']) assert.equal(run([cmd]).status, 1);
+});
+test('validate runs gates only when requested and reports their durations in JSON', () => {
+  const value = project();
+  artifacts(value);
+  plan(value);
+  write(value, 'gates.yaml', { schema_version: 1, gates: [{ id: 'pass', kind: 'command', command: 'exit 0' }] });
+  const fast = run(['validate', '--path', value, '--json']);
+  assert.equal(fast.status, 0, fast.stderr + fast.stdout);
+  assert.equal('gates' in JSON.parse(fast.stdout), false);
+  const full = run(['validate', '--path', value, '--gates', '--json']);
+  assert.equal(full.status, 0, full.stderr + full.stdout);
+  const output = JSON.parse(full.stdout);
+  assert.equal(output.gates[0].status, 'passed');
+  assert.ok(Number.isInteger(output.gates[0].duration_ms));
 });
 test('init writes the one profile and installs its agent-readable template', () => {
   const value = root();

@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { traceTask } from '../src/commands/trace.mjs';
+import { traceTask, traceTasks } from '../src/commands/trace.mjs';
 
 async function repo() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'flow-trace-'));
@@ -22,6 +22,17 @@ test('resolves task identity from Git trailer instead of persisted SHA', async (
   const result = traceTask(root, 'W001-T001');
   assert.equal(result.status, 'resolved');
   assert.match(result.commit.sha, /^[0-9a-f]{40}$/);
+});
+
+test('resolves multiple task identities from one Git history scan', async () => {
+  const root = await repo();
+  execFileSync('git', ['commit', '--allow-empty', '-m', 'Second task\n\nFlow-Work-Item: W001\nFlow-Task: W001-T002'], {
+    cwd: root
+  });
+  const results = traceTasks(root, ['W001-T001', 'W001-T002', 'W001-T003']);
+  assert.equal(results.get('W001-T001').status, 'resolved');
+  assert.equal(results.get('W001-T002').status, 'resolved');
+  assert.equal(results.get('W001-T003').status, 'missing');
 });
 
 test('reports missing and ambiguous task identities', async () => {

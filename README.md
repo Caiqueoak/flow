@@ -49,7 +49,8 @@ All commands use the local installation:
 | `npx --no-install flow init`            | Configure or add/refresh runtime integrations.                              |
 | `npx --no-install flow migrate`         | Atomic structural migration, followed by semantic reconciliation via /flow. |
 | `npx --no-install flow status`          | Progress and dependency/external blockers.                                  |
-| `npx --no-install flow validate`        | Artifact integrity, approvals, DAGs, traceability and deterministic gates.  |
+| `npx --no-install flow validate`        | Fast artifact integrity, approvals, DAGs and traceability checks.            |
+| `npx --no-install flow validate --gates`| Full validation, including configured deterministic project gates.            |
 | `npx --no-install flow route --json`    | Next legal step and required context.                                       |
 | `npx --no-install flow graph`           | Regenerate dependency graph.                                                |
 | `npx --no-install flow trace W015-T003` | Resolve a task's implementation commit.                                     |
