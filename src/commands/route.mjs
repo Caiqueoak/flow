@@ -79,7 +79,7 @@ export function routeProject(root) {
   if (active && deriveExecutionStatus(active, byId).status === 'blocked')
     return {
       action: 'stop',
-      reason: 'external_action',
+      reason: 'dependency_blocked',
       work_item: active.id,
       details: deriveExecutionStatus(active, byId).reasons
     };

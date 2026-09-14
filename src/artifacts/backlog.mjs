@@ -120,13 +120,8 @@ export function validateAcyclic(items) {
 export function deriveExecutionStatus(item, byId) {
   if (item.state === 'completed') return { status: 'completed', reasons: [] };
   const incompleteDependencies = item.depends_on.filter((id) => byId.get(id)?.state !== 'completed');
-  const explicitBlockers = (item.blockers ?? []).filter((blocker) => blocker.status !== 'resolved');
-  if (incompleteDependencies.length || explicitBlockers.length) {
-    return {
-      status: 'blocked',
-      reasons: [...incompleteDependencies.map((id) => ({ type: 'dependency', ref: id })), ...explicitBlockers]
-    };
-  }
+  if (incompleteDependencies.length)
+    return { status: 'blocked', reasons: incompleteDependencies.map((id) => ({ type: 'dependency', ref: id })) };
   return { status: item.state === 'in_progress' ? 'in_progress' : 'ready', reasons: [] };
 }
 

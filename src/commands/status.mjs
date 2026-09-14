@@ -14,7 +14,11 @@ export function runStatus({ args }) {
   const groups = new Map(['in_progress', 'ready', 'blocked', 'completed'].map((status) => [status, []]));
   for (const item of backlog.work_items) {
     const derived = deriveExecutionStatus(item, byId);
-    groups.get(derived.status).push({ ...item, reasons: derived.reasons });
+    groups.get(derived.status).push({
+      ...item,
+      reasons: derived.reasons,
+      blockers: item.blockers.filter((blocker) => blocker.status === 'unresolved')
+    });
   }
   const lines = [];
   for (const [status, items] of groups) {
@@ -23,8 +27,7 @@ export function runStatus({ args }) {
     for (const item of items) {
       const deps = item.reasons.filter((r) => r.type === 'dependency').map((r) => r.ref);
       lines.push(`  ${item.id} — ${item.title}${deps.length ? ` ← ${deps.join(', ')}` : ''}`);
-      for (const reason of item.reasons.filter((reason) => reason.type !== 'dependency'))
-        lines.push(`    ${reason.type}: ${reason.description} [${reason.id}]`);
+      for (const blocker of item.blockers) lines.push(`    blocker: ${blocker.description} [${blocker.id}]`);
     }
     lines.push('');
   }
