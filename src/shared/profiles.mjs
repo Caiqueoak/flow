@@ -4,7 +4,12 @@ const text = fs.readFileSync(
   new URL('../../skills/flow/engineering/profiles/readability-first.md', import.meta.url),
   'utf8'
 );
-export const READABILITY_FIRST_PROFILE = parse(text.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1]);
+export function parseProfileFrontmatter(text) {
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  if (!match) throw new Error('Missing YAML frontmatter in Flow profile.');
+  return parse(match[1]);
+}
+export const READABILITY_FIRST_PROFILE = parseProfileFrontmatter(text);
 export const ENGINEERING_PROFILES = {
   'readability-first': READABILITY_FIRST_PROFILE,
   [READABILITY_FIRST_PROFILE.id]: READABILITY_FIRST_PROFILE
