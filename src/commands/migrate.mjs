@@ -27,9 +27,39 @@ function number(value) {
   if (!match) throw new Error(`Cannot normalize ID '${value}'.`);
   return match[0].padStart(3, '0');
 }
+function temporarySibling(file) {
+  const directory = path.dirname(file);
+  const base = path.basename(file);
+  let attempt = 0;
+  let temporary;
+  do {
+    temporary = path.join(directory, `.${base}.flow-migration-${process.pid}-${Date.now()}-${attempt++}`);
+  } while (fs.existsSync(temporary));
+  return temporary;
+}
+function sameEntry(from, to) {
+  return fs.realpathSync.native(from) === fs.realpathSync.native(to);
+}
 function move(from, to) {
   if (!fs.existsSync(from)) return;
-  if (fs.existsSync(to)) throw new Error(`Migration destination already exists: ${to}`);
+  if (path.resolve(from) === path.resolve(to)) return;
+  if (fs.existsSync(to)) {
+    if (!sameEntry(from, to)) throw new Error(`Migration destination already exists: ${to}`);
+    const temporary = temporarySibling(from);
+    fs.renameSync(from, temporary);
+    try {
+      fs.renameSync(temporary, to);
+    } catch (error) {
+      try {
+        fs.renameSync(temporary, from);
+      } catch (recoveryError) {
+        error.preserveRecoveryData = true;
+        error.recovery = { from, to, temporary, recoveryError };
+      }
+      throw error;
+    }
+    return;
+  }
   fs.mkdirSync(path.dirname(to), { recursive: true });
   fs.renameSync(from, to);
 }
@@ -136,7 +166,7 @@ function migrateStaged(root) {
   ])
     move(path.join(flow, old), path.join(flow, 'docs', next));
   if (fs.existsSync(path.join(flow, 'GRAPH.md'))) fs.unlinkSync(path.join(flow, 'GRAPH.md'));
-  if (oldFile.endsWith('BACKLOG.yaml')) fs.unlinkSync(oldFile);
+  if (oldFile.endsWith('BACKLOG.yaml')) move(oldFile, path.join(flow, 'backlog.yaml'));
   fs.writeFileSync(path.join(flow, 'backlog.yaml'), text);
   fs.writeFileSync(path.join(flow, 'docs', 'graph.md'), generateGraphMarkdown(text));
   const state = emptyState();
@@ -163,6 +193,7 @@ export function migrateProject(root) {
   const staging = fs.mkdtempSync(path.join(root, '.flow-migration-'));
   const backup = path.join(staging, 'backup');
   const staged = path.join(staging, '.flow');
+  let preserveStaging = false;
   try {
     fs.cpSync(flow, staged, { recursive: true });
     migrateStaged(staging);
@@ -174,9 +205,13 @@ export function migrateProject(root) {
       throw error;
     }
     return { unresolved: ['semantic reconciliation'], unchanged: false };
+  } catch (error) {
+    preserveStaging = Boolean(error?.preserveRecoveryData);
+    throw error;
   } finally {
     // Retain the original backup if even rollback failed; never delete the only copy.
-    if (!fs.existsSync(backup) || fs.existsSync(flow)) fs.rmSync(staging, { recursive: true, force: true });
+    if (!preserveStaging && (!fs.existsSync(backup) || fs.existsSync(flow)))
+      fs.rmSync(staging, { recursive: true, force: true });
   }
 }
 export function runMigrate({ args }) {
