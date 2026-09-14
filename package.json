@@ -1,6 +1,6 @@
 {
   "name": "@caiqueoak/flow",
-  "version": "0.3.0",
+  "version": "0.5.3",
   "description": "Readability-first, agent-agnostic software development workflow for coding agents.",
   "type": "module",
   "scripts": {

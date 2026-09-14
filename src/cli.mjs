@@ -26,7 +26,10 @@ function help() {
           'validate   Check schemas, approvals, DAGs, traceability and deterministic gates.',
           'validate   Check schemas, approvals, DAGs and traceability; --gates runs project checks.'
         )
-        .replace('validate options: --json --pre-commit W015-T003', 'validate options: --json --gates --pre-commit W015-T003')
+        .replace(
+          'validate options: --json --pre-commit W015-T003',
+          'validate options: --json --gates --pre-commit W015-T003'
+        )
     );
   commandHelp(
     `Flow ${packageManifest.version}\n\nUse the project-local installation: npx --no-install flow <command>\n\nCommands:\n  init       Configure Flow and install/refresh local agent integrations.\n  migrate    Normalize older artifacts; /flow then reconciles legacy decisions.\n  status     Show progress and dependency/external blockers.\n  validate   Check schemas, approvals, DAGs, traceability and deterministic gates.\n  graph      Regenerate the derived work-item dependency graph.\n  route      Return the next repository-resumable agent step (--json available).\n  trace      Resolve W015-T003 to a HEAD-reachable commit with both Flow trailers.\n\nCommon options: --path <project>, --help, --version\ninit options: --runtime codex,claude --profile readability-first --existing-code improve|preserve\n  Readability First: reusable preferences for SRP, semantic naming, cohesion and simple vertical slices.\n  improve: recommend clearer structure while retaining behavior and external contracts.\n  preserve: retain consistent existing conventions unless a concrete problem warrants change.\n  Neither option authorizes refactoring; engineering changes require human approval.\nvalidate options: --json --pre-commit W015-T003\ntrace options: W015-T003 --json\n\nDiscovery → PRD approval → engineering approval → complete backlog → implementation-plan approval → serial implementation → review.\nUse /flow for agent workflows and engineering changes. Approved engineering.md is authoritative.\nUpdate the npm package with your package manager, then rerun init to refresh integrations.`

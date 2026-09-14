@@ -31,6 +31,9 @@ test('command gates run only when project validation explicitly requests them', 
     ['passed', 'failed']
   );
   assert.ok(evaluated.every((gate) => Number.isInteger(gate.duration_ms) && gate.duration_ms >= 0));
-  assert.equal(validateProject(root).some((f) => f.code === 'GATE'), false);
+  assert.equal(
+    validateProject(root).some((f) => f.code === 'GATE'),
+    false
+  );
   assert.ok(validateProject(root, { evaluateConfiguredGates: true }).some((f) => f.code === 'GATE'));
 });

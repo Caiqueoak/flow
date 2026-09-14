@@ -16,11 +16,11 @@ export function traceTasks(root, qualifiedTaskIds) {
   const matches = new Map([...requested].map((task) => [task, []]));
   let output;
   try {
-    output = execFileSync(
-      'git',
-      ['log', 'HEAD', '--format=%H%x1f%s%x1f%B%x1e'],
-      { cwd: root, encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 }
-    );
+    output = execFileSync('git', ['log', 'HEAD', '--format=%H%x1f%s%x1f%B%x1e'], {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024
+    });
   } catch {
     fail('git history is unavailable; task traceability requires a Git repository.');
   }

@@ -14,7 +14,10 @@ import { traceTasks } from './trace.mjs';
 import { generateGraphMarkdown } from './graph.mjs';
 import { evaluateGates } from './gates.mjs';
 
-export function validateProject(root, { preCommitTask = null, skipTrace = false, evaluateConfiguredGates = false, onGateResults } = {}) {
+export function validateProject(
+  root,
+  { preCommitTask = null, skipTrace = false, evaluateConfiguredGates = false, onGateResults } = {}
+) {
   const findings = [];
   const error = (code, message) => findings.push({ level: 'error', code, message });
   const flow = path.join(root, '.flow');
@@ -178,7 +181,13 @@ export function runValidate({ args }) {
     }
   });
   if (args.includes('--json')) {
-    info(JSON.stringify({ valid: findings.length === 0, findings, ...(includeGates ? { gates: gateResults } : {}) }, null, 2));
+    info(
+      JSON.stringify(
+        { valid: findings.length === 0, findings, ...(includeGates ? { gates: gateResults } : {}) },
+        null,
+        2
+      )
+    );
     if (findings.length) process.exitCode = 1;
     return;
   }

@@ -184,5 +184,5 @@ test('matches the canonical graph format', async () => {
     fs.readFile(new URL('canonical-backlog.yaml', fixture), 'utf8'),
     fs.readFile(new URL('canonical.graph.md', fixture), 'utf8')
   ]);
-  assert.equal(generateGraphMarkdown(backlogText), expected);
+  assert.equal(generateGraphMarkdown(backlogText), expected.replace(/\r\n/g, '\n'));
 });
