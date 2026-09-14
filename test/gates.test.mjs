@@ -14,20 +14,26 @@ test('only deterministic gates are accepted', () => {
     /command or builtin/
   );
 });
-test('command gates execute through project validation', () => {
+test('command gates run only when project validation explicitly requests them', () => {
   const root = project();
   artifacts(root);
   plan(root);
   write(root, 'gates.yaml', {
     schema_version: 1,
     gates: [
-      { id: 'pass', kind: 'command', command: '"' + process.execPath + '" -e "process.exit(0)"' },
-      { id: 'fail', kind: 'command', command: '"' + process.execPath + '" -e "process.exit(1)"' }
+      { id: 'pass', kind: 'command', command: 'exit 0' },
+      { id: 'fail', kind: 'command', command: 'exit 1' }
     ]
   });
+  const evaluated = evaluateGates(root);
   assert.deepEqual(
-    evaluateGates(root).map((gate) => gate.status),
+    evaluated.map((gate) => gate.status),
     ['passed', 'failed']
   );
-  assert.ok(validateProject(root).some((f) => f.code === 'GATE'));
+  assert.ok(evaluated.every((gate) => Number.isInteger(gate.duration_ms) && gate.duration_ms >= 0));
+  assert.equal(
+    validateProject(root).some((f) => f.code === 'GATE'),
+    false
+  );
+  assert.ok(validateProject(root, { evaluateConfiguredGates: true }).some((f) => f.code === 'GATE'));
 });

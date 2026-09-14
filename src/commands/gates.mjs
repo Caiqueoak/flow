@@ -61,8 +61,11 @@ export function evaluateGates(root) {
   if (!fs.existsSync(file)) fail('gates.yaml does not exist.');
   const { gates } = parseGates(fs.readFileSync(file, 'utf8'));
   return gates.map((gate) => {
-    if (gate.kind === 'command') return runCommandGate(root, gate);
-    if (gate.kind === 'builtin') return runBuiltinGate(root, gate);
-    throw new Error(`Unsupported gate kind '${gate.kind}'.`);
+    const startedAt = performance.now();
+    let result;
+    if (gate.kind === 'command') result = runCommandGate(root, gate);
+    else if (gate.kind === 'builtin') result = runBuiltinGate(root, gate);
+    else throw new Error(`Unsupported gate kind '${gate.kind}'.`);
+    return { ...result, duration_ms: Math.round(performance.now() - startedAt) };
   });
 }

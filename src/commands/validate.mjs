@@ -10,11 +10,14 @@ import { parseGates } from '../artifacts/gates.mjs';
 import { validateEngineeringDocument } from '../artifacts/engineering.mjs';
 import { validatePrdDocument } from '../artifacts/prd.mjs';
 import { validateImplementationPlan } from '../artifacts/implementation-plan.mjs';
-import { traceTask } from './trace.mjs';
+import { traceTasks } from './trace.mjs';
 import { generateGraphMarkdown } from './graph.mjs';
 import { evaluateGates } from './gates.mjs';
 
-export function validateProject(root, { preCommitTask = null, skipTrace = false } = {}) {
+export function validateProject(
+  root,
+  { preCommitTask = null, skipTrace = false, evaluateConfiguredGates = false, onGateResults } = {}
+) {
   const findings = [];
   const error = (code, message) => findings.push({ level: 'error', code, message });
   const flow = path.join(root, '.flow');
@@ -81,6 +84,7 @@ export function validateProject(root, { preCommitTask = null, skipTrace = false 
   }
   const byId = new Map(backlog.work_items.map((item) => [item.id, item]));
   let activeTasks = 0;
+  const traceCandidates = [];
   for (const item of backlog.work_items) {
     const base = `work-items/${item.folder}`;
     const missing = ['spec.md', 'tasks.yaml'].filter((name) => !exists(`${base}/${name}`));
@@ -130,26 +134,32 @@ export function validateProject(root, { preCommitTask = null, skipTrace = false 
         if (item.state !== 'pending' && plan.status !== 'approved') error('PLAN', `${item.id}: plan is not approved.`);
       }
     }
-    for (const task of tasks.tasks) {
-      if (task.state !== 'completed' || task.implementation !== 'commit' || skipTrace) continue;
-      const qualified = qualifiedTaskId(item.id, task.id);
-      if (qualified === preCommitTask) continue;
-      try {
-        if (traceTask(root, qualified).status !== 'resolved')
-          error('TRACE', `${qualified}: expected exactly one HEAD-reachable commit with both Flow trailers.`);
-      } catch (failure) {
-        error('TRACE', failure.message);
+    for (const task of tasks.tasks)
+      if (task.state === 'completed' && task.implementation === 'commit' && !skipTrace) {
+        const qualified = qualifiedTaskId(item.id, task.id);
+        if (qualified !== preCommitTask) traceCandidates.push(qualified);
       }
+  }
+  if (traceCandidates.length) {
+    try {
+      for (const [qualified, result] of traceTasks(root, traceCandidates))
+        if (result.status !== 'resolved')
+          error('TRACE', `${qualified}: expected exactly one HEAD-reachable commit with both Flow trailers.`);
+    } catch (failure) {
+      for (const qualified of traceCandidates) error('TRACE', `${qualified}: ${failure.message}`);
     }
   }
   if (activeTasks > 1) error('STATE', 'Only one mutating task may be active across the project.');
   if (exists('gates.yaml')) {
     try {
       parseGates(read('gates.yaml'));
-      if (!migrationPending)
-        for (const gate of evaluateGates(root))
+      if (!migrationPending && evaluateConfiguredGates) {
+        const gateResults = evaluateGates(root);
+        onGateResults?.(gateResults);
+        for (const gate of gateResults)
           if (gate.blocking && ['failed', 'unsupported'].includes(gate.status))
             error('GATE', `${gate.id}: ${gate.status}`);
+      }
     } catch (failure) {
       error('GATES', failure.message);
     }
@@ -160,12 +170,24 @@ export function validateProject(root, { preCommitTask = null, skipTrace = false 
 }
 export function runValidate({ args }) {
   const index = args.indexOf('--pre-commit');
+  const includeGates = args.includes('--gates');
+  let gateResults = [];
   const findings = validateProject(projectRoot(args), {
     preCommitTask: index < 0 ? null : args[index + 1],
-    skipTrace: args.includes('--skip-trace')
+    skipTrace: args.includes('--skip-trace'),
+    evaluateConfiguredGates: includeGates,
+    onGateResults: (results) => {
+      gateResults = results;
+    }
   });
   if (args.includes('--json')) {
-    info(JSON.stringify({ valid: findings.length === 0, findings }, null, 2));
+    info(
+      JSON.stringify(
+        { valid: findings.length === 0, findings, ...(includeGates ? { gates: gateResults } : {}) },
+        null,
+        2
+      )
+    );
     if (findings.length) process.exitCode = 1;
     return;
   }
