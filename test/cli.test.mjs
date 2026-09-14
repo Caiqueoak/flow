@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
+import { parseProfileFrontmatter } from '../src/shared/profiles.mjs';
 const cli = path.resolve('src/cli.mjs');
 function run(args) {
   return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
@@ -12,6 +13,12 @@ function run(args) {
 function root() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'flow-cli-'));
 }
+test('profile frontmatter accepts LF and CRLF and rejects malformed profiles', () => {
+  for (const newline of ['\n', '\r\n']) {
+    assert.deepEqual(parseProfileFrontmatter(`---${newline}id: profile${newline}---${newline}`), { id: 'profile' });
+  }
+  assert.throws(() => parseProfileFrontmatter('id: profile\n'), /Missing YAML frontmatter in Flow profile/);
+});
 test('version source and simplified command help', () => {
   assert.equal(
     execFileSync(process.execPath, [cli, '--version'], { encoding: 'utf8' }).trim(),
