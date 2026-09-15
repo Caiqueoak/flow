@@ -16,5 +16,6 @@ Load this reusable preference template only when synthesizing or explicitly revi
 - Modularize at meaningful boundaries. Do not introduce interfaces, factories, wrappers, layers or infrastructure without demonstrable value exceeding their complexity and maintenance cost.
 - State the concrete return on complexity before adding it. Defer speculative abstractions; optimize for reading and changing code.
 - Verify behavior, domain logic and external boundaries. Use ecosystem tooling for deterministic checks; qualitative review is not a control-plane fact.
+- Organize tests by module, domain, bounded context or feature when the stack supports it. Engineering must map changed paths/contracts to the smallest safe test commands. Escalate to the broad suite for cross-cutting/shared infrastructure, broad contracts, releases, unknown impact or when no trustworthy mapping exists; never invent a narrow command.
 
 These preferences are not a fixed architecture. Reconcile them with PRD constraints, public contracts, security, stack conventions and explicit exceptions before seeking approval.

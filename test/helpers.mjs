@@ -28,13 +28,18 @@ export const prd = document([
   '## Non-goals'
 ]);
 export const spec = [
-  '## Status',
-  '## Goal',
+  '# Work Item Specification',
+  '## Problem',
   '## Scope',
   '## Non-goals',
   '## Requirements',
   '## Acceptance criteria',
-  '## Decisions'
+  '## Contracts',
+  '## Data and APIs',
+  '## Edge cases',
+  '## Risks',
+  '## Decisions',
+  '## Gates'
 ]
   .map((h) => h + '\nBounded scope.')
   .join('\n');
@@ -46,16 +51,17 @@ export function item(id = 'W001', extra = {}) {
     title: 'Example',
     state: 'pending',
     priority: 1,
+    spec_maturity: 'ready',
     depends_on: [],
     blockers: [],
     ...extra
   };
 }
 export function task(id = 'T001', extra = {}) {
-  return { id, title: 'Implement behavior', state: 'pending', depends_on: [], implementation: 'none', ...extra };
+  return { id, title: 'Implement behavior', state: 'pending', depends_on: [], traceability: 'none', ...extra };
 }
 export function write(root, relative, content) {
-  const file = path.join(root, '.flow', relative);
+  const file = path.join(root, '_flow', relative);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, typeof content === 'string' ? content : stringify(content));
 }
@@ -65,17 +71,17 @@ export function project(items = [item()]) {
   write(root, 'docs/prd.md', prd);
   write(root, 'docs/engineering.md', engineering);
   backlog(root, items);
-  write(root, 'gates.yaml', { schema_version: 1, gates: [] });
+  write(root, 'gates.yaml', { schema_version: 2, gates: [] });
   return root;
 }
 export function backlog(root, items) {
-  const value = stringify({ schema_version: 2, work_items: items });
+  const value = stringify({ schema_version: 3, work_items: items });
   write(root, 'backlog.yaml', value);
   write(root, 'docs/graph.md', generateGraphMarkdown(value));
 }
 export function artifacts(root, work = item(), tasks = [task()]) {
   write(root, 'work-items/' + work.folder + '/spec.md', spec);
-  write(root, 'work-items/' + work.folder + '/tasks.yaml', { schema_version: 1, work_item: work.id, tasks });
+  write(root, 'work-items/' + work.folder + '/tasks.yaml', { schema_version: 2, work_item: work.id, tasks });
 }
 export function plan(root, work = item(), metadata = {}) {
   write(

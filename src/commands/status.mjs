@@ -7,11 +7,11 @@ import { routeProject } from './route.mjs';
 
 export function runStatus({ args }) {
   const root = projectRoot(args);
-  if (!fs.existsSync(path.join(root, '.flow', 'backlog.yaml')))
+  if (!fs.existsSync(path.join(root, '_flow', 'backlog.yaml')))
     return info(`Next: ${routeProject(root).phase ?? 'setup'}`);
-  const backlog = parseBacklog(fs.readFileSync(path.join(root, '.flow', 'backlog.yaml'), 'utf8'));
+  const backlog = parseBacklog(fs.readFileSync(path.join(root, '_flow', 'backlog.yaml'), 'utf8'));
   const byId = new Map(backlog.work_items.map((item) => [item.id, item]));
-  const groups = new Map(['in_progress', 'ready', 'blocked', 'completed'].map((status) => [status, []]));
+  const groups = new Map(['in_progress', 'eligible', 'blocked', 'completed'].map((status) => [status, []]));
   for (const item of backlog.work_items) {
     const derived = deriveExecutionStatus(item, byId);
     groups.get(derived.status).push({

@@ -20,7 +20,7 @@ test('profile frontmatter accepts LF and CRLF and rejects malformed profiles', (
   }
   assert.throws(() => parseProfileFrontmatter('id: profile\n'), /Missing YAML frontmatter in Flow profile/);
 });
-test('version source and simplified command help', () => {
+test('version source and declarative global/command help', () => {
   assert.equal(
     execFileSync(process.execPath, [cli, '--version'], { encoding: 'utf8' }).trim(),
     JSON.parse(fs.readFileSync('package.json', 'utf8')).version
@@ -28,14 +28,16 @@ test('version source and simplified command help', () => {
   const help = run(['--help']);
   assert.match(help.stdout, /npx --no-install flow/);
   assert.match(help.stdout, /Readability First/);
-  assert.match(help.stdout, /--gates/);
-  for (const cmd of ['update', 'gates', 'config']) assert.equal(run([cmd]).status, 1);
+  for (const cmd of ['doctor', 'gates', 'work-item', 'task', 'batch']) assert.match(help.stdout, new RegExp(cmd));
+  assert.match(run(['validate', '--help']).stdout, /--gates/);
+  assert.equal(run(['update']).status, 1);
+  assert.equal(run(['validate', '--unknown']).status, 1);
 });
 test('validate runs gates only when requested and reports their durations in JSON', () => {
   const value = project();
   artifacts(value);
   plan(value);
-  write(value, 'gates.yaml', { schema_version: 1, gates: [{ id: 'pass', kind: 'command', command: 'exit 0' }] });
+  write(value, 'gates.yaml', { schema_version: 2, gates: [{ id: 'pass', kind: 'command', command: 'exit 0' }] });
   const fast = run(['validate', '--path', value, '--json']);
   assert.equal(fast.status, 0, fast.stderr + fast.stdout);
   assert.equal('gates' in JSON.parse(fast.stdout), false);
@@ -49,7 +51,7 @@ test('init writes the one profile and installs its agent-readable template', () 
   const value = root();
   const result = run(['init', '--path', value, '--runtime', 'codex', '--existing-code', 'improve']);
   assert.equal(result.status, 0, result.stderr);
-  const config = parse(fs.readFileSync(path.join(value, '.flow/config.yaml'), 'utf8'));
+  const config = parse(fs.readFileSync(path.join(value, '_flow/config.yaml'), 'utf8'));
   assert.equal(config.engineering.profile, 'flow/readability-first@1');
   assert.equal(config.engineering.existing_code_policy, 'improve');
   assert.equal(config.parallelism, undefined);
@@ -58,18 +60,18 @@ test('init writes the one profile and installs its agent-readable template', () 
 });
 test('init refuses old config with zero mutation', () => {
   const value = root();
-  fs.mkdirSync(path.join(value, '.flow'));
+  fs.mkdirSync(path.join(value, '_flow'));
   const old = 'schema_version: 1\nruntimes: []\n';
-  fs.writeFileSync(path.join(value, '.flow/config.yaml'), old);
+  fs.writeFileSync(path.join(value, '_flow/config.yaml'), old);
   const result = run(['init', '--path', value, '--runtime', 'codex']);
   assert.equal(result.status, 1);
-  assert.equal(fs.readFileSync(path.join(value, '.flow/config.yaml'), 'utf8'), old);
-  assert.deepEqual(fs.readdirSync(path.join(value, '.flow')), ['config.yaml']);
+  assert.equal(fs.readFileSync(path.join(value, '_flow/config.yaml'), 'utf8'), old);
+  assert.deepEqual(fs.readdirSync(path.join(value, '_flow')), ['config.yaml']);
 });
 test('established engineering cannot change through init; runtimes can be added', () => {
   const value = root();
   assert.equal(run(['init', '--path', value, '--runtime', 'codex']).status, 0);
-  const file = path.join(value, '.flow/config.yaml');
+  const file = path.join(value, '_flow/config.yaml');
   const before = fs.readFileSync(file, 'utf8');
   assert.equal(run(['init', '--path', value, '--runtime', 'claude', '--existing-code', 'preserve']).status, 1);
   assert.equal(fs.readFileSync(file, 'utf8'), before);
@@ -93,6 +95,6 @@ test('unknown profile, runtime and old brownfield flag fail safely', () => {
     const value = root();
     const result = run(['init', '--path', value, ...(args[0] === '--runtime' ? [] : ['--runtime', 'codex']), ...args]);
     assert.equal(result.status, 1);
-    assert.equal(fs.existsSync(path.join(value, '.flow/config.yaml')), false);
+    assert.equal(fs.existsSync(path.join(value, '_flow/config.yaml')), false);
   }
 });

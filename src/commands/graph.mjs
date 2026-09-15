@@ -18,14 +18,14 @@ function escapeMermaid(text) {
 const CLASSES = [
   '  classDef completed fill:#dcfce7,stroke:#16a34a,color:#14532d;',
   '  classDef in_progress fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;',
-  '  classDef ready fill:#fef3c7,stroke:#d97706,color:#78350f;',
+  '  classDef eligible fill:#fef3c7,stroke:#d97706,color:#78350f;',
   '  classDef blocked fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;'
 ];
 
 const LINK_STYLES = {
   completed: 'stroke:#16a34a,stroke-width:2px',
   in_progress: 'stroke:#2563eb,stroke-width:3px',
-  ready: 'stroke:#d97706,stroke-width:2px,stroke-dasharray:6 4',
+  eligible: 'stroke:#d97706,stroke-width:2px,stroke-dasharray:6 4',
   blocked: 'stroke:#dc2626,stroke-width:2px,stroke-dasharray:2 3'
 };
 
@@ -48,8 +48,8 @@ export function generateGraphMarkdown(backlogText) {
     '',
     '- 🟩 **Completed** — accepted work.',
     '- 🟦 **In Progress** — currently executing.',
-    '- 🟨 **Ready** — pending work with all dependencies satisfied.',
-    '- 🟥 **Blocked** — pending work with at least one incomplete work-item dependency.',
+    '- 🟨 **Eligible** — pending work with dependencies and blockers satisfied.',
+    '- 🟥 **Blocked** — pending work with an incomplete dependency or unresolved blocker.',
     '',
     '```mermaid',
     "%%{init: {'flowchart': {'curve': 'linear', 'nodeSpacing': 32, 'rankSpacing': 54}} }%%",
@@ -61,7 +61,7 @@ export function generateGraphMarkdown(backlogText) {
   lines.push('');
   edges.forEach((edge, index) => lines.push(`  linkStyle ${index} ${LINK_STYLES[statuses.get(edge.source)]};`));
   lines.push('', ...CLASSES);
-  for (const status of ['completed', 'in_progress', 'ready', 'blocked']) {
+  for (const status of ['completed', 'in_progress', 'eligible', 'blocked']) {
     const ids = ordered.filter((item) => statuses.get(item.id) === status).map((item) => item.id);
     if (ids.length) lines.push(`  class ${ids.join(',')} ${status};`);
   }
@@ -75,9 +75,9 @@ export function generateGraphMarkdown(backlogText) {
 }
 
 export function writeGraph(root) {
-  const backlogPath = path.join(root, '.flow', 'backlog.yaml');
+  const backlogPath = path.join(root, '_flow', 'backlog.yaml');
   if (!fs.existsSync(backlogPath)) throw new ArtifactValidationError(`Backlog not found: ${backlogPath}`);
-  const graphPath = path.join(root, '.flow', 'docs', 'graph.md');
+  const graphPath = path.join(root, '_flow', 'docs', 'graph.md');
   fs.mkdirSync(path.dirname(graphPath), { recursive: true });
   const markdown = generateGraphMarkdown(fs.readFileSync(backlogPath, 'utf8'));
   const temporaryPath = `${graphPath}.${process.pid}.${Date.now()}.tmp`;

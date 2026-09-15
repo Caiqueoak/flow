@@ -28,7 +28,7 @@ function runBuiltinGate(root, gate) {
       status: 'unsupported',
       message: `Unknown builtin rule '${gate.rule}'.`
     };
-  const excluded = new Set(['.git', '.flow', 'node_modules']);
+  const excluded = new Set(['.git', '_flow', 'node_modules']);
   const violations = [];
   function walk(directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -56,11 +56,31 @@ function runBuiltinGate(root, gate) {
   };
 }
 
-export function evaluateGates(root) {
-  const file = path.join(root, '.flow', 'gates.yaml');
+export function selectGates(gates, { ids = [], task = null, workItem = null, stage = null, all = false } = {}) {
+  return gates.filter((gate) => {
+    if (ids.length && !ids.includes(gate.id)) return false;
+    if (stage && gate.stage !== stage) return false;
+    if (all) return true;
+    if (task)
+      return (
+        (gate.scope.tasks ?? []).includes(task) ||
+        (gate.scope.work_items ?? []).includes(task.split('-T')[0]) ||
+        (gate.stage === 'task' && !Object.keys(gate.scope).length)
+      );
+    if (workItem)
+      return (
+        (gate.scope.work_items ?? []).includes(workItem) ||
+        (gate.stage === 'work-item-review' && !Object.keys(gate.scope).length)
+      );
+    return ids.length > 0 || Boolean(stage);
+  });
+}
+
+export function evaluateGates(root, filters = { all: true }) {
+  const file = path.join(root, '_flow', 'gates.yaml');
   if (!fs.existsSync(file)) fail('gates.yaml does not exist.');
   const { gates } = parseGates(fs.readFileSync(file, 'utf8'));
-  return gates.map((gate) => {
+  return selectGates(gates, filters).map((gate) => {
     const startedAt = performance.now();
     let result;
     if (gate.kind === 'command') result = runCommandGate(root, gate);
@@ -68,4 +88,40 @@ export function evaluateGates(root) {
     else throw new Error(`Unsupported gate kind '${gate.kind}'.`);
     return { ...result, duration_ms: Math.round(performance.now() - startedAt) };
   });
+}
+
+function option(args, name) {
+  const index = args.indexOf(name);
+  return index < 0 ? null : args[index + 1];
+}
+
+export function runGates({ args }) {
+  const root = path.resolve(option(args, '--path') ?? process.cwd());
+  const action = args.find((arg) => !arg.startsWith('-'));
+  const file = path.join(root, '_flow', 'gates.yaml');
+  if (!fs.existsSync(file)) fail('gates.yaml does not exist.');
+  const parsed = parseGates(fs.readFileSync(file, 'utf8'));
+  const filters = {
+    ids: option(args, '--id')?.split(',') ?? [],
+    task: option(args, '--task'),
+    workItem: option(args, '--work-item'),
+    stage: option(args, '--stage'),
+    all: args.includes('--all')
+  };
+  const hasFilter = filters.ids.length || filters.task || filters.workItem || filters.stage || filters.all;
+  if (action === 'list' && !hasFilter) filters.all = true;
+  const selected = selectGates(parsed.gates, filters);
+  if (action === 'list') {
+    const output = args.includes('--json')
+      ? JSON.stringify(selected, null, 2)
+      : selected.map((gate) => `${gate.id}\t${gate.stage}\t${gate.cost}\t${gate.command ?? gate.rule}`).join('\n');
+    return console.log(output);
+  }
+  if (action !== 'run') fail("flow gates requires 'list' or 'run'.");
+  if (!selected.length) fail('No gates matched; use --all or a scope filter.');
+  const results = evaluateGates(root, filters);
+  if (args.includes('--json')) console.log(JSON.stringify(results, null, 2));
+  else
+    for (const result of results) console.log(`${result.status.toUpperCase()} ${result.id} (${result.duration_ms}ms)`);
+  if (results.some((result) => result.blocking && result.status !== 'passed')) process.exitCode = 1;
 }

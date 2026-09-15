@@ -7,7 +7,7 @@ import { stringify } from 'yaml';
 import { generateGraphMarkdown, writeGraph } from '../src/commands/graph.mjs';
 
 function backlog(items) {
-  return stringify({ schema_version: 2, work_items: items });
+  return stringify({ schema_version: 3, work_items: items });
 }
 const items = [
   {
@@ -92,15 +92,15 @@ function dependencyEdges(graph) {
   return [...graph.matchAll(/^\s+(W\d+ --> W\d+)$/gm)].map((match) => match[1]);
 }
 
-test('renders every dependency edge and derives ready/blocked without persisting blocked', () => {
+test('renders every dependency edge and derives eligible/blocked without persisting either', () => {
   const graph = generateGraphMarkdown(backlog(items));
   for (const edge of ['W001 --> W002', 'W001 --> W003', 'W002 --> W004', 'W003 --> W004'])
     assert.match(graph, new RegExp(edge));
   assert.match(graph, /class W001 completed;/);
   assert.match(graph, /class W002 in_progress;/);
-  assert.match(graph, /class W003 ready;/);
+  assert.match(graph, /class W003 eligible;/);
   assert.match(graph, /class W004 blocked;/);
-  assert.match(graph, /Ready/);
+  assert.match(graph, /Eligible/);
   assert.match(graph, /Blocked/);
 });
 
@@ -149,16 +149,16 @@ test('changes only an outgoing edge style when its source status changes', () =>
 
 test('renders the colored status legend', () => {
   const graph = generateGraphMarkdown(backlog(items));
-  for (const status of ['🟩 **Completed**', '🟦 **In Progress**', '🟨 **Ready**', '🟥 **Blocked**'])
+  for (const status of ['🟩 **Completed**', '🟦 **In Progress**', '🟨 **Eligible**', '🟥 **Blocked**'])
     assert.ok(graph.includes(status));
 });
 
 test('writes only docs/graph.md from lowercase backlog.yaml', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'flow-graph-'));
-  await fs.mkdir(path.join(root, '.flow'), { recursive: true });
-  await fs.writeFile(path.join(root, '.flow', 'backlog.yaml'), backlog(items));
+  await fs.mkdir(path.join(root, '_flow'), { recursive: true });
+  await fs.writeFile(path.join(root, '_flow', 'backlog.yaml'), backlog(items));
   const { graphPath } = writeGraph(root);
-  assert.equal(graphPath, path.join(root, '.flow', 'docs', 'graph.md'));
+  assert.equal(graphPath, path.join(root, '_flow', 'docs', 'graph.md'));
   assert.match(await fs.readFile(graphPath, 'utf8'), /W002 --> W004/);
   const first = await fs.readFile(graphPath, 'utf8');
   writeGraph(root);
@@ -167,7 +167,7 @@ test('writes only docs/graph.md from lowercase backlog.yaml', async () => {
 
 test('regenerates edge styles from changed backlog state', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'flow-graph-state-'));
-  const backlogPath = path.join(root, '.flow', 'backlog.yaml');
+  const backlogPath = path.join(root, '_flow', 'backlog.yaml');
   await fs.mkdir(path.dirname(backlogPath), { recursive: true });
   await fs.writeFile(backlogPath, backlog(items));
   const before = writeGraph(root).markdown;

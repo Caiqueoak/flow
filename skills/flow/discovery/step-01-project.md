@@ -1,5 +1,10 @@
-# Discovery — define product
+# Discovery — resolve product ambiguity
 
-Read current intent and existing product evidence. Create `.flow/docs/prd.md` as a coherent proposal for global, cross-work-item product rules and learner-visible constraints, not architecture or work-item implementation detail. Frontmatter: schema_version: 1, status: draft. Headings: # Product Requirements; ## Purpose; ## Users; ## Scope; ## Requirements; ## Constraints; ## Non-goals.
+Scale depth to ambiguity, not document length. Persist decisions, discarded alternatives, assumptions, evidence and open questions after each pass so discovery resumes without repetition.
 
-Create state.yaml with schema_version: 1, execution.phase: discovery, active.work_item/task: null, stop_reason: null, migration.status: not_required. Do not create incomplete work-item folders or implement code. Present scope and ask PRD approval through the next routed step.
+1. Problem: users, context, evidence, motivation and desired outcomes.
+2. Product: journeys, relevant personas, business rules, primary cases, exceptions, risks, metrics, alternatives and non-goals.
+3. Viability: investigate only technical questions capable of changing product, cost, schedule, risk or feasibility.
+4. Consolidation: close gaps that prevent a PRD, engineering analysis or backlog decomposition.
+
+Do not define the full architecture here. If viability changes product, record the product decision explicitly. Read `bmad-comparison.md` for the adopted/rejected prompt-design rationale.

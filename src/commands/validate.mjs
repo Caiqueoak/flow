@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { info, fail } from '../shared/cli-io.mjs';
 import { projectRoot } from '../shared/project-path.mjs';
 import { readConfig } from '../shared/project-config.mjs';
@@ -10,17 +11,19 @@ import { parseGates } from '../artifacts/gates.mjs';
 import { validateEngineeringDocument } from '../artifacts/engineering.mjs';
 import { validatePrdDocument } from '../artifacts/prd.mjs';
 import { validateImplementationPlan } from '../artifacts/implementation-plan.mjs';
-import { traceTasks } from './trace.mjs';
+import { traceTasks, gitObjectIdFormat } from './trace.mjs';
 import { generateGraphMarkdown } from './graph.mjs';
 import { evaluateGates } from './gates.mjs';
+import { validateSpec } from '../artifacts/spec.mjs';
+import { FLOW_SCHEMA_VERSION } from '../domain/contracts.mjs';
 
 export function validateProject(
   root,
-  { preCommitTask = null, skipTrace = false, evaluateConfiguredGates = false, onGateResults } = {}
+  { preCommitTask = null, skipTrace = false, evaluateConfiguredGates = false, onGateResults, workItem = null } = {}
 ) {
   const findings = [];
   const error = (code, message) => findings.push({ level: 'error', code, message });
-  const flow = path.join(root, '.flow');
+  const flow = path.join(root, '_flow');
   const exists = (relative) => fs.existsSync(path.join(flow, relative));
   const hasExactRootEntry = (name) => fs.readdirSync(flow).includes(name);
   const read = (relative) => fs.readFileSync(path.join(flow, relative), 'utf8');
@@ -30,7 +33,7 @@ export function validateProject(
   } catch (failure) {
     error('CONFIG', failure.message);
   }
-  if (!config || config.schema_version !== 2) {
+  if (!config || config.schema_version !== FLOW_SCHEMA_VERSION) {
     error('CONFIG', 'Initialize Flow or migrate the existing project.');
     return findings;
   }
@@ -48,13 +51,9 @@ export function validateProject(
     error('STATE', failure.message);
   }
   const migrationPending = state?.migration.status === 'pending_reconciliation';
-  const backlogRequired = [
-    'backlog_planning',
-    'work_item_plan_approval',
-    'implementation',
-    'work_item_review',
-    'complete'
-  ].includes(state?.execution.phase);
+  const backlogRequired = ['backlog', 'specification', 'planning', 'implementation', 'review', 'complete'].includes(
+    state?.execution.phase
+  );
   if (!exists('backlog.yaml')) {
     if (backlogRequired) error('MISSING', 'Missing backlog.yaml.');
     return findings;
@@ -84,13 +83,29 @@ export function validateProject(
   }
   const byId = new Map(backlog.work_items.map((item) => [item.id, item]));
   let activeTasks = 0;
+  let preCommitRecord = null;
   const traceCandidates = [];
   for (const item of backlog.work_items) {
+    if (
+      workItem &&
+      item.id !== workItem &&
+      !item.depends_on.includes(workItem) &&
+      !findings.some((finding) => finding.code === 'BACKLOG')
+    )
+      continue;
     const base = `work-items/${item.folder}`;
-    const missing = ['spec.md', 'tasks.yaml'].filter((name) => !exists(`${base}/${name}`));
-    if (missing.length) {
-      if (!(migrationPending && item.state === 'pending'))
-        error('WORK_ITEM', `${item.id} is missing ${missing.join(', ')}.`);
+    if (item.spec_maturity === 'outlined') {
+      if (item.state !== 'pending') error('STATE', `${item.id}: outlined work cannot be active or completed.`);
+      if (exists(`${base}/tasks.yaml`) || exists(`${base}/implementation-plan.md`))
+        error('WORK_ITEM', `${item.id}: outlined work cannot have tasks or an implementation plan.`);
+      continue;
+    }
+    if (!exists(`${base}/spec.md`)) {
+      error('WORK_ITEM', `${item.id} is ready but missing spec.md.`);
+      continue;
+    }
+    if (!exists(`${base}/tasks.yaml`)) {
+      if (item.state !== 'pending') error('WORK_ITEM', `${item.id} is missing tasks.yaml.`);
       continue;
     }
     let tasks;
@@ -100,7 +115,7 @@ export function validateProject(
       error('TASKS', failure.message);
       continue;
     }
-    const historical = tasks.tasks.length > 0 && tasks.tasks.every((task) => task.implementation === 'legacy');
+    const historical = tasks.tasks.length > 0 && tasks.tasks.every((task) => task.traceability === 'legacy');
     activeTasks += tasks.tasks.filter((task) => task.state === 'in_progress').length;
     if (tasks.tasks.some((task) => task.state === 'in_progress') && item.state !== 'in_progress')
       error('STATE', `${item.id}: active task requires active work item.`);
@@ -110,16 +125,7 @@ export function validateProject(
       error('STATE', `${item.id}: active work is blocked.`);
     if (!historical && !migrationPending) {
       const spec = read(`${base}/spec.md`);
-      for (const heading of [
-        '## Status',
-        '## Goal',
-        '## Scope',
-        '## Non-goals',
-        '## Requirements',
-        '## Acceptance criteria',
-        '## Decisions'
-      ])
-        if (!spec.split(/\r?\n/).includes(heading)) error('SPEC', `${item.id} missing ${heading}.`);
+      for (const message of validateSpec(spec).errors) error('SPEC', `${item.id}: ${message}`);
       const planPath = `${base}/implementation-plan.md`;
       if (!exists(planPath)) {
         if (item.state !== 'pending') error('PLAN', `${item.id} requires an approved implementation plan.`);
@@ -135,18 +141,62 @@ export function validateProject(
       }
     }
     for (const task of tasks.tasks)
-      if (task.state === 'completed' && task.implementation === 'commit' && !skipTrace) {
+      if (qualifiedTaskId(item.id, task.id) === preCommitTask) preCommitRecord = { item, task };
+    for (const task of tasks.tasks)
+      if (task.state === 'completed' && task.traceability === 'commit' && !skipTrace) {
         const qualified = qualifiedTaskId(item.id, task.id);
-        if (qualified !== preCommitTask) traceCandidates.push(qualified);
+        if (qualified !== preCommitTask) traceCandidates.push({ qualified, persisted: task.commit_sha });
       }
+  }
+  if (preCommitTask) {
+    if (!preCommitRecord) error('SCOPE', `${preCommitTask}: task does not exist.`);
+    else if (preCommitRecord.task.state !== 'in_progress')
+      error('SCOPE', `${preCommitTask}: task must be in_progress for pre-commit validation.`);
+    else {
+      try {
+        const staged = execFileSync('git', ['diff', '--cached', '--name-only', '-z'], { cwd: root, encoding: 'utf8' })
+          .split('\0')
+          .filter(Boolean);
+        if (preCommitRecord.task.traceability === 'commit' && !staged.length)
+          error('SCOPE', `${preCommitTask}: implementation commit has no staged changes.`);
+        if (preCommitRecord.task.traceability === 'none' && staged.length)
+          error('SCOPE', `${preCommitTask}: traceability none cannot have staged repository changes.`);
+        const administrative = staged.filter((file) =>
+          /(^|\/)_flow\/(?:state\.yaml|backlog\.yaml|docs\/graph\.md|.*tasks\.yaml)$/.test(file.replace(/\\/g, '/'))
+        );
+        if (administrative.length)
+          error(
+            'SCOPE',
+            `${preCommitTask}: administrative Flow metadata must not be in the implementation commit: ${administrative.join(', ')}.`
+          );
+      } catch (failure) {
+        error('SCOPE', `${preCommitTask}: cannot inspect staged Git diff: ${failure.message}`);
+      }
+    }
   }
   if (traceCandidates.length) {
     try {
-      for (const [qualified, result] of traceTasks(root, traceCandidates))
+      const objectFormat = gitObjectIdFormat(root);
+      for (const candidate of traceCandidates)
+        if (candidate.persisted?.length !== objectFormat.hexadecimal_length)
+          error('TRACE', `${candidate.qualified}: commit_sha is not a full ${objectFormat.algorithm} object ID.`);
+      for (const [qualified, result] of traceTasks(
+        root,
+        traceCandidates.map((candidate) => candidate.qualified)
+      )) {
         if (result.status !== 'resolved')
           error('TRACE', `${qualified}: expected exactly one HEAD-reachable commit with both Flow trailers.`);
+        else {
+          const persisted = traceCandidates.find((candidate) => candidate.qualified === qualified)?.persisted;
+          if (persisted !== result.commit.sha)
+            error(
+              'TRACE_DIVERGENCE',
+              `${qualified}: persisted SHA ${persisted} differs from reachable ${result.commit.sha}.`
+            );
+        }
+      }
     } catch (failure) {
-      for (const qualified of traceCandidates) error('TRACE', `${qualified}: ${failure.message}`);
+      for (const { qualified } of traceCandidates) error('TRACE', `${qualified}: ${failure.message}`);
     }
   }
   if (activeTasks > 1) error('STATE', 'Only one mutating task may be active across the project.');
@@ -154,7 +204,7 @@ export function validateProject(
     try {
       parseGates(read('gates.yaml'));
       if (!migrationPending && evaluateConfiguredGates) {
-        const gateResults = evaluateGates(root);
+        const gateResults = evaluateGates(root, { all: true });
         onGateResults?.(gateResults);
         for (const gate of gateResults)
           if (gate.blocking && ['failed', 'unsupported'].includes(gate.status))
@@ -169,11 +219,14 @@ export function validateProject(
   return findings;
 }
 export function runValidate({ args }) {
+  const startedAt = performance.now();
   const index = args.indexOf('--pre-commit');
+  const workItemIndex = args.indexOf('--work-item');
   const includeGates = args.includes('--gates');
   let gateResults = [];
   const findings = validateProject(projectRoot(args), {
     preCommitTask: index < 0 ? null : args[index + 1],
+    workItem: workItemIndex < 0 ? null : args[workItemIndex + 1],
     skipTrace: args.includes('--skip-trace'),
     evaluateConfiguredGates: includeGates,
     onGateResults: (results) => {
@@ -181,9 +234,16 @@ export function runValidate({ args }) {
     }
   });
   if (args.includes('--json')) {
+    const metrics = {
+      duration_ms: Math.round(performance.now() - startedAt),
+      processes: includeGates ? gateResults.filter((gate) => gate.kind === 'command').length : 0,
+      git_reads: findings.filter((finding) => ['TRACE', 'TRACE_DIVERGENCE', 'SCOPE'].includes(finding.code)).length,
+      validations: findings.length + 1,
+      gates_executed: gateResults.length
+    };
     info(
       JSON.stringify(
-        { valid: findings.length === 0, findings, ...(includeGates ? { gates: gateResults } : {}) },
+        { valid: findings.length === 0, findings, metrics, ...(includeGates ? { gates: gateResults } : {}) },
         null,
         2
       )

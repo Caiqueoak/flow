@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 work_items:
   - id: W001
     folder: W001-foundation

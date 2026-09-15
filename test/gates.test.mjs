@@ -9,7 +9,7 @@ test('only deterministic gates are accepted', () => {
   assert.throws(
     () =>
       parseGates(
-        stringify({ schema_version: 1, gates: [{ id: 'review', kind: 'agentic', profile: 'flow/maintainability@1' }] })
+        stringify({ schema_version: 2, gates: [{ id: 'review', kind: 'agentic', profile: 'flow/maintainability@1' }] })
       ),
     /command or builtin/
   );
@@ -19,7 +19,7 @@ test('command gates run only when project validation explicitly requests them', 
   artifacts(root);
   plan(root);
   write(root, 'gates.yaml', {
-    schema_version: 1,
+    schema_version: 2,
     gates: [
       { id: 'pass', kind: 'command', command: 'exit 0' },
       { id: 'fail', kind: 'command', command: 'exit 1' }

@@ -1,4 +1,10 @@
 import { parseDocument } from 'yaml';
+import {
+  BACKLOG_SCHEMA_VERSION,
+  LIFECYCLE_STATES,
+  SPEC_MATURITIES,
+  WORK_ITEM_ID as WORK_ITEM_ID_PATTERN
+} from '../domain/contracts.mjs';
 
 export class ArtifactValidationError extends Error {
   constructor(message) {
@@ -8,8 +14,9 @@ export class ArtifactValidationError extends Error {
 }
 
 const KINDS = new Set(['feature', 'technical', 'maintenance']);
-const STATES = new Set(['pending', 'in_progress', 'completed']);
-const WORK_ITEM_ID = /^W\d{3,}$/;
+const STATES = new Set(LIFECYCLE_STATES);
+const SPEC_MATURITY = new Set(SPEC_MATURITIES);
+const WORK_ITEM_ID = WORK_ITEM_ID_PATTERN;
 const WORK_ITEM_FOLDER = /^W\d{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function fail(message) {
@@ -30,7 +37,8 @@ export function parseBacklog(text, { source = 'backlog.yaml' } = {}) {
   const document = parseDocument(text, { prettyErrors: false, uniqueKeys: true });
   if (document.errors.length) fail(`${source} is invalid: ${document.errors[0].message}`);
   const backlog = requireObject(document.toJS(), source);
-  if (backlog.schema_version !== 2) fail(`${source} schema_version must be 2.`);
+  if (backlog.schema_version !== BACKLOG_SCHEMA_VERSION)
+    fail(`${source} schema_version must be ${BACKLOG_SCHEMA_VERSION}.`);
   if (!Array.isArray(backlog.work_items)) fail(`${source} work_items must be a list.`);
 
   const ids = new Set();
@@ -53,6 +61,10 @@ export function parseBacklog(text, { source = 'backlog.yaml' } = {}) {
     const state = item.state ?? item.status;
     if (!STATES.has(state)) fail(`${label}.state must be pending, in_progress, or completed.`);
     if (!Number.isInteger(item.priority) || item.priority < 1) fail(`${label}.priority must be a positive integer.`);
+    const specMaturity = item.spec_maturity ?? (item.state === 'pending' ? 'outlined' : 'ready');
+    if (!SPEC_MATURITY.has(specMaturity)) fail(`${label}.spec_maturity must be outlined or ready.`);
+    if (state !== 'pending' && specMaturity !== 'ready')
+      fail(`${id}: in_progress or completed work must have spec_maturity ready.`);
     if (!Array.isArray(item.depends_on ?? [])) fail(`${label}.depends_on must be a list.`);
     if (!Array.isArray(item.blockers ?? [])) fail(`${label}.blockers must be a list when present.`);
 
@@ -74,6 +86,7 @@ export function parseBacklog(text, { source = 'backlog.yaml' } = {}) {
       title,
       state,
       priority: item.priority,
+      spec_maturity: specMaturity,
       depends_on: dependencies,
       blockers: (item.blockers ?? []).map((blocker) => {
         requireObject(blocker, `${id} blocker`);
@@ -83,7 +96,18 @@ export function parseBacklog(text, { source = 'backlog.yaml' } = {}) {
         requireString(blocker.description, `${id} blocker.description`);
         if (!['unresolved', 'resolved'].includes(blocker.status)) fail(`${id} blocker.status is invalid.`);
         return blocker;
-      })
+      }),
+      ...(item.objective ? { objective: requireString(item.objective, `${label}.objective`) } : {}),
+      boundaries: Array.isArray(item.boundaries) ? item.boundaries : [],
+      requirements: Array.isArray(item.requirements) ? item.requirements : [],
+      provides: Array.isArray(item.provides) ? item.provides : [],
+      consumes: Array.isArray(item.consumes) ? item.consumes : [],
+      dependency_rationale:
+        item.dependency_rationale &&
+        typeof item.dependency_rationale === 'object' &&
+        !Array.isArray(item.dependency_rationale)
+          ? item.dependency_rationale
+          : {}
     };
   });
 
@@ -96,7 +120,7 @@ export function parseBacklog(text, { source = 'backlog.yaml' } = {}) {
   validateAcyclic(items);
   if (items.filter((item) => item.state === 'in_progress').length > 1)
     fail('Only one mutating work item may be in_progress.');
-  return { schema_version: 2, work_items: items };
+  return { schema_version: BACKLOG_SCHEMA_VERSION, work_items: items };
 }
 
 export function validateAcyclic(items) {
@@ -120,9 +144,13 @@ export function validateAcyclic(items) {
 export function deriveExecutionStatus(item, byId) {
   if (item.state === 'completed') return { status: 'completed', reasons: [] };
   const incompleteDependencies = item.depends_on.filter((id) => byId.get(id)?.state !== 'completed');
-  if (incompleteDependencies.length)
-    return { status: 'blocked', reasons: incompleteDependencies.map((id) => ({ type: 'dependency', ref: id })) };
-  return { status: item.state === 'in_progress' ? 'in_progress' : 'ready', reasons: [] };
+  const unresolvedBlockers = item.blockers.filter((blocker) => blocker.status === 'unresolved');
+  const reasons = [
+    ...incompleteDependencies.map((id) => ({ type: 'dependency', ref: id })),
+    ...unresolvedBlockers.map((blocker) => ({ type: 'blocker', ref: blocker.id, blocker_type: blocker.type }))
+  ];
+  if (reasons.length) return { status: 'blocked', reasons };
+  return { status: item.state === 'in_progress' ? 'in_progress' : 'eligible', reasons: [] };
 }
 
 export function topologicalOrder(items) {

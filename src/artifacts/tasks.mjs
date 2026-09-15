@@ -1,8 +1,14 @@
 import { parseDocument } from 'yaml';
 import { ArtifactValidationError } from './backlog.mjs';
+import {
+  LIFECYCLE_STATES,
+  TASKS_SCHEMA_VERSION,
+  TASK_ID as TASK_ID_PATTERN,
+  TRACEABILITY_MODES
+} from '../domain/contracts.mjs';
 
-const STATES = new Set(['pending', 'in_progress', 'completed']);
-const TASK_ID = /^T\d{3,}$/;
+const STATES = new Set(LIFECYCLE_STATES);
+const TASK_ID = TASK_ID_PATTERN;
 
 function fail(message) {
   throw new ArtifactValidationError(message);
@@ -20,7 +26,7 @@ export function parseTasks(text, { source = 'tasks.yaml', expectedWorkItem = nul
   const document = parseDocument(text, { prettyErrors: false, uniqueKeys: true });
   if (document.errors.length) fail(`${source} is invalid: ${document.errors[0].message}`);
   const value = requireObject(document.toJS(), source);
-  if (value.schema_version !== 1) fail(`${source} schema_version must be 1.`);
+  if (value.schema_version !== TASKS_SCHEMA_VERSION) fail(`${source} schema_version must be ${TASKS_SCHEMA_VERSION}.`);
   const workItem = requireString(value.work_item, `${source} work_item`);
   if (expectedWorkItem && workItem !== expectedWorkItem)
     fail(`${source} belongs to ${workItem}, expected ${expectedWorkItem}.`);
@@ -43,17 +49,24 @@ export function parseTasks(text, { source = 'tasks.yaml', expectedWorkItem = nul
       if (!TASK_ID.test(dependency)) fail(`${id} depends on invalid task ID '${dependency}'.`);
       if (dependency === id) fail(`${id} cannot depend on itself.`);
     }
-    const implementation = task.implementation ?? 'commit';
-    if (!['commit', 'none', 'legacy'].includes(implementation))
-      fail(`${id}.implementation must be commit, none or legacy.`);
-    if (implementation === 'legacy' && state !== 'completed')
+    const traceability = task.traceability ?? task.implementation ?? 'commit';
+    if (!TRACEABILITY_MODES.includes(traceability)) fail(`${id}.traceability must be commit, none or legacy.`);
+    if (traceability === 'legacy' && state !== 'completed')
       fail(`${id}: legacy is reserved for completed migrated tasks.`);
+    const commitSha = task.commit_sha ?? null;
+    if (commitSha !== null && (typeof commitSha !== 'string' || !/^[0-9a-f]+$/i.test(commitSha)))
+      fail(`${id}.commit_sha must be a full Git object ID.`);
+    if (traceability === 'none' && commitSha) fail(`${id}: traceability none cannot have commit_sha.`);
+    if (traceability === 'commit' && state === 'completed' && !commitSha)
+      fail(`${id}: completed commit task requires commit_sha.`);
+    if (traceability !== 'commit' && task.commit_sha) fail(`${id}: only commit traceability may have commit_sha.`);
     return {
       id,
       title,
       state,
       depends_on: dependencies,
-      implementation,
+      traceability,
+      ...(commitSha ? { commit_sha: commitSha } : {}),
       ...(task.legacy_commit ? { legacy_commit: task.legacy_commit } : {})
     };
   });
@@ -64,7 +77,7 @@ export function parseTasks(text, { source = 'tasks.yaml', expectedWorkItem = nul
   validateTaskDag(tasks);
   if (tasks.filter((task) => task.state === 'in_progress').length > 1)
     fail('Only one mutating task may be in_progress.');
-  return { schema_version: 1, work_item: workItem, tasks };
+  return { schema_version: TASKS_SCHEMA_VERSION, work_item: workItem, tasks };
 }
 
 function validateTaskDag(tasks) {
