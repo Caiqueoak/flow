@@ -9,7 +9,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": 2
+      "const": 3
     },
     "work_item": {
       "type": "string",
@@ -24,8 +24,7 @@
           "id",
           "title",
           "state",
-          "depends_on",
-          "traceability"
+          "depends_on"
         ],
         "properties": {
           "id": {
@@ -51,11 +50,9 @@
               "pattern": "^T\\d{3,}$"
             }
           },
-          "traceability": {
+          "provenance": {
             "enum": [
-              "commit",
-              "none",
-              "legacy"
+              "legacy_migration"
             ]
           },
           "legacy_commit": {

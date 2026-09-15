@@ -1,5 +1,13 @@
 # Flow
 
+## Canonical work-items
+
+Each `_flow/work-items/W###-*/` directory is the sole source of truth. Creating a work-item writes versionable shells for `spec.md`, `tasks.yaml`, `implementation-plan.md`, and `review.yaml`. A spec may remain `outlined`; tasks require a `ready` spec and implementation requires an approved plan.
+
+Run `flow sync` to materialize `_flow/generated/backlog.yaml` and `_flow/generated/graph.md`. Sync only reads canonical work-items and only writes `_flow/generated/`; it never alters a canonical source. Generated files are disposable and ignored by Git.
+
+Complete a task with one commit whose exact subject is `type(domain): description [W###-T###]`. Complete review with `flow work-item review-complete W### --domain domain`, which creates `chore(domain): complete review [W###]`. The review commit contains only canonical artifacts in that work-item folder. Any deliberate `spec.md` review change belongs in that same commit; nothing outside that folder may enter it.
+
 CLI-first, repository-resumable delivery for coding agents. Flow keeps deterministic state, IDs, dependency routing, approvals, Git evidence, gates and migrations in the CLI while the agent owns product and engineering judgment.
 
 ## Install

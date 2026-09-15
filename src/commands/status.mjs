@@ -1,35 +1,20 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { info } from '../shared/cli-io.mjs';
 import { projectRoot } from '../shared/project-path.mjs';
-import { deriveExecutionStatus, parseBacklog } from '../artifacts/backlog.mjs';
-import { routeProject } from './route.mjs';
-
+import { loadWorkItems, lifecycle } from '../artifacts/work-items.mjs';
 export function runStatus({ args }) {
-  const root = projectRoot(args);
-  if (!fs.existsSync(path.join(root, '_flow', 'backlog.yaml')))
-    return info(`Next: ${routeProject(root).phase ?? 'setup'}`);
-  const backlog = parseBacklog(fs.readFileSync(path.join(root, '_flow', 'backlog.yaml'), 'utf8'));
-  const byId = new Map(backlog.work_items.map((item) => [item.id, item]));
-  const groups = new Map(['in_progress', 'eligible', 'blocked', 'completed'].map((status) => [status, []]));
-  for (const item of backlog.work_items) {
-    const derived = deriveExecutionStatus(item, byId);
-    groups.get(derived.status).push({
-      ...item,
-      reasons: derived.reasons,
-      blockers: item.blockers.filter((blocker) => blocker.status === 'unresolved')
-    });
-  }
-  const lines = [];
-  for (const [status, items] of groups) {
-    if (!items.length) continue;
-    lines.push(status.replace('_', ' ').replace(/^./, (c) => c.toUpperCase()));
-    for (const item of items) {
-      const deps = item.reasons.filter((r) => r.type === 'dependency').map((r) => r.ref);
-      lines.push(`  ${item.id} — ${item.title}${deps.length ? ` ← ${deps.join(', ')}` : ''}`);
-      for (const blocker of item.blockers) lines.push(`    blocker: ${blocker.description} [${blocker.id}]`);
-    }
-    lines.push('');
-  }
-  info(lines.join('\n').trim());
+  const items = loadWorkItems(projectRoot(args)),
+    by = new Map(items.map((i) => [i.id, i]));
+  const value = {
+    work_items: items.map((i) => ({
+      id: i.id,
+      title: i.title,
+      status: lifecycle(i, by).status,
+      task: i.tasks.tasks.find((t) => t.state === 'in_progress')?.id ?? null
+    }))
+  };
+  info(
+    args.includes('--json')
+      ? JSON.stringify(value, null, 2)
+      : value.work_items.map((i) => `${i.id} ${i.status} ${i.title}`).join('\n') || 'No work-items.'
+  );
 }

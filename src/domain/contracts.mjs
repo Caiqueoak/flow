@@ -1,6 +1,9 @@
-export const FLOW_SCHEMA_VERSION = 3;
-export const BACKLOG_SCHEMA_VERSION = 3;
-export const TASKS_SCHEMA_VERSION = 2;
+export const FLOW_SCHEMA_VERSION = 4;
+// Backlog and graph are generated projections, never canonical inputs.
+export const BACKLOG_SCHEMA_VERSION = 4;
+export const TASKS_SCHEMA_VERSION = 3;
+export const REVIEW_SCHEMA_VERSION = 1;
+// Kept as a migration reader compatibility constant; state.yaml is not canonical.
 export const STATE_SCHEMA_VERSION = 2;
 export const GATES_SCHEMA_VERSION = 2;
 
@@ -13,7 +16,6 @@ export const QUALIFIED_TASK_ID = new RegExp(QUALIFIED_TASK_ID_PATTERN);
 
 export const LIFECYCLE_STATES = Object.freeze(['pending', 'in_progress', 'completed']);
 export const SPEC_MATURITIES = Object.freeze(['outlined', 'ready']);
-export const TRACEABILITY_MODES = Object.freeze(['commit', 'none', 'legacy']);
 export const WORKFLOW = Object.freeze({
   discovery: ['define_problem', 'explore_product', 'assess_viability', 'consolidate'],
   prd: ['draft', 'await_approval'],
@@ -83,30 +85,29 @@ export const JSON_SCHEMAS = Object.freeze({
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['id', 'title', 'state', 'depends_on', 'traceability'],
+          required: ['id', 'title', 'state', 'depends_on'],
           properties: {
             id: id(TASK_ID_PATTERN),
             title: { type: 'string', minLength: 1 },
             state: { enum: LIFECYCLE_STATES },
             depends_on: { type: 'array', uniqueItems: true, items: id(TASK_ID_PATTERN) },
-            traceability: { enum: TRACEABILITY_MODES },
+            provenance: { enum: ['legacy_migration'] },
             legacy_commit: { type: 'string', description: 'Read-only provenance for migrated completed tasks.' }
           }
         }
       }
     }
   },
-  state: {
+  review: {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
-    $id: 'https://flow.local/schemas/state.schema.json',
+    $id: 'https://flow.local/schemas/review.schema.json',
     type: 'object',
-    required: ['schema_version', 'execution', 'active', 'stop_reason', 'migration'],
+    required: ['schema_version', 'work_item', 'status'],
     properties: {
-      schema_version: { const: STATE_SCHEMA_VERSION },
-      execution: { type: 'object' },
-      active: { type: 'object' },
-      stop_reason: { type: ['string', 'null'] },
-      migration: { type: 'object' }
+      schema_version: { const: REVIEW_SCHEMA_VERSION },
+      work_item: id(WORK_ITEM_ID_PATTERN),
+      status: { enum: ['pending', 'approved'] },
+      reviewed_at: { type: 'string' }
     }
   },
   gates: {

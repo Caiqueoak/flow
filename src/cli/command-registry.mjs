@@ -74,14 +74,14 @@ export const COMMANDS = Object.freeze([
     run: 'runRoute'
   },
   {
-    name: 'graph',
-    description: 'Regenerate the dependency projection.',
-    usage: 'flow graph',
+    name: 'sync',
+    description: 'Materialize disposable projections from canonical work-items.',
+    usage: 'flow sync',
     flags: common,
-    effects: 'Writes _flow/docs/graph.md.',
-    when: 'After backlog changes.',
-    load: () => import('../commands/graph.mjs'),
-    run: 'runGraph'
+    effects: 'Reads only canonical work-items; writes _flow/generated/ only.',
+    when: 'After canonical work-item changes.',
+    load: () => import('../commands/sync.mjs'),
+    run: 'runSync'
   },
   {
     name: 'trace',
@@ -126,27 +126,27 @@ export const COMMANDS = Object.freeze([
       { name: '--depends-on', value: '<W###,...>' },
       { name: '--id', value: '<blocker-id>' },
       { name: '--type', value: '<type>', values: ['external_action', 'consequential_decision'] },
-      { name: '--description', value: '<text>' }
+      { name: '--description', value: '<text>' },
+      { name: '--domain', value: '<domain>' }
     ],
-    effects: 'Atomically writes backlog and graph.',
+    effects: 'Writes only artifacts in the target work-item folder.',
     when: 'For deterministic backlog mutations.',
     load: () => import('../commands/operations.mjs'),
     run: 'runWorkItem'
   },
   {
     name: 'task',
-    description: 'Create, update, start or complete tasks.',
-    usage: 'flow task <create|set|start|commit|complete> W###[-T###] [options]',
+    description: 'Create, update, start or commit tasks.',
+    usage: 'flow task <create|set|start|commit> W###[-T###] [options]',
     arguments: [{ name: 'operation', required: true }],
     flags: [
       ...common,
       { name: '--title', value: '<text>' },
       { name: '--depends-on', value: '<T###,...>' },
-      { name: '--traceability', value: '<mode>', values: ['commit', 'none'] },
       { name: '--message', value: '<objective commit title>' }
     ],
-    effects: 'Atomically writes tasks and cursor.',
-    when: 'Only after spec_maturity is ready.',
+    effects: 'Task commit creates the one canonical implementation commit.',
+    when: 'Only after spec maturity is ready.',
     load: () => import('../commands/operations.mjs'),
     run: 'runTask'
   },
@@ -160,24 +160,6 @@ export const COMMANDS = Object.freeze([
     when: 'Only after explicit approval of the exact document.',
     load: () => import('../commands/operations.mjs'),
     run: 'runApproval'
-  },
-  {
-    name: 'state',
-    description: 'Update the cursor with phase/step validation.',
-    usage: 'flow state update --phase <phase> --step <step>',
-    arguments: [{ name: 'operation', required: true }],
-    flags: [
-      ...common,
-      { name: '--phase', value: '<phase>' },
-      { name: '--step', value: '<step>' },
-      { name: '--work-item', value: '<W###|none>' },
-      { name: '--task', value: '<W###-T###|none>' },
-      { name: '--stop-reason', value: '<reason|none>' }
-    ],
-    effects: 'Atomically writes state.yaml.',
-    when: 'After completing a routed step.',
-    load: () => import('../commands/operations.mjs'),
-    run: 'runState'
   },
   {
     name: 'batch',

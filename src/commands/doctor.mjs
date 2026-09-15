@@ -53,14 +53,14 @@ export function diagnoseProject(root, { quick = false, version, packageRoot } = 
       'Run flow init to refresh configured integrations.'
     );
   }
-  for (const required of ['config.yaml', 'state.yaml', 'gates.yaml'])
+  for (const required of ['config.yaml', 'gates.yaml', 'work-items'])
     add(
       `artifact:${required}`,
       fs.existsSync(path.join(flow, required)),
       `${required} is present.`,
       'Restore it or run flow init.'
     );
-  for (const schema of ['config', 'backlog', 'tasks', 'state', 'gates'])
+  for (const schema of ['config', 'backlog', 'tasks', 'review', 'gates'])
     add(
       `schema:${schema}`,
       fs.existsSync(path.join(packageRoot, 'schemas', `${schema}.schema.json`)),
@@ -76,7 +76,7 @@ export function diagnoseProject(root, { quick = false, version, packageRoot } = 
       'Run flow validate for details.'
     );
   } else {
-    for (const file of ['backlog.yaml', 'state.yaml', 'gates.yaml']) {
+    for (const file of ['gates.yaml']) {
       const target = path.join(flow, file);
       if (!fs.existsSync(target)) continue;
       try {

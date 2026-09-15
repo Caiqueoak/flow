@@ -9,7 +9,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": 3
+      "const": 4
     },
     "work_items": {
       "type": "array",

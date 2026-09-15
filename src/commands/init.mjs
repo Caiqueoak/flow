@@ -5,7 +5,6 @@ import { defaultConfig, readConfig, writeConfig } from '../shared/project-config
 import { projectRoot, valueAfter } from '../shared/project-path.mjs';
 import { installRuntimeSkill } from '../shared/skill-installer.mjs';
 import { BROWNFIELD_POLICIES, ENGINEERING_PROFILES } from '../shared/profiles.mjs';
-import { emptyState, stringifyState } from '../artifacts/state.mjs';
 import { FLOW_SCHEMA_VERSION, GATES_SCHEMA_VERSION } from '../domain/contracts.mjs';
 
 const RUNTIME_DEFINITIONS = {
@@ -110,8 +109,10 @@ export async function runInit({ args, packageRoot, version }) {
   config.flow_version = version;
   writeConfig(root, config);
   if (!existed) {
-    fs.writeFileSync(path.join(flowDirectory, 'state.yaml'), stringifyState(emptyState()));
     fs.writeFileSync(path.join(flowDirectory, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
+    fs.mkdirSync(path.join(flowDirectory, 'work-items'), { recursive: true });
+    fs.mkdirSync(path.join(flowDirectory, 'generated'), { recursive: true });
+    fs.writeFileSync(path.join(flowDirectory, 'generated', '.gitignore'), '*\n!.gitignore\n');
   }
   for (const runtime of config.runtimes)
     info(`✓ ${runtime.type}: ${path.relative(root, installRuntimeSkill(root, runtime, packageRoot))}`);

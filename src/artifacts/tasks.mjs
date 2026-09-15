@@ -1,11 +1,6 @@
 import { parseDocument } from 'yaml';
 import { ArtifactValidationError } from './backlog.mjs';
-import {
-  LIFECYCLE_STATES,
-  TASKS_SCHEMA_VERSION,
-  TASK_ID as TASK_ID_PATTERN,
-  TRACEABILITY_MODES
-} from '../domain/contracts.mjs';
+import { LIFECYCLE_STATES, TASKS_SCHEMA_VERSION, TASK_ID as TASK_ID_PATTERN } from '../domain/contracts.mjs';
 
 const STATES = new Set(LIFECYCLE_STATES);
 const TASK_ID = TASK_ID_PATTERN;
@@ -49,20 +44,22 @@ export function parseTasks(text, { source = 'tasks.yaml', expectedWorkItem = nul
       if (!TASK_ID.test(dependency)) fail(`${id} depends on invalid task ID '${dependency}'.`);
       if (dependency === id) fail(`${id} cannot depend on itself.`);
     }
-    const traceability = task.traceability ?? task.implementation ?? 'commit';
-    if (!TRACEABILITY_MODES.includes(traceability)) fail(`${id}.traceability must be commit, none or legacy.`);
-    if (traceability === 'legacy' && state !== 'completed')
-      fail(`${id}: legacy is reserved for completed migrated tasks.`);
-    // Native task evidence is deliberately derived from reachable Git trailers.
-    // Do not retain an object ID here: rebases and history repair must not make
-    // the workflow state lie about the authoritative implementation evidence.
-    if (Object.hasOwn(task, 'commit_sha')) fail(`${id}.commit_sha is retired; resolve evidence with flow trace.`);
+    if (
+      Object.hasOwn(task, 'traceability') ||
+      Object.hasOwn(task, 'implementation') ||
+      Object.hasOwn(task, 'commit_sha')
+    )
+      fail(`${id}: traceability, implementation and commit_sha are retired.`);
+    if (task.provenance !== undefined && task.provenance !== 'legacy_migration')
+      fail(`${id}.provenance must be legacy_migration when present.`);
+    if (task.provenance === 'legacy_migration' && state !== 'completed')
+      fail(`${id}: legacy_migration is reserved for completed migrated tasks.`);
     return {
       id,
       title,
       state,
       depends_on: dependencies,
-      traceability,
+      ...(task.provenance ? { provenance: task.provenance } : {}),
       ...(task.legacy_commit ? { legacy_commit: task.legacy_commit } : {})
     };
   });
