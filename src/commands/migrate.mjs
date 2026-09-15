@@ -3,9 +3,10 @@ import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { info } from '../shared/cli-io.mjs';
 import { projectRoot } from '../shared/project-path.mjs';
-import { emptyState, stringifyState } from '../artifacts/state.mjs';
+import { emptyState, stringifyState, parseState } from '../artifacts/state.mjs';
 import { parseBacklog } from '../artifacts/backlog.mjs';
 import { parseTasks } from '../artifacts/tasks.mjs';
+import { parseGates } from '../artifacts/gates.mjs';
 import { generateGraphMarkdown } from './graph.mjs';
 import { readConfig, writeConfig, defaultConfig } from '../shared/project-config.mjs';
 import {
@@ -101,6 +102,7 @@ function normalizeTasks(file, item) {
     delete result.status;
     delete result.execution_id;
     delete result.implementation;
+    delete result.commit_sha;
     return result;
   });
   const text = stringify({ schema_version: TASKS_SCHEMA_VERSION, work_item: item.id, tasks }, { lineWidth: 0 });
@@ -194,6 +196,22 @@ function migrateStaged(root) {
   config.engineering.existing_code_policy = 'improve';
   writeConfig(root, config);
 }
+function inspectCurrent(root, targetVersion) {
+  const flow = path.join(root, '_flow');
+  const changes = [];
+  try { const config = readConfig(root); if (!config || config.schema_version !== FLOW_SCHEMA_VERSION || config.flow_version !== targetVersion) changes.push('upgrade config.yaml'); } catch { changes.push('upgrade config.yaml'); }
+  let backlog;
+  try { backlog = parseBacklog(fs.readFileSync(path.join(flow, 'backlog.yaml'), 'utf8')); } catch { changes.push('upgrade backlog.yaml'); }
+  if (backlog) for (const item of backlog.work_items) {
+    const tasks = path.join(flow, 'work-items', item.folder, 'tasks.yaml');
+    if (fs.existsSync(tasks)) try { parseTasks(fs.readFileSync(tasks, 'utf8'), { expectedWorkItem: item.id }); } catch { changes.push(`upgrade work-items/${item.folder}/tasks.yaml`); }
+  }
+  try { parseState(fs.readFileSync(path.join(flow, 'state.yaml'), 'utf8')); } catch { changes.push('upgrade state.yaml'); }
+  try { parseGates(fs.readFileSync(path.join(flow, 'gates.yaml'), 'utf8')); } catch { changes.push('upgrade gates.yaml'); }
+  try { const backlogText = fs.readFileSync(path.join(flow, 'backlog.yaml'), 'utf8'); if (fs.readFileSync(path.join(flow, 'docs', 'graph.md'), 'utf8') !== generateGraphMarkdown(backlogText)) changes.push('regenerate docs/graph.md'); } catch { changes.push('regenerate docs/graph.md'); }
+  return [...new Set(changes)];
+}
+
 export function migrationPlan(root, targetVersion = '0.6.0') {
   const currentFlow = path.join(root, '_flow');
   const legacyFlow = path.join(root, '.flow');
@@ -227,6 +245,7 @@ export function migrationPlan(root, targetVersion = '0.6.0') {
   if (!config?.flow_version || config.flow_version !== targetVersion)
     changes.push('record executed Flow package version');
   if (legacy.length) changes.push('normalize legacy artifact names and IDs');
+  if (!usesLegacyDirectory) changes.push(...inspectCurrent(root, targetVersion));
   const backlogFile = path.join(flow, 'backlog.yaml');
   if (fs.existsSync(backlogFile)) {
     const backlog = parse(fs.readFileSync(backlogFile, 'utf8'));
@@ -271,11 +290,12 @@ function upgradeCurrentStaged(root, targetVersion) {
         const value = parse(fs.readFileSync(taskPath, 'utf8'));
         value.schema_version = TASKS_SCHEMA_VERSION;
         for (const task of value.tasks ?? []) {
-          task.traceability =
-            task.state === 'completed' && !task.commit_sha
-              ? 'legacy'
-              : (task.traceability ?? task.implementation ?? 'commit');
+          if (task.state === 'completed' && task.commit_sha) {
+            task.legacy_commit ??= task.commit_sha;
+            task.traceability = 'legacy';
+          } else task.traceability = task.traceability ?? task.implementation ?? 'commit';
           delete task.implementation;
+          delete task.commit_sha;
         }
         fs.writeFileSync(taskPath, stringify(value, { lineWidth: 0 }));
       }
@@ -350,14 +370,7 @@ export function migrateProject(root, { targetVersion = '0.6.0' } = {}) {
   const legacyFlow = path.join(root, '.flow');
   const sourceFlow = fs.existsSync(targetFlow) ? targetFlow : legacyFlow;
   const usesLegacyDirectory = sourceFlow === legacyFlow;
-  const config = usesLegacyDirectory ? null : readConfig(root);
-  if (
-    !usesLegacyDirectory &&
-    config?.schema_version === FLOW_SCHEMA_VERSION &&
-    config.flow_version === targetVersion &&
-    fs.existsSync(path.join(targetFlow, 'backlog.yaml')) &&
-    parse(fs.readFileSync(path.join(targetFlow, 'backlog.yaml'), 'utf8')).schema_version === BACKLOG_SCHEMA_VERSION
-  )
+  if (!usesLegacyDirectory && inspectCurrent(root, targetVersion).length === 0)
     return { unresolved: [], unchanged: true };
   const staging = fs.mkdtempSync(path.join(root, '_flow-migration-'));
   const backup = path.join(staging, 'backup');
