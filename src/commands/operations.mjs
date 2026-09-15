@@ -7,7 +7,7 @@ import { projectRoot, valueAfter } from '../shared/project-path.mjs';
 import { loadWorkItems, lifecycle } from '../artifacts/work-items.mjs';
 import { parseTasks } from '../artifacts/tasks.mjs';
 import { parseReview } from '../artifacts/review.mjs';
-import { validateSpec } from '../artifacts/spec.mjs';
+import { validateSpec, SPEC_HEADINGS } from '../artifacts/spec.mjs';
 import { validateProject } from './validate.mjs';
 import { evaluateGates } from './gates.mjs';
 const pos = (a) => a.filter((v, i) => !v.startsWith('-') && (i === 0 || !a[i - 1].startsWith('--'))),
@@ -86,7 +86,9 @@ export function runWorkItem({ args }) {
   const item = find(root, target);
   if (action === 'promote') {
     const r = validateSpec(fs.readFileSync(path.join(item.base, 'spec.md'), 'utf8'), { expectedWorkItem: item.id });
-    if (r.errors.length) fail(`${item.id} spec is insufficient: ${r.errors.join(', ')}`);
+    const missing = SPEC_HEADINGS.filter((heading) => !new Set(r.body.split(/\r?\n/)).has(heading));
+    if (r.errors.length || missing.length)
+      fail(`${item.id} spec is insufficient: ${r.errors.concat(missing).join(', ')}`);
     editSpec(item, (m) => (m.maturity = 'ready'));
   } else if (action === 'set')
     editSpec(item, (m) => {
