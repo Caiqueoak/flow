@@ -86,8 +86,8 @@ export const COMMANDS = Object.freeze([
   {
     name: 'trace',
     description: 'Resolve a permanent task ID against reachable Git history.',
-    usage: 'flow trace W###-T### [--json]',
-    arguments: [{ name: 'task', required: true }],
+    usage: 'flow trace W###[-T###] [--json]',
+    arguments: [{ name: 'identity', required: true, description: 'Task W###-T### or aggregate work-item W###.' }],
     flags: [...common, { name: '--json' }],
     effects: 'Read-only Git inspection.',
     when: 'After task completion and during review.',
@@ -116,7 +116,7 @@ export const COMMANDS = Object.freeze([
   {
     name: 'work-item',
     description: 'Create or deterministically update backlog work-items.',
-    usage: 'flow work-item <create|set|priority|dependencies|blocker-add|blocker-resolve|promote> ...',
+    usage: 'flow work-item <create|set|priority|dependencies|blocker-add|blocker-resolve|promote|review-complete> ...',
     arguments: [{ name: 'operation', required: true }],
     flags: [
       ...common,
@@ -143,7 +143,6 @@ export const COMMANDS = Object.freeze([
       { name: '--title', value: '<text>' },
       { name: '--depends-on', value: '<T###,...>' },
       { name: '--traceability', value: '<mode>', values: ['commit', 'none'] },
-      { name: '--commit-sha', value: '<oid>' },
       { name: '--message', value: '<objective commit title>' }
     ],
     effects: 'Atomically writes tasks and cursor.',
@@ -224,18 +223,21 @@ export function renderGlobalHelp(version) {
   const rows = COMMANDS.filter((command) => !command.hidden).map(
     (command) => `  ${command.name.padEnd(11)} ${command.description}`
   );
-  return `Flow ${version}\n\nUsage: npx --no-install flow <command> [options]\nEngineering baseline: Readability First.\n\nCommands:\n${rows.join('\n')}\n\nRun flow <command> --help for syntax, values, effects and usage guidance.`;
+  return `Flow ${version}\n\nUsage: npx --no-install flow <command> [options]\nEngineering baseline: Readability First.\n\nGlobal parameters:\n  --help, -h       Show help.\n  --version, -v    Show package version.\n  --path <project> Select project root (default: current directory).\n\nCommands:\n${rows.join('\n')}\n\nRun flow <command> --help for syntax, values, effects and usage guidance.`;
 }
 export function renderCommandHelp(command) {
+  const argumentsText = command.arguments?.length
+    ? command.arguments.map((argument) => `  ${argument.name}${argument.required ? ' (required)' : ''} — ${argument.description ?? 'Command argument.'}`).join('\n')
+    : '  (none)';
   const flags = command.flags?.length
     ? command.flags
         .map(
           (flag) =>
-            `  ${flag.name}${flag.value ? ` ${flag.value}` : ''}${flag.values ? ` (${flag.values.join('|')})` : ''}${flag.default ? ` [default: ${flag.default}]` : ''}`
+            `  ${flag.name}${flag.value ? ` ${flag.value}` : ''}${flag.values ? ` (${flag.values.join('|')})` : ''}${flag.default ? ` [default: ${flag.default}]` : ''} — ${flag.description ?? 'Command option.'}`
         )
         .join('\n')
     : '  (none)';
-  return `${command.description}\n\nSyntax:\n  ${command.usage}\n\nOptions:\n${flags}\n\nEffects:\n  ${command.effects}\n\nUse when:\n  ${command.when}`;
+  return `${command.description}\n\nSyntax:\n  ${command.usage}\n\nArguments:\n${argumentsText}\n\nOptions:\n${flags}\n\nEffects:\n  ${command.effects}\n\nUse when:\n  ${command.when}`;
 }
 export function validateCommandArguments(command, args) {
   const allowed = new Map((command.flags ?? []).map((flag) => [flag.name, flag]));

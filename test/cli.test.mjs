@@ -28,8 +28,12 @@ test('version source and declarative global/command help', () => {
   const help = run(['--help']);
   assert.match(help.stdout, /npx --no-install flow/);
   assert.match(help.stdout, /Readability First/);
+  assert.match(help.stdout, /Global parameters/);
+  assert.match(help.stdout, /--path <project>/);
   for (const cmd of ['doctor', 'gates', 'work-item', 'task', 'batch']) assert.match(help.stdout, new RegExp(cmd));
-  assert.match(run(['validate', '--help']).stdout, /--gates/);
+  const validateHelp = run(['validate', '--help']).stdout;
+  assert.match(validateHelp, /--gates.*—/);
+  assert.match(run(['gates', '--help']).stdout, /--stage <stage> \(task\|work-item-review\|full\).*—/);
   assert.equal(run(['update']).status, 1);
   assert.equal(run(['validate', '--unknown']).status, 1);
 });
