@@ -19,6 +19,7 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": [
           "id",
           "title",
@@ -57,9 +58,9 @@
               "legacy"
             ]
           },
-          "commit_sha": {
+          "legacy_commit": {
             "type": "string",
-            "pattern": "^[0-9a-fA-F]+$"
+            "description": "Read-only provenance for migrated completed tasks."
           }
         }
       }

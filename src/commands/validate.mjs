@@ -11,7 +11,7 @@ import { parseGates } from '../artifacts/gates.mjs';
 import { validateEngineeringDocument } from '../artifacts/engineering.mjs';
 import { validatePrdDocument } from '../artifacts/prd.mjs';
 import { validateImplementationPlan } from '../artifacts/implementation-plan.mjs';
-import { traceTasks, gitObjectIdFormat } from './trace.mjs';
+import { traceTasks } from './trace.mjs';
 import { generateGraphMarkdown } from './graph.mjs';
 import { evaluateGates } from './gates.mjs';
 import { validateSpec } from '../artifacts/spec.mjs';
@@ -145,7 +145,7 @@ export function validateProject(
     for (const task of tasks.tasks)
       if (task.state === 'completed' && task.traceability === 'commit' && !skipTrace) {
         const qualified = qualifiedTaskId(item.id, task.id);
-        if (qualified !== preCommitTask) traceCandidates.push({ qualified, persisted: task.commit_sha });
+        if (qualified !== preCommitTask) traceCandidates.push({ qualified });
       }
   }
   if (preCommitTask) {
@@ -176,24 +176,12 @@ export function validateProject(
   }
   if (traceCandidates.length) {
     try {
-      const objectFormat = gitObjectIdFormat(root);
-      for (const candidate of traceCandidates)
-        if (candidate.persisted?.length !== objectFormat.hexadecimal_length)
-          error('TRACE', `${candidate.qualified}: commit_sha is not a full ${objectFormat.algorithm} object ID.`);
       for (const [qualified, result] of traceTasks(
         root,
         traceCandidates.map((candidate) => candidate.qualified)
       )) {
         if (result.status !== 'resolved')
           error('TRACE', `${qualified}: expected exactly one HEAD-reachable commit with both Flow trailers.`);
-        else {
-          const persisted = traceCandidates.find((candidate) => candidate.qualified === qualified)?.persisted;
-          if (persisted !== result.commit.sha)
-            error(
-              'TRACE_DIVERGENCE',
-              `${qualified}: persisted SHA ${persisted} differs from reachable ${result.commit.sha}.`
-            );
-        }
       }
     } catch (failure) {
       for (const { qualified } of traceCandidates) error('TRACE', `${qualified}: ${failure.message}`);

@@ -34,7 +34,7 @@ const slug = (title) =>
 const cleanTask = (task) => {
   const clean = { ...task };
   delete clean.implementation;
-  delete clean.legacy_commit;
+  delete clean.commit_sha;
   return clean;
 };
 
@@ -163,7 +163,7 @@ function mutateWorkItem(root, operation) {
     return id;
   }
   const item = findItem(backlog, operation.work_item);
-  if (item.state === 'completed')
+  if (item.state === 'completed' && operation.action !== 'review-complete')
     fail(`${item.id} is completed; preserve history and create maintenance work instead.`);
   if (operation.action === 'set') {
     if (operation.title) item.title = operation.title;
@@ -185,6 +185,18 @@ function mutateWorkItem(root, operation) {
     const blocker = item.blockers.find((candidate) => candidate.id === operation.id);
     if (!blocker) fail(`Unknown blocker '${operation.id}'.`);
     blocker.status = 'resolved';
+  } else if (operation.action === 'review-complete') {
+    const stateFile = flowPath(root, 'state.yaml');
+    const state = fs.existsSync(stateFile) ? parseState(fs.readFileSync(stateFile, 'utf8')) : emptyState();
+    const tasks = readTasks(root, item);
+    if (!tasks.tasks.length || tasks.tasks.some((task) => task.state !== 'completed')) fail(`${item.id} has incomplete tasks.`);
+    if (item.state !== 'in_progress') fail(`${item.id} must be in_progress before review completion.`);
+    if (state.execution.phase !== 'review' || state.execution.step !== 'review_work_item' || state.active.work_item !== item.id)
+      fail(`${item.id} must be at the review cursor before review completion.`);
+    item.state = 'completed';
+    state.active = { work_item: null, task: null };
+    state.stop_reason = null;
+    fs.writeFileSync(stateFile, stringifyState(state));
   } else if (operation.action === 'promote') {
     const spec = flowPath(root, `work-items/${item.folder}/spec.md`);
     if (!fs.existsSync(spec)) fail(`${item.id} requires spec.md before promotion.`);
@@ -254,13 +266,9 @@ function mutateTask(root, operation) {
     if (task.traceability === 'commit') {
       const traced = traceTask(path.dirname(root), operation.task);
       if (traced.status !== 'resolved') fail(`${operation.task} requires exactly one reachable implementation commit.`);
-      if (operation.commit_sha && operation.commit_sha !== traced.commit.sha)
-        fail(`Provided commit_sha differs from the trailer-resolved commit.`);
-      task.commit_sha = traced.commit.sha;
-    } else if (operation.commit_sha) fail('traceability none cannot have commit_sha.');
+    }
     task.state = 'completed';
-    if (tasks.tasks.every((candidate) => candidate === task || candidate.state === 'completed'))
-      item.state = 'completed';
+    // Completion moves the cursor to review but never completes the work item.
   } else fail(`Unknown task operation '${operation.action}'.`);
   writeTasks(root, item, tasks);
   writeBacklog(root, backlog);
@@ -302,7 +310,6 @@ function taskFromArgs(args) {
     title: valueAfter(args, '--title'),
     depends_on: dependencies === undefined ? undefined : list(dependencies),
     traceability: valueAfter(args, '--traceability'),
-    commit_sha: valueAfter(args, '--commit-sha'),
     message: valueAfter(args, '--message')
   };
 }
@@ -335,6 +342,22 @@ function createImplementationCommit(root, operation) {
   return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 }
 
+function commitFlowMetadata(root, qualifiedTask) {
+  // The implementation commit must already have consumed its staged application
+  // changes. Refuse to accidentally bundle a caller's staged work here.
+  const alreadyStaged = execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' })
+    .split(/\r?\n/).filter(Boolean);
+  if (alreadyStaged.length) fail(`Refusing metadata persistence with staged changes: ${alreadyStaged.join(', ')}.`);
+  const taskFile = path.join('_flow', 'work-items');
+  execFileSync('git', ['add', '--', '_flow/state.yaml', '_flow/backlog.yaml', '_flow/docs/graph.md', taskFile], { cwd: root });
+  const staged = execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean);
+  const allowed = new RegExp(`^_flow/(?:state\\.yaml|backlog\\.yaml|docs/graph\\.md|work-items/[^/]+/tasks\\.yaml)$`);
+  if (staged.some((file) => !allowed.test(file.replace(/\\/g, '/')))) fail('Metadata persistence staged a non-Flow artifact.');
+  if (!staged.length) return false;
+  execFileSync('git', ['commit', '-m', `chore(flow): persist ${qualifiedTask} metadata`], { cwd: root, stdio: 'inherit' });
+  return true;
+}
+
 export function runWorkItem({ args }) {
   const root = projectRoot(args);
   const result = transact(root, (staging) => mutateWorkItem(staging, workItemFromArgs(args)));
@@ -344,10 +367,11 @@ export function runTask({ args }) {
   const root = projectRoot(args);
   const operation = taskFromArgs(args);
   if (operation.action === 'commit') {
-    operation.commit_sha = createImplementationCommit(root, operation);
+    createImplementationCommit(root, operation);
     operation.action = 'complete';
   }
   const result = transact(root, (staging) => mutateTask(staging, operation));
+  if (args[0] === 'commit' || args[0] === 'complete') commitFlowMetadata(root, operation.task);
   info(`${result} updated.`);
 }
 export function runState({ args }) {

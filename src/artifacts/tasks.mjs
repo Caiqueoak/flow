@@ -53,20 +53,16 @@ export function parseTasks(text, { source = 'tasks.yaml', expectedWorkItem = nul
     if (!TRACEABILITY_MODES.includes(traceability)) fail(`${id}.traceability must be commit, none or legacy.`);
     if (traceability === 'legacy' && state !== 'completed')
       fail(`${id}: legacy is reserved for completed migrated tasks.`);
-    const commitSha = task.commit_sha ?? null;
-    if (commitSha !== null && (typeof commitSha !== 'string' || !/^[0-9a-f]+$/i.test(commitSha)))
-      fail(`${id}.commit_sha must be a full Git object ID.`);
-    if (traceability === 'none' && commitSha) fail(`${id}: traceability none cannot have commit_sha.`);
-    if (traceability === 'commit' && state === 'completed' && !commitSha)
-      fail(`${id}: completed commit task requires commit_sha.`);
-    if (traceability !== 'commit' && task.commit_sha) fail(`${id}: only commit traceability may have commit_sha.`);
+    // Native task evidence is deliberately derived from reachable Git trailers.
+    // Do not retain an object ID here: rebases and history repair must not make
+    // the workflow state lie about the authoritative implementation evidence.
+    if (Object.hasOwn(task, 'commit_sha')) fail(`${id}.commit_sha is retired; resolve evidence with flow trace.`);
     return {
       id,
       title,
       state,
       depends_on: dependencies,
       traceability,
-      ...(commitSha ? { commit_sha: commitSha } : {}),
       ...(task.legacy_commit ? { legacy_commit: task.legacy_commit } : {})
     };
   });

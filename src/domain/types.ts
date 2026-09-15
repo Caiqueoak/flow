@@ -38,7 +38,7 @@ export interface Task {
   state: LifecycleState;
   depends_on: Array<`T${number}`>;
   traceability: Traceability;
-  commit_sha?: string;
+  legacy_commit?: string;
 }
 
 export interface ExecutionCursor {

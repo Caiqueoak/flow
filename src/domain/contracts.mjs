@@ -82,6 +82,7 @@ export const JSON_SCHEMAS = Object.freeze({
         type: 'array',
         items: {
           type: 'object',
+          additionalProperties: false,
           required: ['id', 'title', 'state', 'depends_on', 'traceability'],
           properties: {
             id: id(TASK_ID_PATTERN),
@@ -89,7 +90,7 @@ export const JSON_SCHEMAS = Object.freeze({
             state: { enum: LIFECYCLE_STATES },
             depends_on: { type: 'array', uniqueItems: true, items: id(TASK_ID_PATTERN) },
             traceability: { enum: TRACEABILITY_MODES },
-            commit_sha: { type: 'string', pattern: '^[0-9a-fA-F]+$' }
+            legacy_commit: { type: 'string', description: 'Read-only provenance for migrated completed tasks.' }
           }
         }
       }

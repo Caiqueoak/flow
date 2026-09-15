@@ -51,6 +51,23 @@ test('state rejects an invalid phase and step combination without writing', () =
   assert.equal(fs.existsSync(path.join(root, '_flow/state.yaml')), false);
 });
 
+test('review-complete is the only work-item completion transition and does not route a successor', () => {
+  const first = item('W001', { state: 'in_progress' });
+  const second = item('W002', { depends_on: ['W001'], spec_maturity: 'outlined' });
+  const root = project([first, second]);
+  artifacts(root, first, [task('T001', { state: 'completed', traceability: 'none' })]);
+  write(root, 'state.yaml', {
+    schema_version: 2,
+    execution: { phase: 'review', step: 'review_work_item' },
+    active: { work_item: 'W001', task: null }, stop_reason: null,
+    migration: { status: 'not_required' }
+  });
+  assert.equal(run(['work-item', 'review-complete', 'W001', '--path', root]).status, 0);
+  const state = parse(fs.readFileSync(path.join(root, '_flow/state.yaml'), 'utf8'));
+  assert.deepEqual(state.active, { work_item: null, task: null });
+  assert.equal(parse(fs.readFileSync(path.join(root, '_flow/backlog.yaml'), 'utf8')).work_items[0].state, 'completed');
+});
+
 test('doctor detects version drift without mutating project files', () => {
   const root = project();
   const configFile = path.join(root, '_flow/config.yaml');
@@ -64,7 +81,7 @@ test('doctor detects version drift without mutating project files', () => {
   assert.equal(fs.readFileSync(configFile, 'utf8'), before);
 });
 
-test('task completion persists the full trailer-resolved object ID and advances the cursor', () => {
+test('task commit writes separate metadata evidence and leaves final work for review', () => {
   const root = project([item('W001', { state: 'in_progress' })]);
   artifacts(root, item(), [task('T001', { state: 'in_progress', traceability: 'commit' })]);
   plan(root);
@@ -77,14 +94,19 @@ test('task completion persists the full trailer-resolved object ID and advances 
   execFileSync('git', ['add', 'implementation.txt'], { cwd: root });
   const result = run(['task', 'commit', 'W001-T001', '--message', 'feat: implement', '--path', root]);
   assert.equal(result.status, 0, result.stderr);
-  const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  const metadata = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
   assert.match(
-    execFileSync('git', ['log', '-1', '--format=%B'], { cwd: root, encoding: 'utf8' }),
+    execFileSync('git', ['log', '-2', '--format=%B'], { cwd: root, encoding: 'utf8' }),
     /Flow-Task: W001-T001/
   );
   const tasks = parse(fs.readFileSync(path.join(root, '_flow/work-items/W001-example/tasks.yaml'), 'utf8'));
-  assert.equal(tasks.tasks[0].commit_sha, sha);
+  assert.equal(tasks.tasks[0].commit_sha, undefined);
   assert.equal(tasks.tasks[0].state, 'completed');
+  assert.match(execFileSync('git', ['show', '-s', '--format=%B', metadata], { cwd: root, encoding: 'utf8' }), /^chore\(flow\): persist W001-T001 metadata\s*$/);
+  assert.doesNotMatch(execFileSync('git', ['show', '-s', '--format=%B', metadata], { cwd: root, encoding: 'utf8' }), /Flow-Task:/);
+  const implementation = execFileSync('git', ['rev-parse', 'HEAD^'], { cwd: root, encoding: 'utf8' }).trim();
+  assert.match(execFileSync('git', ['show', '-s', '--format=%B', implementation], { cwd: root, encoding: 'utf8' }), /Flow-Task: W001-T001/);
+  assert.equal(parse(fs.readFileSync(path.join(root, '_flow/backlog.yaml'), 'utf8')).work_items[0].state, 'in_progress');
   const state = parse(fs.readFileSync(path.join(root, '_flow/state.yaml'), 'utf8'));
   assert.deepEqual(state.execution, { phase: 'review', step: 'review_work_item' });
 });
