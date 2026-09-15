@@ -3,10 +3,9 @@ import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { info } from '../shared/cli-io.mjs';
 import { projectRoot } from '../shared/project-path.mjs';
-import { emptyState, stringifyState, parseState } from '../artifacts/state.mjs';
+import { emptyState, stringifyState } from '../artifacts/state.mjs';
 import { parseBacklog } from '../artifacts/backlog.mjs';
 import { parseGates } from '../artifacts/gates.mjs';
-import { generateGraphMarkdown } from './graph.mjs';
 import { syncProject } from './sync.mjs';
 import { validateProject } from './validate.mjs';
 import { readConfig, writeConfig, defaultConfig } from '../shared/project-config.mjs';
@@ -14,7 +13,6 @@ import {
   BACKLOG_SCHEMA_VERSION,
   FLOW_SCHEMA_VERSION,
   GATES_SCHEMA_VERSION,
-  STATE_SCHEMA_VERSION,
   TASKS_SCHEMA_VERSION
 } from '../domain/contracts.mjs';
 
@@ -174,6 +172,9 @@ function migrateStaged(root) {
   config.engineering.existing_code_policy = 'improve';
   writeConfig(root, config);
 }
+function hasLegacyBacklog(flow) {
+  return fs.existsSync(path.join(flow, 'BACKLOG.yaml')) || fs.existsSync(path.join(flow, 'backlog.yaml'));
+}
 function inspectCurrent(root, targetVersion) {
   const flow = path.join(root, '_flow');
   const changes = [];
@@ -184,33 +185,33 @@ function inspectCurrent(root, targetVersion) {
   } catch {
     changes.push('upgrade config.yaml');
   }
-  let backlog;
-  try {
-    backlog = parseBacklog(fs.readFileSync(path.join(flow, 'backlog.yaml'), 'utf8'));
-  } catch {
-    changes.push('upgrade backlog.yaml');
-  }
-  if (backlog)
-    for (const item of backlog.work_items) {
-      const tasks = path.join(flow, 'work-items', item.folder, 'tasks.yaml');
-      if (fs.existsSync(tasks)) changes.push(`upgrade work-items/${item.folder}/tasks.yaml`);
+  const workItems = path.join(flow, 'work-items');
+  if (!fs.existsSync(workItems)) changes.push('restore work-items directory');
+  else
+    for (const entry of fs.readdirSync(workItems, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const tasks = path.join(workItems, entry.name, 'tasks.yaml');
+      if (!fs.existsSync(tasks)) {
+        changes.push(`restore work-items/${entry.name}/tasks.yaml`);
+        continue;
+      }
+      try {
+        const value = parse(fs.readFileSync(tasks, 'utf8')) ?? {};
+        if (
+          value.schema_version !== TASKS_SCHEMA_VERSION ||
+          (value.tasks ?? []).some((task) =>
+            ['traceability', 'implementation', 'commit_sha'].some((field) => Object.hasOwn(task, field))
+          )
+        )
+          changes.push(`upgrade work-items/${entry.name}/tasks.yaml`);
+      } catch {
+        changes.push(`upgrade work-items/${entry.name}/tasks.yaml`);
+      }
     }
-  try {
-    parseState(fs.readFileSync(path.join(flow, 'state.yaml'), 'utf8'));
-  } catch {
-    changes.push('upgrade state.yaml');
-  }
   try {
     parseGates(fs.readFileSync(path.join(flow, 'gates.yaml'), 'utf8'));
   } catch {
     changes.push('upgrade gates.yaml');
-  }
-  try {
-    const backlogText = fs.readFileSync(path.join(flow, 'backlog.yaml'), 'utf8');
-    if (fs.readFileSync(path.join(flow, 'docs', 'graph.md'), 'utf8') !== generateGraphMarkdown(backlogText))
-      changes.push('regenerate docs/graph.md');
-  } catch {
-    changes.push('regenerate docs/graph.md');
   }
   return [...new Set(changes)];
 }
@@ -250,7 +251,7 @@ export function migrationPlan(root, targetVersion = '0.6.0') {
   if (legacy.length) changes.push('normalize legacy artifact names and IDs');
   if (!usesLegacyDirectory) changes.push(...inspectCurrent(root, targetVersion));
   const backlogFile = path.join(flow, 'backlog.yaml');
-  if (fs.existsSync(backlogFile)) {
+  if (usesLegacyDirectory && fs.existsSync(backlogFile)) {
     const backlog = parse(fs.readFileSync(backlogFile, 'utf8'));
     backlog.schema_version = BACKLOG_SCHEMA_VERSION;
     if ((backlog.work_items ?? []).some((item) => !item.spec_maturity))
@@ -278,81 +279,30 @@ export function migrationPlan(root, targetVersion = '0.6.0') {
   };
 }
 
-function upgradeCurrentStaged(root, targetVersion) {
+function upgradeCanonicalStaged(root, targetVersion) {
   const flow = path.join(root, '_flow');
-  const backlogFile = path.join(flow, 'backlog.yaml');
-  if (fs.existsSync(backlogFile)) {
-    const backlog = parse(fs.readFileSync(backlogFile, 'utf8'));
-    backlog.schema_version = BACKLOG_SCHEMA_VERSION;
-    for (const item of backlog.work_items ?? []) {
-      item.spec_maturity ??= fs.existsSync(path.join(flow, 'work-items', item.folder, 'spec.md'))
-        ? 'ready'
-        : 'outlined';
-      const taskPath = path.join(flow, 'work-items', item.folder, 'tasks.yaml');
-      if (fs.existsSync(taskPath)) {
-        const value = parse(fs.readFileSync(taskPath, 'utf8'));
-        value.schema_version = TASKS_SCHEMA_VERSION;
-        for (const task of value.tasks ?? []) {
-          if (task.state === 'completed' && task.commit_sha) {
-            task.legacy_commit ??= task.commit_sha;
-            task.provenance = 'legacy_migration';
-          }
-          delete task.traceability;
-          delete task.implementation;
-          delete task.commit_sha;
+  const workItems = path.join(flow, 'work-items');
+  if (fs.existsSync(workItems))
+    for (const entry of fs.readdirSync(workItems, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const taskPath = path.join(workItems, entry.name, 'tasks.yaml');
+      if (!fs.existsSync(taskPath)) continue;
+      const value = parse(fs.readFileSync(taskPath, 'utf8')) ?? {};
+      value.schema_version = TASKS_SCHEMA_VERSION;
+      for (const task of value.tasks ?? []) {
+        if (task.state === 'completed' && task.commit_sha) {
+          task.legacy_commit ??= task.commit_sha;
+          task.provenance = 'legacy_migration';
         }
-        fs.writeFileSync(taskPath, stringify(value, { lineWidth: 0 }));
+        delete task.traceability;
+        delete task.implementation;
+        delete task.commit_sha;
       }
+      fs.writeFileSync(taskPath, stringify(value, { lineWidth: 0 }));
     }
-    const text = stringify(backlog, { lineWidth: 0 });
-    parseBacklog(text);
-    fs.writeFileSync(backlogFile, text);
-    fs.mkdirSync(path.join(flow, 'docs'), { recursive: true });
-    fs.writeFileSync(path.join(flow, 'docs', 'graph.md'), generateGraphMarkdown(text));
-  }
   const config = readConfig(root) ?? defaultConfig(targetVersion);
   config.flow_version = targetVersion;
   writeConfig(root, config);
-  const stateFile = path.join(flow, 'state.yaml');
-  if (!fs.existsSync(stateFile)) {
-    const state = emptyState();
-    state.execution = { phase: 'reconcile', step: 'resolve_conflicts' };
-    state.migration = { status: 'pending_reconciliation' };
-    fs.writeFileSync(stateFile, stringifyState(state));
-  } else {
-    const rawState = parse(fs.readFileSync(stateFile, 'utf8'));
-    rawState.schema_version = STATE_SCHEMA_VERSION;
-    const phaseMap = {
-      engineering_bootstrap: 'engineering',
-      backlog_planning: 'backlog',
-      work_item_plan_approval: 'planning',
-      build: 'implementation',
-      work_item_review: 'review',
-      migration_reconciliation: 'reconcile'
-    };
-    rawState.execution ??= {};
-    rawState.execution.phase = phaseMap[rawState.execution.phase] ?? rawState.execution.phase ?? 'discovery';
-    const defaults = {
-      discovery: 'define_problem',
-      prd: 'draft',
-      engineering: 'draft',
-      backlog: 'route',
-      specification: 'deepen',
-      planning: 'prepare_plan',
-      implementation: 'execute_task',
-      review: 'review_work_item',
-      reconcile: 'resolve_conflicts',
-      complete: 'finished'
-    };
-    rawState.execution.step = defaults[rawState.execution.phase];
-    delete rawState.execution.id;
-    delete rawState.execution.workflow_hash;
-    rawState.execution = { phase: 'reconcile', step: 'resolve_conflicts' };
-    rawState.migration = { status: 'pending_reconciliation' };
-    rawState.active = { work_item: null, task: null };
-    rawState.stop_reason = null;
-    fs.writeFileSync(stateFile, stringifyState(rawState));
-  }
   const gatesFile = path.join(flow, 'gates.yaml');
   if (!fs.existsSync(gatesFile)) fs.writeFileSync(gatesFile, `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
   else {
@@ -374,18 +324,15 @@ export function migrateProject(root, { targetVersion = '0.6.0' } = {}) {
   const legacyFlow = path.join(root, '.flow');
   const sourceFlow = fs.existsSync(targetFlow) ? targetFlow : legacyFlow;
   const usesLegacyDirectory = sourceFlow === legacyFlow;
-  if (!usesLegacyDirectory && inspectCurrent(root, targetVersion).length === 0)
-    return { unresolved: [], unchanged: true };
+  if (!usesLegacyDirectory && plan.changes.length === 0) return { unresolved: [], unchanged: true };
   const staging = fs.mkdtempSync(path.join(root, '_flow-migration-'));
   const backup = path.join(staging, 'backup');
   const staged = path.join(staging, '_flow');
   let preserveStaging = false;
   try {
     fs.cpSync(sourceFlow, staged, { recursive: true });
-    const stagedConfig = readConfig(staging);
-    if (!usesLegacyDirectory && stagedConfig?.schema_version >= 2 && fs.readdirSync(staged).includes('backlog.yaml'))
-      upgradeCurrentStaged(staging, targetVersion);
-    else migrateStaged(staging);
+    if (usesLegacyDirectory || hasLegacyBacklog(staged)) migrateStaged(staging);
+    else upgradeCanonicalStaged(staging, targetVersion);
     syncProject(staging);
     const findings = validateProject(staging);
     if (findings.length)

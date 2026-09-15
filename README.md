@@ -6,7 +6,7 @@ Each `_flow/work-items/W###-*/` directory is the sole source of truth. Creating 
 
 Run `flow sync` to materialize `_flow/generated/backlog.yaml` and `_flow/generated/graph.md`. Sync only reads canonical work-items and only writes `_flow/generated/`; it never alters a canonical source. Generated files are disposable and ignored by Git.
 
-Complete a task with one commit whose exact subject is `type(domain): description [W###-T###]` and whose body contains matching `Flow-Work-Item` and `Flow-Task` trailers. Complete review with `flow work-item review-complete W### --domain domain`, which creates `chore(domain): complete review [W###]`. The review commit contains only canonical artifacts in that work-item folder. Any deliberate `spec.md` review change belongs in that same commit; nothing outside that folder may enter it.
+Complete a task with one commit whose exact subject is `type(domain): description [W###-T###]` and whose body contains matching `Flow-Work-Item` and `Flow-Task` trailers. Complete review with `flow work-item review-complete W### --domain domain`, which creates `chore(domain): complete review [W###]`. The review commit may contain only that item's `spec.md` and `review.yaml`; a deliberate review-time `spec.md` amendment belongs in the same commit.
 
 CLI-first, repository-resumable delivery for coding agents. Flow keeps deterministic state, IDs, dependency routing, approvals, Git evidence, gates and migrations in the CLI while the agent owns product and engineering judgment.
 
@@ -26,7 +26,7 @@ The project records the Flow package version that initialized or explicitly upda
 
 The backlog contains every known work-item and its DAG, but deep specs are created on demand. `spec_maturity: outlined|ready` is independent of `state: pending|in_progress|completed`. Eligibility is derived from completed dependencies plus resolved external/decision blockers; then routing uses lower priority number and lower numeric ID.
 
-`state.yaml` contains only the execution cursor. Product truth lives in `docs/prd.md`, technical truth in `docs/engineering.md`, and work-item maturity/DAG in `backlog.yaml`.
+Generated `backlog.yaml` and `graph.md` are disposable projections under `_flow/generated/`. Product truth lives in `docs/prd.md`, technical truth in `docs/engineering.md`, and work-item maturity/DAG in canonical work-item specs.
 
 ## CLI
 

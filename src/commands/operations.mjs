@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -27,8 +28,8 @@ const pos = (a) => a.filter((v, i) => !v.startsWith('-') && (i === 0 || !a[i - 1
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'work-item',
   write = (f, v) => fs.writeFileSync(f, stringify(v, { lineWidth: 0 }));
-const stagedFiles = (root) =>
-  execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' })
+const stagedFiles = (root, env) =>
+  execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8', env })
     .split(/\r?\n/)
     .filter(Boolean)
     .map((file) => file.replace(/\\/g, '/'));
@@ -49,8 +50,8 @@ function declaredFiles(root, args) {
     fail('Generated projections must never be committed.');
   return normalized;
 }
-function requireExactStagedFiles(root, allowed) {
-  const actual = stagedFiles(root);
+function requireExactStagedFiles(root, allowed, env) {
+  const actual = stagedFiles(root, env);
   const expected = new Set(allowed);
   const unexpected = actual.filter((file) => !expected.has(file));
   const missing = allowed.filter((file) => !actual.includes(file));
@@ -58,6 +59,27 @@ function requireExactStagedFiles(root, allowed) {
     fail(
       `Staged scope differs from --files.${missing.length ? ` Missing: ${missing.join(', ')}.` : ''}${unexpected.length ? ` Unexpected: ${unexpected.join(', ')}.` : ''}`
     );
+}
+function requireOnlyStagedFiles(root, allowed) {
+  const expected = new Set(allowed);
+  const unexpected = stagedFiles(root).filter((file) => !expected.has(file));
+  if (unexpected.length) fail(`Staged scope contains unexpected files: ${unexpected.join(', ')}.`);
+}
+function temporaryIndex(root) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-index-'));
+  const index = path.join(directory, 'index');
+  const configured = execFileSync('git', ['rev-parse', '--git-path', 'index'], { cwd: root, encoding: 'utf8' }).trim();
+  const current = path.resolve(root, configured);
+  if (fs.existsSync(current)) fs.copyFileSync(current, index);
+  const env = { ...process.env, GIT_INDEX_FILE: index };
+  if (!fs.existsSync(index)) execFileSync('git', ['read-tree', 'HEAD'], { cwd: root, env });
+  return { directory, env };
+}
+function discardTemporaryIndex(index) {
+  fs.rmSync(index.directory, { recursive: true, force: true });
+}
+function resetCommittedIndex(root, files) {
+  execFileSync('git', ['reset', '--quiet', 'HEAD', '--', ...files], { cwd: root });
 }
 function planDocument(metadata, body) {
   return `---\n${stringify(metadata).trimEnd()}\n---${body}`;
@@ -219,18 +241,24 @@ function commit(root, item, tasks, task, id, msg, args) {
   if (bad.length) fail(`Task gates failed: ${bad.map((g) => g.id).join(', ')}.`);
   const f = path.join(item.base, 'tasks.yaml'),
     old = fs.readFileSync(f, 'utf8');
+  const temporary = temporaryIndex(root);
+  const taskFile = path.relative(root, f).replace(/\\/g, '/');
   task.state = 'completed';
   write(f, tasks);
   try {
-    execFileSync('git', ['add', '--', path.relative(root, f)], { cwd: root });
-    requireExactStagedFiles(root, [...files, path.relative(root, f).replace(/\\/g, '/')]);
+    execFileSync('git', ['add', '--', taskFile], { cwd: root, env: temporary.env });
+    requireExactStagedFiles(root, [...files, taskFile], temporary.env);
     execFileSync('git', ['commit', '-m', subject, '-m', `Flow-Work-Item: ${item.id}\nFlow-Task: ${id}`], {
       cwd: root,
+      env: temporary.env,
       stdio: 'inherit'
     });
+    resetCommittedIndex(root, [...files, taskFile]);
   } catch (e) {
     fs.writeFileSync(f, old);
     throw e;
+  } finally {
+    discardTemporaryIndex(temporary);
   }
   info(`${id} committed.`);
 }
@@ -249,27 +277,30 @@ function review(root, item, args) {
   if (bad.length) fail(`Review gates failed: ${bad.map((g) => g.id).join(', ')}.`);
   const f = path.join(item.base, 'review.yaml'),
     v = parseReview(fs.readFileSync(f, 'utf8'), { expectedWorkItem: item.id });
-  v.status = 'approved';
-  v.reviewed_at = new Date().toISOString();
-  write(f, v);
   const rel = path.relative(root, item.base).replace(/\\/g, '/');
+  const reviewFile = `${rel}/review.yaml`;
+  const specFile = `${rel}/spec.md`;
+  const allowed = [specFile, reviewFile];
+  requireOnlyStagedFiles(root, allowed);
+  const temporary = temporaryIndex(root);
   try {
-    execFileSync('git', ['add', '--', rel], { cwd: root });
-    const staged = execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' })
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .map((x) => x.replace(/\\/g, '/'));
-    if (staged.some((x) => !x.startsWith(`${rel}/`) || x.startsWith('_flow/generated/')))
-      fail('Review commit may contain only canonical artifacts in its work-item folder.');
+    v.status = 'approved';
+    v.reviewed_at = new Date().toISOString();
+    write(f, v);
+    execFileSync('git', ['add', '--', reviewFile], { cwd: root, env: temporary.env });
     execFileSync('git', ['commit', '-m', `chore(${domain}): complete review [${item.id}]`], {
       cwd: root,
+      env: temporary.env,
       stdio: 'inherit'
     });
+    resetCommittedIndex(root, allowed);
   } catch (e) {
     v.status = 'pending';
     delete v.reviewed_at;
     write(f, v);
     throw e;
+  } finally {
+    discardTemporaryIndex(temporary);
   }
   info(`${item.id} review completed.`);
 }

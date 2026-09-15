@@ -103,11 +103,25 @@ test('task and review use canonical subjects and release dependent work', () => 
     execFileSync('git', ['log', '-1', '--format=%B'], { cwd: root, encoding: 'utf8' }),
     /Flow-Work-Item: W101\r?\nFlow-Task: W101-T001/
   );
+  const trace = JSON.parse(run(root, ['trace', 'W101', '--json']).stdout);
+  assert.deepEqual(trace.tasks[0].task, 'W101-T001');
+  assert.match(trace.tasks[0].sha, /^[0-9a-f]{40}$/);
+  assert.equal(trace.tasks[0].title, 'implement item');
+  assert.ok(trace.tasks[0].files.includes('implementation.txt'));
+  const traceText = run(root, ['trace', 'W101']).stdout;
+  assert.match(traceText, /W101-T001 {1}[0-9a-f]{40} {1}implement item/);
+  assert.match(traceText, / {2}implementation\.txt/);
   assert.equal(run(root, ['sync']).status, 0);
+  const base = path.join(root, '_flow', 'work-items', 'W101-canonical-item');
+  fs.writeFileSync(path.join(base, 'notes.md'), 'not review evidence\n');
   assert.equal(run(root, ['work-item', 'review-complete', 'W101', '--domain', 'flow']).status, 0);
   assert.match(
     execFileSync('git', ['log', '-1', '--format=%s'], { cwd: root, encoding: 'utf8' }),
     /chore\(flow\): complete review \[W101\]/
+  );
+  assert.doesNotMatch(
+    execFileSync('git', ['show', '--format=', '--name-only', 'HEAD'], { cwd: root, encoding: 'utf8' }),
+    /notes\.md/
   );
   assert.equal(JSON.parse(run(root, ['route', '--json']).stdout).work_item, 'W102');
 });
@@ -178,4 +192,73 @@ test('migration preserves legacy work-items and creates valid outlined shells', 
   );
   assert.deepEqual(tasks.tasks, []);
   assert.equal(run(root, ['validate', '--json']).status, 0);
+});
+
+test('migration is a no-op for the current canonical layout', () => {
+  const root = project();
+  const plan = JSON.parse(run(root, ['migrate', '--plan', '--json']).stdout);
+  assert.deepEqual(plan.changes, []);
+  assert.equal(run(root, ['migrate', '--apply']).status, 0);
+  assert.equal(fs.existsSync(path.join(root, '_flow-backups')), false);
+});
+
+test('failed task commits preserve the real index and task state', () => {
+  const root = project();
+  ready(root);
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  fs.writeFileSync(path.join(root, 'implementation.txt'), 'done\n');
+  execFileSync('git', ['add', 'implementation.txt'], { cwd: root });
+  assert.equal(run(root, ['sync']).status, 0);
+  const hook = path.join(root, '.git', 'hooks', 'pre-commit');
+  fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n');
+  const result = run(root, [
+    'task',
+    'commit',
+    'W101-T001',
+    '--message',
+    'feat(flow): implement item [W101-T001]',
+    '--files',
+    'implementation.txt'
+  ]);
+  assert.notEqual(result.status, 0);
+  const tasks = parse(
+    fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-canonical-item', 'tasks.yaml'), 'utf8')
+  );
+  assert.equal(tasks.tasks[0].state, 'in_progress');
+  assert.deepEqual(
+    execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' }).trim().split(/\r?\n/),
+    ['implementation.txt']
+  );
+});
+
+test('failed review commits preserve the real index and pending review', () => {
+  const root = project();
+  ready(root);
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  fs.writeFileSync(path.join(root, 'implementation.txt'), 'done\n');
+  execFileSync('git', ['add', 'implementation.txt'], { cwd: root });
+  assert.equal(run(root, ['sync']).status, 0);
+  assert.equal(
+    run(root, [
+      'task',
+      'commit',
+      'W101-T001',
+      '--message',
+      'feat(flow): implement item [W101-T001]',
+      '--files',
+      'implementation.txt'
+    ]).status,
+    0
+  );
+  assert.equal(run(root, ['sync']).status, 0);
+  fs.writeFileSync(path.join(root, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n');
+  const result = run(root, ['work-item', 'review-complete', 'W101', '--domain', 'flow']);
+  assert.notEqual(result.status, 0);
+  const review = parse(
+    fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-canonical-item', 'review.yaml'), 'utf8')
+  );
+  assert.equal(review.status, 'pending');
+  assert.equal(execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' }).trim(), '');
 });
