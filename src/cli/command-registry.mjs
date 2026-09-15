@@ -143,7 +143,8 @@ export const COMMANDS = Object.freeze([
       ...common,
       { name: '--title', value: '<text>' },
       { name: '--depends-on', value: '<T###,...>' },
-      { name: '--message', value: '<objective commit title>' }
+      { name: '--message', value: '<objective commit title>' },
+      { name: '--files', value: '<path,...>' }
     ],
     effects: 'Task commit creates the one canonical implementation commit.',
     when: 'Only after spec maturity is ready.',
@@ -162,26 +163,11 @@ export const COMMANDS = Object.freeze([
     run: 'runApproval'
   },
   {
-    name: 'batch',
-    description: 'Apply a YAML/JSON transaction after validating every operation.',
-    usage: 'flow batch --file <path>|--stdin [--format yaml|json]',
-    flags: [
-      ...common,
-      { name: '--file', value: '<path>' },
-      { name: '--stdin' },
-      { name: '--format', value: '<format>', values: ['yaml', 'json'] }
-    ],
-    effects: 'Atomically writes all affected artifacts or none.',
-    when: 'For multiple deterministic mutations.',
-    load: () => import('../commands/operations.mjs'),
-    run: 'runBatch'
-  },
-  {
     name: 'scope',
     description: 'Validate the staged scope for one task before its implementation commit.',
-    usage: 'flow scope validate W###-T### [--json]',
+    usage: 'flow scope validate W###-T### --files <path,...> [--json]',
     arguments: [{ name: 'operation', required: true }],
-    flags: [...common, { name: '--json' }],
+    flags: [...common, { name: '--files', value: '<path,...>' }, { name: '--json' }],
     effects: 'Read-only staged Git inspection and structural validation.',
     when: 'Immediately before a task implementation commit.',
     load: () => import('../commands/operations.mjs'),
@@ -246,8 +232,6 @@ export function validateCommandArguments(command, args) {
   }
   if (command.name === 'migrate' && args.includes('--plan') === args.includes('--apply'))
     throw new Error('flow migrate requires exactly one of --plan or --apply.');
-  if (command.name === 'batch' && args.includes('--file') === args.includes('--stdin'))
-    throw new Error('flow batch requires exactly one of --file or --stdin.');
   if (command.arguments?.some((argument) => argument.required) && !positional.length)
     throw new Error(`flow ${command.name} requires ${command.arguments[0].name}.`);
 }

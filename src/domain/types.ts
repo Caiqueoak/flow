@@ -1,6 +1,6 @@
 export type LifecycleState = 'pending' | 'in_progress' | 'completed';
 export type SpecMaturity = 'outlined' | 'ready';
-export type Traceability = 'commit' | 'none' | 'legacy';
+export type TaskProvenance = 'legacy_migration';
 export type WorkflowPhase =
   | 'discovery'
   | 'prd'
@@ -37,7 +37,7 @@ export interface Task {
   title: string;
   state: LifecycleState;
   depends_on: Array<`T${number}`>;
-  traceability: Traceability;
+  provenance?: TaskProvenance;
   legacy_commit?: string;
 }
 

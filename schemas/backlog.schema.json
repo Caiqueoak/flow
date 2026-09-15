@@ -49,8 +49,11 @@
           },
           "state": {
             "enum": [
-              "pending",
+              "outlined",
+              "blocked",
+              "eligible",
               "in_progress",
+              "review",
               "completed"
             ]
           },

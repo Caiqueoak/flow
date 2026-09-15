@@ -6,7 +6,7 @@ Each `_flow/work-items/W###-*/` directory is the sole source of truth. Creating 
 
 Run `flow sync` to materialize `_flow/generated/backlog.yaml` and `_flow/generated/graph.md`. Sync only reads canonical work-items and only writes `_flow/generated/`; it never alters a canonical source. Generated files are disposable and ignored by Git.
 
-Complete a task with one commit whose exact subject is `type(domain): description [W###-T###]`. Complete review with `flow work-item review-complete W### --domain domain`, which creates `chore(domain): complete review [W###]`. The review commit contains only canonical artifacts in that work-item folder. Any deliberate `spec.md` review change belongs in that same commit; nothing outside that folder may enter it.
+Complete a task with one commit whose exact subject is `type(domain): description [W###-T###]` and whose body contains matching `Flow-Work-Item` and `Flow-Task` trailers. Complete review with `flow work-item review-complete W### --domain domain`, which creates `chore(domain): complete review [W###]`. The review commit contains only canonical artifacts in that work-item folder. Any deliberate `spec.md` review change belongs in that same commit; nothing outside that folder may enter it.
 
 CLI-first, repository-resumable delivery for coding agents. Flow keeps deterministic state, IDs, dependency routing, approvals, Git evidence, gates and migrations in the CLI while the agent owns product and engineering judgment.
 
@@ -51,29 +51,23 @@ flow work-item dependencies W015 --depends-on W003,W009
 flow work-item blocker-add W015 --id vendor-approval --type external_action --description "Vendor approval"
 flow work-item blocker-resolve W015 --id vendor-approval
 flow work-item promote W015
-flow task create W015 --title "Add query contract" --traceability commit
+flow task create W015 --title "Add query contract"
 flow task start W015-T001
-flow scope validate W015-T001
-flow task commit W015-T001 --message "feat: add customer query [W015-T001]"
-# Recovery when the commit exists but metadata persistence failed:
-flow task complete W015-T001
+flow scope validate W015-T001 --files src/query.js,test/query.test.js
+flow task commit W015-T001 --message "feat: add customer query [W015-T001]" --files src/query.js,test/query.test.js
 flow approval record _flow/work-items/W015-customer-search/implementation-plan.md
-flow state update --phase implementation --step execute_task --work-item W015 --task W015-T001
-flow graph
 ```
-
-Batch accepts a YAML/JSON list (or `{operations: [...]}`) from `--file` or `--stdin`. All operations are applied against staging and validated before `_flow` is swapped; any failure leaves the live project unchanged.
 
 ## Git traceability
 
-`W###-T###` is permanent task identity. A repository-mutating native task uses `traceability: commit` and exactly one coherent implementation commit. Its objective message contains the task ID and its body contains:
+`W###-T###` is permanent task identity. A repository-mutating task creates exactly one coherent implementation commit. Its objective message contains the task ID for human visibility and its body contains the canonical machine evidence:
 
 ```text
 Flow-Work-Item: W015
 Flow-Task: W015-T003
 ```
 
-After the commit, `flow task complete W015-T003` resolves the unique reachable trailer match and persists only Flow metadata in a separate administrative commit without Flow trailers. SHA evidence is never stored in tasks.yaml. `flow trace W015-T003` resolves the task commit, while `flow trace W015` aggregates reachable implementation commits by `Flow-Work-Item`, including task, SHA, title and changed files. `none` is for deliberate non-repository work; `legacy` is migration-only.
+`flow trace W015-T003` resolves a unique reachable commit only when its subject and both trailers agree. SHA evidence is never stored in tasks.yaml. `flow trace W015` aggregates reachable implementation commits by `Flow-Work-Item`, including task, SHA, title and changed files.
 
 ## Gates and performance
 

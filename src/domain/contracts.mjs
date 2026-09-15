@@ -15,6 +15,14 @@ export const TASK_ID = new RegExp(TASK_ID_PATTERN);
 export const QUALIFIED_TASK_ID = new RegExp(QUALIFIED_TASK_ID_PATTERN);
 
 export const LIFECYCLE_STATES = Object.freeze(['pending', 'in_progress', 'completed']);
+export const DERIVED_WORK_ITEM_STATES = Object.freeze([
+  'outlined',
+  'blocked',
+  'eligible',
+  'in_progress',
+  'review',
+  'completed'
+]);
 export const SPEC_MATURITIES = Object.freeze(['outlined', 'ready']);
 export const WORKFLOW = Object.freeze({
   discovery: ['define_problem', 'explore_product', 'assess_viability', 'consolidate'],
@@ -62,7 +70,7 @@ export const JSON_SCHEMAS = Object.freeze({
             folder: { type: 'string', pattern: '^W\\d{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$' },
             kind: { enum: ['feature', 'technical', 'maintenance'] },
             title: { type: 'string', minLength: 1 },
-            state: { enum: LIFECYCLE_STATES },
+            state: { enum: DERIVED_WORK_ITEM_STATES },
             priority: { type: 'integer', minimum: 1 },
             spec_maturity: { enum: SPEC_MATURITIES },
             depends_on: { type: 'array', uniqueItems: true, items: id(WORK_ITEM_ID_PATTERN) },

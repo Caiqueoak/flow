@@ -65,7 +65,7 @@ export function derivedBacklog(items) {
       title: i.title,
       kind: i.kind,
       priority: i.priority,
-      maturity: i.maturity,
+      spec_maturity: i.maturity,
       depends_on: i.depends_on,
       blockers: i.blockers,
       state: lifecycle(i, byId).status

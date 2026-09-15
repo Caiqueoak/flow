@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { parse, stringify } from 'yaml';
 import { fail, info } from '../shared/cli-io.mjs';
@@ -26,6 +27,46 @@ const pos = (a) => a.filter((v, i) => !v.startsWith('-') && (i === 0 || !a[i - 1
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'work-item',
   write = (f, v) => fs.writeFileSync(f, stringify(v, { lineWidth: 0 }));
+const stagedFiles = (root) =>
+  execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' })
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((file) => file.replace(/\\/g, '/'));
+function declaredFiles(root, args) {
+  const raw = valueAfter(args, '--files');
+  if (!raw) fail('--files is required.');
+  const files = list(raw);
+  if (!files.length) fail('--files must name at least one project-relative file.');
+  const normalized = files.map((file) => {
+    if (path.isAbsolute(file)) fail(`--files must be project-relative: '${file}'.`);
+    const resolved = path.resolve(root, file);
+    const relative = path.relative(root, resolved).replace(/\\/g, '/');
+    if (!relative || relative === '..' || relative.startsWith('../')) fail(`--files escapes the project: '${file}'.`);
+    return relative;
+  });
+  if (new Set(normalized).size !== normalized.length) fail('--files contains duplicate paths.');
+  if (normalized.some((file) => file.startsWith('_flow/generated/')))
+    fail('Generated projections must never be committed.');
+  return normalized;
+}
+function requireExactStagedFiles(root, allowed) {
+  const actual = stagedFiles(root);
+  const expected = new Set(allowed);
+  const unexpected = actual.filter((file) => !expected.has(file));
+  const missing = allowed.filter((file) => !actual.includes(file));
+  if (unexpected.length || missing.length)
+    fail(
+      `Staged scope differs from --files.${missing.length ? ` Missing: ${missing.join(', ')}.` : ''}${unexpected.length ? ` Unexpected: ${unexpected.join(', ')}.` : ''}`
+    );
+}
+function planDocument(metadata, body) {
+  return `---\n${stringify(metadata).trimEnd()}\n---${body}`;
+}
+function planRevision(metadata, body) {
+  const stable = { ...metadata };
+  delete stable.approval;
+  return createHash('sha256').update(planDocument(stable, body)).digest('hex');
+}
 const find = (root, id) => {
   const x = loadWorkItems(root).find((i) => i.id === id);
   if (!x) fail(`Unknown work-item '${id}'.`);
@@ -33,7 +74,12 @@ const find = (root, id) => {
 };
 const plan = (f) => {
   const m = fs.readFileSync(f, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  return m ? parse(m[1])?.status : null;
+  if (!m) return null;
+  const metadata = parse(m[1]) ?? {};
+  const body = fs.readFileSync(f, 'utf8').slice(m[0].length);
+  return metadata.status === 'approved' && metadata.approval?.revision === planRevision(metadata, body)
+    ? 'approved'
+    : null;
 };
 function create(root, id, title, kind, priority, depends_on) {
   const base = path.join(root, '_flow', 'work-items', `${id}-${slug(title)}`);
@@ -154,10 +200,10 @@ export function runTask({ args }) {
     write(f, tasks);
     return info(`${target} updated.`);
   }
-  if (action === 'commit') return commit(root, item, tasks, task, target, valueAfter(args, '--message'));
+  if (action === 'commit') return commit(root, item, tasks, task, target, valueAfter(args, '--message'), args);
   fail(`Unknown task operation '${action}'.`);
 }
-function commit(root, item, tasks, task, id, msg) {
+function commit(root, item, tasks, task, id, msg, args) {
   if (task.state !== 'in_progress') fail(`${id} must be in_progress.`);
   const subject = msg?.trim(),
     safe = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
@@ -167,6 +213,8 @@ function commit(root, item, tasks, task, id, msg) {
   if (!subject || !re.test(subject)) fail(`--message must be type(domain): description [${id}].`);
   const findings = validateProject(root, { preCommitTask: id, skipTrace: true });
   if (findings.length) fail(`Pre-commit validation failed: ${findings.map((x) => x.code).join(', ')}.`);
+  const files = declaredFiles(root, args);
+  requireExactStagedFiles(root, files);
   const bad = evaluateGates(root, { task: id }).filter((g) => g.blocking && g.status !== 'passed');
   if (bad.length) fail(`Task gates failed: ${bad.map((g) => g.id).join(', ')}.`);
   const f = path.join(item.base, 'tasks.yaml'),
@@ -175,13 +223,11 @@ function commit(root, item, tasks, task, id, msg) {
   write(f, tasks);
   try {
     execFileSync('git', ['add', '--', path.relative(root, f)], { cwd: root });
-    const staged = execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' })
-      .split(/\r?\n/)
-      .filter(Boolean);
-    if (!staged.length) fail('Task commit has no staged changes.');
-    if (staged.some((x) => x.replace(/\\/g, '/').startsWith('_flow/generated/')))
-      fail('Generated projections must never be committed.');
-    execFileSync('git', ['commit', '-m', subject], { cwd: root, stdio: 'inherit' });
+    requireExactStagedFiles(root, [...files, path.relative(root, f).replace(/\\/g, '/')]);
+    execFileSync('git', ['commit', '-m', subject, '-m', `Flow-Work-Item: ${item.id}\nFlow-Task: ${id}`], {
+      cwd: root,
+      stdio: 'inherit'
+    });
   } catch (e) {
     fs.writeFileSync(f, old);
     throw e;
@@ -231,11 +277,26 @@ export function runScope({ args }) {
   const id = pos(args)[1],
     findings = validateProject(projectRoot(args), { preCommitTask: id, skipTrace: true });
   if (findings.length) fail(findings.map((x) => `${x.code}: ${x.message}`).join(' | '));
+  requireExactStagedFiles(projectRoot(args), declaredFiles(projectRoot(args), args));
   info(`${id} staged scope is valid.`);
 }
-export function runApproval() {
-  fail('Use the document approval workflow.');
-}
-export function runBatch() {
-  fail('Batch mutations are retired; use local work-item commands.');
+export function runApproval({ args }) {
+  const root = projectRoot(args);
+  const target = pos(args)[1];
+  if (pos(args)[0] !== 'record' || !target) fail('Usage: flow approval record <implementation-plan.md>.');
+  if (path.isAbsolute(target)) fail('Approval path must be project-relative.');
+  const file = path.resolve(root, target);
+  const item = loadWorkItems(root).find((candidate) => path.resolve(candidate.base, 'implementation-plan.md') === file);
+  if (!item) fail('Approvals may only record a canonical work-item implementation plan.');
+  const text = fs.readFileSync(file, 'utf8');
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---([\s\S]*)$/);
+  if (!match) fail('implementation-plan.md requires YAML frontmatter.');
+  const metadata = parse(match[1]) ?? {};
+  metadata.status = 'approved';
+  delete metadata.approval;
+  const at = valueAfter(args, '--at') ?? new Date().toISOString();
+  if (Number.isNaN(Date.parse(at))) fail('--at must be an ISO timestamp.');
+  metadata.approval = { at: new Date(at).toISOString(), revision: planRevision(metadata, match[2]) };
+  fs.writeFileSync(file, planDocument(metadata, match[2]));
+  info(`${item.id} implementation plan approved.`);
 }

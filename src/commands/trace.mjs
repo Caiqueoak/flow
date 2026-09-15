@@ -7,23 +7,43 @@ const subject =
   /^(feat|fix|docs|style|refactor|test|build|ci|chore|perf|revert)\(([a-z0-9][a-z0-9-]*)\): (.+) \[(W\d{3,}(?:-T\d{3,})?)\]$/;
 function history(root) {
   try {
-    return execFileSync('git', ['log', 'HEAD', '--format=%H%x1f%ct%x1f%s%x1e'], { cwd: root, encoding: 'utf8' })
+    return execFileSync('git', ['log', 'HEAD', '--format=%H%x1f%ct%x1f%s%x1f%B%x1e'], { cwd: root, encoding: 'utf8' })
       .split('\x1e')
       .filter((r) => r.trim())
       .map((r) => {
-        const [sha, timestamp, ...rest] = r.trim().split('\x1f');
-        return { sha, timestamp: Number(timestamp), subject: rest.join('\x1f') };
+        const [sha, timestamp, subject, body = ''] = r.trim().split('\x1f');
+        return { sha, timestamp: Number(timestamp), subject, body };
       });
   } catch {
     fail('git history is unavailable.');
   }
 }
+function trailers(body) {
+  const values = new Map();
+  for (const line of body.split(/\r?\n/)) {
+    const match = line.match(/^(Flow-Work-Item|Flow-Task):\s*(\S+)\s*$/);
+    if (!match) continue;
+    if (values.has(match[1])) return null;
+    values.set(match[1], match[2]);
+  }
+  return values;
+}
+function isCanonicalTaskCommit(entry, id) {
+  const match = entry.subject.match(subject);
+  if (!match || match[4] !== id) return false;
+  const values = trailers(entry.body);
+  return values?.get('Flow-Task') === id && values.get('Flow-Work-Item') === id.split('-')[0];
+}
 function classify(entries, id) {
   const wanted = entries.filter((e) => e.subject.endsWith(`[${id}]`)),
-    good = wanted.filter((e) => {
-      const m = e.subject.match(subject);
-      return m && m[4] === id && (task.test(id) ? m[1] !== 'chore' || true : m[1] === 'chore');
-    }),
+    good = wanted.filter((entry) =>
+      task.test(id)
+        ? isCanonicalTaskCommit(entry, id)
+        : (() => {
+            const match = entry.subject.match(subject);
+            return match && match[4] === id && match[1] === 'chore';
+          })()
+    ),
     invalid = wanted.filter((e) => !good.includes(e));
   return {
     status: invalid.length ? 'invalid' : !good.length ? 'missing' : good.length > 1 ? 'ambiguous' : 'resolved',
@@ -41,9 +61,9 @@ export function traceTasks(root, ids) {
 export function traceWorkItem(root, id) {
   if (!work.test(id)) fail(`invalid work-item ID '${id}'.`);
   const entries = history(root),
-    tasks = entries.filter((e) => {
-      const m = e.subject.match(subject);
-      return m && m[4].startsWith(`${id}-T`);
+    tasks = entries.filter((entry) => {
+      const match = entry.subject.match(subject);
+      return match && match[4].startsWith(`${id}-T`) && isCanonicalTaskCommit(entry, match[4]);
     }),
     review = classify(entries, id);
   return { work_item_id: id, commits: [...tasks, ...review.commits], review, invalid_commits: review.invalid_commits };
