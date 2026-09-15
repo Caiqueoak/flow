@@ -212,6 +212,7 @@ test('failed task commits preserve the real index and task state', () => {
   assert.equal(run(root, ['sync']).status, 0);
   const hook = path.join(root, '.git', 'hooks', 'pre-commit');
   fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n');
+  fs.chmodSync(hook, 0o755);
   const result = run(root, [
     'task',
     'commit',
@@ -253,7 +254,9 @@ test('failed review commits preserve the real index and pending review', () => {
     0
   );
   assert.equal(run(root, ['sync']).status, 0);
-  fs.writeFileSync(path.join(root, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n');
+  const hook = path.join(root, '.git', 'hooks', 'pre-commit');
+  fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n');
+  fs.chmodSync(hook, 0o755);
   const result = run(root, ['work-item', 'review-complete', 'W101', '--domain', 'flow']);
   assert.notEqual(result.status, 0);
   const review = parse(
@@ -261,4 +264,20 @@ test('failed review commits preserve the real index and pending review', () => {
   );
   assert.equal(review.status, 'pending');
   assert.equal(execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' }).trim(), '');
+});
+
+test('packaged workflow instructions use the canonical task and review commands', () => {
+  const planning = fs.readFileSync('skills/flow/planning/step-01-create-tasks.md', 'utf8');
+  const build = fs.readFileSync('skills/flow/build/step-01-execute-task.md', 'utf8');
+  const review = fs.readFileSync('skills/flow/review/step-01-review-work-item.md', 'utf8');
+  const invariants = fs.readFileSync('skills/flow/invariants.md', 'utf8');
+  const readme = fs.readFileSync('README.md', 'utf8');
+
+  for (const instructions of [planning, build, invariants]) {
+    assert.doesNotMatch(instructions, /`traceability:/);
+  }
+  assert.doesNotMatch(build, /flow task complete/);
+  assert.match(build, /flow task commit W###-T### --message "type\(domain\): description \[W###-T###\]" --files/);
+  assert.match(review, /flow work-item review-complete W### --domain domain/);
+  assert.match(readme, /flow task commit W015-T001 --message "feat\(search\): add customer query \[W015-T001\]"/);
 });

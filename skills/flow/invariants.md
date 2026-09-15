@@ -10,7 +10,7 @@
 8. SRP, semantic naming, cohesion, low coupling, locality and justified complexity guide qualitative review; do not fake mechanical proof with Markdown regex.
 9. Dependencies belong in depends_on. External approvals belong in structured unresolved blockers.
 10. Regenerate graph through npx --no-install flow graph; never hand-edit derived output.
-11. New mutating tasks use `traceability: commit`, exactly one implementation commit, the permanent ID in the message, and both Flow trailers. Deliberate non-repository tasks use `none`; `legacy` is reserved for completed migrated tasks.
+11. Each mutating task is completed by `flow task commit`, which creates exactly one implementation commit with the permanent ID in the subject and both Flow trailers. Native tasks never persist traceability fields; `provenance: legacy_migration` is reserved for completed migrated tasks.
 12. Completion requires acceptance, verification, review and traceability. Completed changes become fix tasks or maintenance work.
 13. Pending migration reconciliation blocks all normal planning/build until legacy constraints reach canonical owners.
 14. Invoke only local npx --no-install flow commands. Progress alone is not a terminal stop.

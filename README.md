@@ -54,7 +54,7 @@ flow work-item promote W015
 flow task create W015 --title "Add query contract"
 flow task start W015-T001
 flow scope validate W015-T001 --files src/query.js,test/query.test.js
-flow task commit W015-T001 --message "feat: add customer query [W015-T001]" --files src/query.js,test/query.test.js
+flow task commit W015-T001 --message "feat(search): add customer query [W015-T001]" --files src/query.js,test/query.test.js
 flow approval record _flow/work-items/W015-customer-search/implementation-plan.md
 ```
 
