@@ -65,7 +65,7 @@ Flow-Work-Item: W015
 Flow-Task: W015-T003
 ```
 
-After the commit, `flow task complete W015-T003` resolves the unique reachable trailer match and stores the full Git object ID as `commit_sha`. Metadata persistence is a separate administrative change without Flow trailers. `flow trace` reports task/work-item records, persisted and currently resolved SHA, divergence, title, trailers, changed files and artifact paths. `none` is for deliberate non-repository work; `legacy` is migration-only.
+After the commit, `flow task complete W015-T003` resolves the unique reachable trailer match and persists only Flow metadata in a separate administrative commit without Flow trailers. SHA evidence is never stored in tasks.yaml. `flow trace W015-T003` resolves the task commit, while `flow trace W015` aggregates reachable implementation commits by `Flow-Work-Item`, including task, SHA, title and changed files. `none` is for deliberate non-repository work; `legacy` is migration-only.
 
 ## Gates and performance
 
@@ -92,4 +92,4 @@ npm run test:package
 npm run pack:check
 ```
 
-The npm binary points at strict-TypeScript-built ESM. The published package contains compiled source, skills and generated JSON Schemas.
+The npm binary points at ESM build output. Runtime sources remain JavaScript in this staged packaging migration and are not strict TypeScript-checked; a full source conversion is intentionally separate. The published package contains compiled source, skills and generated JSON Schemas.
