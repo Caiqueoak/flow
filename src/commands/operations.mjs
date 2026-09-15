@@ -189,9 +189,14 @@ function mutateWorkItem(root, operation) {
     const stateFile = flowPath(root, 'state.yaml');
     const state = fs.existsSync(stateFile) ? parseState(fs.readFileSync(stateFile, 'utf8')) : emptyState();
     const tasks = readTasks(root, item);
-    if (!tasks.tasks.length || tasks.tasks.some((task) => task.state !== 'completed')) fail(`${item.id} has incomplete tasks.`);
+    if (!tasks.tasks.length || tasks.tasks.some((task) => task.state !== 'completed'))
+      fail(`${item.id} has incomplete tasks.`);
     if (item.state !== 'in_progress') fail(`${item.id} must be in_progress before review completion.`);
-    if (state.execution.phase !== 'review' || state.execution.step !== 'review_work_item' || state.active.work_item !== item.id)
+    if (
+      state.execution.phase !== 'review' ||
+      state.execution.step !== 'review_work_item' ||
+      state.active.work_item !== item.id
+    )
       fail(`${item.id} must be at the review cursor before review completion.`);
     item.state = 'completed';
     state.active = { work_item: null, task: null };
@@ -346,15 +351,24 @@ function commitFlowMetadata(root, qualifiedTask) {
   // The implementation commit must already have consumed its staged application
   // changes. Refuse to accidentally bundle a caller's staged work here.
   const alreadyStaged = execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' })
-    .split(/\r?\n/).filter(Boolean);
+    .split(/\r?\n/)
+    .filter(Boolean);
   if (alreadyStaged.length) fail(`Refusing metadata persistence with staged changes: ${alreadyStaged.join(', ')}.`);
   const taskFile = path.join('_flow', 'work-items');
-  execFileSync('git', ['add', '--', '_flow/state.yaml', '_flow/backlog.yaml', '_flow/docs/graph.md', taskFile], { cwd: root });
-  const staged = execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean);
+  execFileSync('git', ['add', '--', '_flow/state.yaml', '_flow/backlog.yaml', '_flow/docs/graph.md', taskFile], {
+    cwd: root
+  });
+  const staged = execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' })
+    .split(/\r?\n/)
+    .filter(Boolean);
   const allowed = new RegExp(`^_flow/(?:state\\.yaml|backlog\\.yaml|docs/graph\\.md|work-items/[^/]+/tasks\\.yaml)$`);
-  if (staged.some((file) => !allowed.test(file.replace(/\\/g, '/')))) fail('Metadata persistence staged a non-Flow artifact.');
+  if (staged.some((file) => !allowed.test(file.replace(/\\/g, '/'))))
+    fail('Metadata persistence staged a non-Flow artifact.');
   if (!staged.length) return false;
-  execFileSync('git', ['commit', '-m', `chore(flow): persist ${qualifiedTask} metadata`], { cwd: root, stdio: 'inherit' });
+  execFileSync('git', ['commit', '-m', `chore(flow): persist ${qualifiedTask} metadata`], {
+    cwd: root,
+    stdio: 'inherit'
+  });
   return true;
 }
 

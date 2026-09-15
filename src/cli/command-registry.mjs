@@ -227,7 +227,12 @@ export function renderGlobalHelp(version) {
 }
 export function renderCommandHelp(command) {
   const argumentsText = command.arguments?.length
-    ? command.arguments.map((argument) => `  ${argument.name}${argument.required ? ' (required)' : ''} — ${argument.description ?? 'Command argument.'}`).join('\n')
+    ? command.arguments
+        .map(
+          (argument) =>
+            `  ${argument.name}${argument.required ? ' (required)' : ''} — ${argument.description ?? 'Command argument.'}`
+        )
+        .join('\n')
     : '  (none)';
   const flags = command.flags?.length
     ? command.flags

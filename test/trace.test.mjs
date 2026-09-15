@@ -56,8 +56,14 @@ test('a task trailer without its matching work-item trailer is not identity', as
 
 test('aggregates all reachable work-item commits in deterministic order and reports malformed trailers', async () => {
   const root = await repo();
-  execFileSync('git', ['commit', '--allow-empty', '-m', 'Second task W001-T002\n\nFlow-Work-Item: W001\nFlow-Task: W001-T002'], { cwd: root });
-  execFileSync('git', ['commit', '--allow-empty', '-m', 'Broken implementation\n\nFlow-Work-Item: W001'], { cwd: root });
+  execFileSync(
+    'git',
+    ['commit', '--allow-empty', '-m', 'Second task W001-T002\n\nFlow-Work-Item: W001\nFlow-Task: W001-T002'],
+    { cwd: root }
+  );
+  execFileSync('git', ['commit', '--allow-empty', '-m', 'Broken implementation\n\nFlow-Work-Item: W001'], {
+    cwd: root
+  });
   const result = traceWorkItem(root, 'W001');
   assert.deepEqual(result.commits.map((commit) => commit.task).sort(), ['W001-T001', 'W001-T002']);
   assert.equal(result.invalid_commits.length, 1);

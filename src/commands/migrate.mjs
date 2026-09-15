@@ -199,16 +199,46 @@ function migrateStaged(root) {
 function inspectCurrent(root, targetVersion) {
   const flow = path.join(root, '_flow');
   const changes = [];
-  try { const config = readConfig(root); if (!config || config.schema_version !== FLOW_SCHEMA_VERSION || config.flow_version !== targetVersion) changes.push('upgrade config.yaml'); } catch { changes.push('upgrade config.yaml'); }
-  let backlog;
-  try { backlog = parseBacklog(fs.readFileSync(path.join(flow, 'backlog.yaml'), 'utf8')); } catch { changes.push('upgrade backlog.yaml'); }
-  if (backlog) for (const item of backlog.work_items) {
-    const tasks = path.join(flow, 'work-items', item.folder, 'tasks.yaml');
-    if (fs.existsSync(tasks)) try { parseTasks(fs.readFileSync(tasks, 'utf8'), { expectedWorkItem: item.id }); } catch { changes.push(`upgrade work-items/${item.folder}/tasks.yaml`); }
+  try {
+    const config = readConfig(root);
+    if (!config || config.schema_version !== FLOW_SCHEMA_VERSION || config.flow_version !== targetVersion)
+      changes.push('upgrade config.yaml');
+  } catch {
+    changes.push('upgrade config.yaml');
   }
-  try { parseState(fs.readFileSync(path.join(flow, 'state.yaml'), 'utf8')); } catch { changes.push('upgrade state.yaml'); }
-  try { parseGates(fs.readFileSync(path.join(flow, 'gates.yaml'), 'utf8')); } catch { changes.push('upgrade gates.yaml'); }
-  try { const backlogText = fs.readFileSync(path.join(flow, 'backlog.yaml'), 'utf8'); if (fs.readFileSync(path.join(flow, 'docs', 'graph.md'), 'utf8') !== generateGraphMarkdown(backlogText)) changes.push('regenerate docs/graph.md'); } catch { changes.push('regenerate docs/graph.md'); }
+  let backlog;
+  try {
+    backlog = parseBacklog(fs.readFileSync(path.join(flow, 'backlog.yaml'), 'utf8'));
+  } catch {
+    changes.push('upgrade backlog.yaml');
+  }
+  if (backlog)
+    for (const item of backlog.work_items) {
+      const tasks = path.join(flow, 'work-items', item.folder, 'tasks.yaml');
+      if (fs.existsSync(tasks))
+        try {
+          parseTasks(fs.readFileSync(tasks, 'utf8'), { expectedWorkItem: item.id });
+        } catch {
+          changes.push(`upgrade work-items/${item.folder}/tasks.yaml`);
+        }
+    }
+  try {
+    parseState(fs.readFileSync(path.join(flow, 'state.yaml'), 'utf8'));
+  } catch {
+    changes.push('upgrade state.yaml');
+  }
+  try {
+    parseGates(fs.readFileSync(path.join(flow, 'gates.yaml'), 'utf8'));
+  } catch {
+    changes.push('upgrade gates.yaml');
+  }
+  try {
+    const backlogText = fs.readFileSync(path.join(flow, 'backlog.yaml'), 'utf8');
+    if (fs.readFileSync(path.join(flow, 'docs', 'graph.md'), 'utf8') !== generateGraphMarkdown(backlogText))
+      changes.push('regenerate docs/graph.md');
+  } catch {
+    changes.push('regenerate docs/graph.md');
+  }
   return [...new Set(changes)];
 }
 

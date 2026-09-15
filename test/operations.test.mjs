@@ -59,7 +59,8 @@ test('review-complete is the only work-item completion transition and does not r
   write(root, 'state.yaml', {
     schema_version: 2,
     execution: { phase: 'review', step: 'review_work_item' },
-    active: { work_item: 'W001', task: null }, stop_reason: null,
+    active: { work_item: 'W001', task: null },
+    stop_reason: null,
     migration: { status: 'not_required' }
   });
   assert.equal(run(['work-item', 'review-complete', 'W001', '--path', root]).status, 0);
@@ -102,11 +103,23 @@ test('task commit writes separate metadata evidence and leaves final work for re
   const tasks = parse(fs.readFileSync(path.join(root, '_flow/work-items/W001-example/tasks.yaml'), 'utf8'));
   assert.equal(tasks.tasks[0].commit_sha, undefined);
   assert.equal(tasks.tasks[0].state, 'completed');
-  assert.match(execFileSync('git', ['show', '-s', '--format=%B', metadata], { cwd: root, encoding: 'utf8' }), /^chore\(flow\): persist W001-T001 metadata\s*$/);
-  assert.doesNotMatch(execFileSync('git', ['show', '-s', '--format=%B', metadata], { cwd: root, encoding: 'utf8' }), /Flow-Task:/);
+  assert.match(
+    execFileSync('git', ['show', '-s', '--format=%B', metadata], { cwd: root, encoding: 'utf8' }),
+    /^chore\(flow\): persist W001-T001 metadata\s*$/
+  );
+  assert.doesNotMatch(
+    execFileSync('git', ['show', '-s', '--format=%B', metadata], { cwd: root, encoding: 'utf8' }),
+    /Flow-Task:/
+  );
   const implementation = execFileSync('git', ['rev-parse', 'HEAD^'], { cwd: root, encoding: 'utf8' }).trim();
-  assert.match(execFileSync('git', ['show', '-s', '--format=%B', implementation], { cwd: root, encoding: 'utf8' }), /Flow-Task: W001-T001/);
-  assert.equal(parse(fs.readFileSync(path.join(root, '_flow/backlog.yaml'), 'utf8')).work_items[0].state, 'in_progress');
+  assert.match(
+    execFileSync('git', ['show', '-s', '--format=%B', implementation], { cwd: root, encoding: 'utf8' }),
+    /Flow-Task: W001-T001/
+  );
+  assert.equal(
+    parse(fs.readFileSync(path.join(root, '_flow/backlog.yaml'), 'utf8')).work_items[0].state,
+    'in_progress'
+  );
   const state = parse(fs.readFileSync(path.join(root, '_flow/state.yaml'), 'utf8'));
   assert.deepEqual(state.execution, { phase: 'review', step: 'review_work_item' });
 });
