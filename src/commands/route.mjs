@@ -94,7 +94,12 @@ export function routeProject(root) {
       reason: backlog.work_items.every((item) => item.state === 'completed') ? 'finished' : 'external_action'
     };
   const base = `work-items/${item.folder}`;
-  const context = ['.flow/docs/engineering.md', `.flow/${base}/spec.md`, `.flow/${base}/tasks.yaml`];
+  const context = [
+    '.flow/docs/prd.md',
+    '.flow/docs/engineering.md',
+    `.flow/${base}/spec.md`,
+    `.flow/${base}/tasks.yaml`
+  ];
   const tasks = parseTasks(read(`${base}/tasks.yaml`), { expectedWorkItem: item.id });
   const extra = { work_item: item.id, required_context: context };
   const prepare = () => step('work_item_plan_approval', 'planning/step-02-prepare-plan.md', extra);
