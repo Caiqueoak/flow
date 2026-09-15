@@ -1,6 +1,6 @@
 # Planning — draft an implementation plan
 
-Reread the FULL approved engineering.md, selected spec/tasks, affected code and tests. Write implementation-plan.md BEFORE application edits. Frontmatter: schema_version: 1, work_item: W###, status: draft, engineering_revision and spec_revision SHA256 of the exact UTF-8 files. Calculate with Node crypto; never guess.
+Reread the applicable global PRD rules, the FULL approved engineering.md, selected spec/tasks, affected code and tests. The PRD supplies product constraints; the spec supplies only this work item's bounded delivery scope. Write implementation-plan.md BEFORE application edits. Frontmatter: schema_version: 1, work_item: W###, status: draft, engineering_revision and spec_revision SHA256 of the exact UTF-8 files. Calculate with Node crypto; never guess.
 
 Use exact headings:
 

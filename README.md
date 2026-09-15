@@ -30,9 +30,9 @@ PRD, engineering and plans use YAML frontmatter with `schema_version: 1`, `statu
 ## Canonical artifacts
 
 - `config.yaml`: runtime/bootstrap preferences; installed package metadata owns version.
-- `docs/prd.md`: product truth; `docs/engineering.md`: approved engineering truth.
+- `docs/prd.md`: global, cross-work-item product truth and learner-visible constraints; `docs/engineering.md`: approved global technical/code/infra truth.
 - `backlog.yaml`: schema 2, W### IDs, W###-kebab-case folders, kinds, priority, dependency DAG and lifecycle.
-- `work-items/W###-slug/spec.md`: bounded scope and decisions; `tasks.yaml`: schema 1, work_item, local T### task DAG.
+- `work-items/W###-slug/spec.md`: bounded scope, delivery decisions, and acceptance for one work item; it references applicable PRD rules without redefining them. `tasks.yaml`: schema 1, work_item, local T### task DAG.
 - `implementation-plan.md`: human-approved implementation approach.
 - `state.yaml`: resume cursor and migration reconciliation status.
 - `gates.yaml`: schema 1, command/builtin checks only; qualitative judgment remains review instructions.

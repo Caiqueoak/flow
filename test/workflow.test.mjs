@@ -48,6 +48,16 @@ test('plan missing, draft, approved and stale routes deterministically', () => {
   fs.appendFileSync(path.join(root, '.flow/work-items/W001-example/spec.md'), '\nChanged.');
   assert.equal(routeProject(root).phase, 'work_item_plan_approval');
 });
+test('selected work-item routes include the global PRD alongside bounded scope', () => {
+  const root = project();
+  artifacts(root);
+  const expected = '.flow/docs/prd.md';
+  assert.ok(routeProject(root).required_context.includes(expected));
+  plan(root);
+  assert.ok(routeProject(root).required_context.includes(expected));
+  artifacts(root, item(), [task('T001', { state: 'completed' })]);
+  assert.ok(routeProject(root).required_context.includes(expected));
+});
 test('numeric task order, review and final completion', () => {
   const root = project();
   artifacts(root, item(), [task('T010'), task('T002')]);

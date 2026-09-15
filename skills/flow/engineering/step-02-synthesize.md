@@ -2,7 +2,7 @@
 
 Read the approved PRD, config, full existing engineering evidence, repository tooling/contracts, profiles/readability-first.md and technology-defaults.md. Use existing_code_policy improve to critique accidental structure while preserving behavior; preserve gives consistent patterns stronger weight. Neither authorizes refactoring.
 
-Recommend a complete but proportional contract. Frontmatter: schema_version: 1, status: draft, baseline.profile: flow/readability-first@1, baseline.existing_code_policy: improve|preserve|not_applicable. Include exact headings:
+Recommend a complete but proportional technical contract. Keep global product behavior in the PRD and bounded delivery behavior in work-item specs; engineering records only the technical/code/infra constraints that realize them. Frontmatter: schema_version: 1, status: draft, baseline.profile: flow/readability-first@1, baseline.existing_code_policy: improve|preserve|not_applicable. Include exact headings:
 
 # Engineering
 

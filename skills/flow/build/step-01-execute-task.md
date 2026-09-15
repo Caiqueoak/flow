@@ -1,6 +1,6 @@
 # Build — execute one approved task
 
-Read the FULL engineering.md, spec, tasks and approved current implementation plan. Verify current route and approval hashes before application edits. Persist both selected work item and task in_progress; no other mutating task may be active.
+Read the applicable global PRD rules, the FULL engineering.md, spec, tasks and approved current implementation plan. Verify current route and approval hashes before application edits. Persist both selected work item and task in_progress; no other mutating task may be active.
 
 Implement the bounded approved change for readability: semantic naming, mandatory SRP, low coupling, high cohesion, locality and justified complexity. If the approach must change materially, revise the plan and ask approval before continuing.
 
