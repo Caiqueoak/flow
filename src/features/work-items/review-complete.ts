@@ -21,15 +21,15 @@ interface GateResult {
   status: string;
 }
 
-const parseReviewBoundary = parseReview as (
+const parseReviewBoundary = parseReview as unknown as (
   text: string,
   options: { expectedWorkItem: string }
 ) => WorkItemReview;
-const validateProjectBoundary = validateProject as (
+const validateProjectBoundary = validateProject as unknown as (
   root: string,
   options: { workItem: string }
 ) => ValidationFinding[];
-const evaluateGatesBoundary = evaluateGates as (
+const evaluateGatesBoundary = evaluateGates as unknown as (
   root: string,
   options: { workItem: string; stage: 'work-item-review' }
 ) => GateResult[];
