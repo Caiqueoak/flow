@@ -4,13 +4,23 @@ import { positionalArguments, projectRelativeFiles } from '../../shared/cli/argu
 import { assertExactStagedFiles } from '../../shared/git/git.js';
 import { projectRoot } from '../../shared/project-path.mjs';
 
+interface ValidationFinding {
+  code: string;
+  message: string;
+}
+
+const validateProjectBoundary = validateProject as (
+  root: string,
+  options: { preCommitTask?: string; skipTrace?: boolean }
+) => ValidationFinding[];
+
 export function runScope({ args }: { args: string[] }): void {
   const root = projectRoot(args);
   const taskId = positionalArguments(args)[1];
-  const findings = validateProject(root, { preCommitTask: taskId, skipTrace: true });
+  const findings = validateProjectBoundary(root, { preCommitTask: taskId, skipTrace: true });
 
   if (findings.length) {
-    fail(findings.map((finding: { code: string; message: string }) => `${finding.code}: ${finding.message}`).join(' | '));
+    fail(findings.map((finding) => `${finding.code}: ${finding.message}`).join(' | '));
   }
 
   assertExactStagedFiles(root, projectRelativeFiles(root, args));
