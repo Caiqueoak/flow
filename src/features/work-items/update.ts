@@ -1,3 +1,4 @@
+import { fail } from '../../shared/cli-io.mjs';
 import type { BlockerType, LoadedWorkItem, WorkItemId, WorkItemKind } from '../../shared/domain/work-item.js';
 import { commaSeparatedValues, optionValue, requiredOption } from '../../shared/cli/arguments.js';
 import { editSpecMetadata } from './shared.js';
@@ -46,9 +47,9 @@ export function resolveWorkItemBlocker(item: LoadedWorkItem, args: readonly stri
     const blocker = metadata.blockers.find((candidate) => candidate.id === blockerId);
 
     if (!blocker) {
-      throw new Error('Unknown blocker.');
+      fail('Unknown blocker.');
     }
 
-    blocker.status = 'resolved';
+    blocker!.status = 'resolved';
   });
 }
