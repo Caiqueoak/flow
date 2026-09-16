@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { FLOW_SCHEMA_VERSION } from '../domain/contracts.mjs';
+import { READABILITY_FIRST_PROFILE } from './profiles.mjs';
 
 export function configPath(root) {
   return path.join(root, '_flow', 'config.yaml');
@@ -12,7 +13,7 @@ export function defaultConfig(flowVersion = '0.6.0') {
     schema_version: FLOW_SCHEMA_VERSION,
     flow_version: flowVersion,
     runtimes: [],
-    engineering: { profile: 'flow/readability-first@1', existing_code_policy: 'not_applicable' }
+    engineering: { profile: READABILITY_FIRST_PROFILE.id, existing_code_policy: 'not_applicable' }
   };
 }
 
