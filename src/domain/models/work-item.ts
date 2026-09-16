@@ -1,4 +1,4 @@
-import type {
+import {
   BLOCKER_STATUSES,
   BLOCKER_TYPES,
   SPEC_MATURITIES,
