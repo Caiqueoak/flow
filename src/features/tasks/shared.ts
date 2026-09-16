@@ -7,7 +7,7 @@ import type { Task, TaskCollection, TaskId } from '../../shared/domain/task.js';
 import type { LoadedWorkItem } from '../../shared/domain/work-item.js';
 import { readText } from '../../shared/filesystem/files.js';
 
-const parseTasksBoundary = parseTasks as (
+const parseTasksBoundary = parseTasks as unknown as (
   text: string,
   options: { expectedWorkItem: string }
 ) => TaskCollection;
