@@ -1,19 +1,11 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "checkJs": false,
     "strict": true,
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "rootDir": "src",
-    "outDir": "dist",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "skipLibCheck": true
-  },
-  "include": ["src/**/*"]
+  }
 }

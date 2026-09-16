@@ -43,8 +43,7 @@ jobs:
           node-version: 22.x
           cache: npm
       - run: npm ci
-      - run: npm run build
-      - run: node --test --test-name-pattern=migration test/canonical.test.mjs
+      - run: npm test
 
   publish:
     name: release npm
@@ -69,19 +68,21 @@ jobs:
       - name: Install npm with Trusted Publishing support
         run: npm install --global npm@latest
       - run: npm --version
-      - name: Establish the npm release baseline once
+      - name: Determine version and publish
+        run: npm exec --yes --package=semantic-release@25.0.9 -- semantic-release
+      - name: Synchronize package version from npm
         shell: bash
         run: |
           package_name="$(node -p 'require("./package.json").name')"
           published_version="$(npm view "${package_name}" version)"
-          baseline_tag="v${published_version}"
-          if git rev-parse --verify --quiet "refs/tags/${baseline_tag}"; then
+          npm version "${published_version}" --no-git-tag-version --ignore-scripts --allow-same-version
+
+          if git diff --quiet -- package.json package-lock.json; then
             exit 0
           fi
-          baseline_commit="$(git log -n 1 --format=%H -- package.json)"
+
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git tag --annotate "${baseline_tag}" "${baseline_commit}" --message "Release ${baseline_tag}"
-          git push origin "${baseline_tag}"
-      - name: Determine version and publish
-        run: npm exec --yes --package=semantic-release@25.0.9 -- semantic-release
+          git add package.json package-lock.json
+          git commit --message "chore(release): sync package version to ${published_version} [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
