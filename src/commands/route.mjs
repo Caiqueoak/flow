@@ -1,8 +1,25 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { info } from '../shared/cli-io.mjs';
 import { projectRoot } from '../shared/project-path.mjs';
 import { loadWorkItems, lifecycle } from '../artifacts/work-items.mjs';
+import { parseState } from '../artifacts/state.mjs';
+
 const step = (phase, instruction, extra = {}) => ({ action: 'continue', phase, instruction, ...extra });
+
+function migrationRoute(root) {
+  const file = path.join(root, '_flow', 'state.yaml');
+  if (!fs.existsSync(file)) return null;
+  const state = parseState(fs.readFileSync(file, 'utf8'));
+  return state.migration.status === 'pending_reconciliation'
+    ? step('reconcile', 'migration/step-01-reconcile.md')
+    : null;
+}
+
 export function routeProject(root) {
+  const migration = migrationRoute(root);
+  if (migration) return migration;
+
   const items = loadWorkItems(root),
     by = new Map(items.map((i) => [i.id, i]));
   const active = items.find((i) => lifecycle(i, by).status === 'in_progress');
