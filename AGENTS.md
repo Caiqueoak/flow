@@ -24,6 +24,7 @@
 
 ## Verification
 
-Run `npm run typecheck`, `npm test`, `npm run lint`, `npm run format:check`, `npm run pack:check`, and `npm run test:package` after structural changes.
+Run `npm run verify` after structural changes. It is the single source of truth for
+the local pre-push hook and CI validation suite.
 
 Read `docs/architecture.md`, `docs/commands.md`, and `docs/testing.md` before changing module ownership.

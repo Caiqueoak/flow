@@ -98,6 +98,7 @@ npm run format:check
 npm test
 npm run test:package
 npm run pack:check
+npm run verify
 ```
 
 The npm binary points at ESM build output. Typed boundaries and new slices use strict TypeScript; remaining stable ESM modules are compiled in the same build while their type migration continues. The published package contains compiled source, skills and generated JSON Schemas.
@@ -108,3 +109,9 @@ Publishing runs from `main`. After semantic-release publishes a version, CI read
 `latest` version from npm and commits that exact value to `package.json` and
 `package-lock.json`. npm is the version authority; do not manually advance these
 versions for a release.
+
+## Local push checks
+
+Husky runs `npm run verify` before every `git push`. This is the same command run
+by the validation jobs in CI, so a successful local push has passed the full
+repository check suite for the installed Node version.
