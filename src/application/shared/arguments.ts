@@ -24,13 +24,20 @@ export function optionValue(args: readonly string[], option: string): string | u
 
 export function requiredOption(args: readonly string[], option: string): string {
   const value = optionValue(args, option);
-  if (!value) fail(`${option} is required.`);
-  return value;
+
+  if (!value) {
+    fail(`${option} is required.`);
+  }
+
+  return value!;
 }
 
 export function projectRelativeFiles(root: string, args: readonly string[]): string[] {
   const files = commaSeparatedValues(requiredOption(args, '--files'));
-  if (!files.length) fail('--files must name at least one project-relative file.');
+
+  if (!files.length) {
+    fail('--files must name at least one project-relative file.');
+  }
 
   const normalized = files.map((file) => normalizeProjectRelativePath(root, file));
 
