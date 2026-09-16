@@ -19,11 +19,14 @@ interface GateResult {
   status: string;
 }
 
-const validateProjectBoundary = validateProject as (
+const validateProjectBoundary = validateProject as unknown as (
   root: string,
-  options: { preCommitTask?: string; skipTrace?: boolean }
+  options: { preCommitTask: string; skipTrace: boolean }
 ) => ValidationFinding[];
-const evaluateGatesBoundary = evaluateGates as (root: string, options: { task: string }) => GateResult[];
+const evaluateGatesBoundary = evaluateGates as unknown as (
+  root: string,
+  options: { task: string }
+) => GateResult[];
 
 export function commitTask(
   root: string,
