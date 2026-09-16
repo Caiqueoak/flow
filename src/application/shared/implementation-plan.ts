@@ -32,23 +32,15 @@ export function parseImplementationPlan(text: string): ParsedImplementationPlan 
   };
 }
 
-export function serializeImplementationPlan(
-  metadata: ImplementationPlanMetadata,
-  body: string
-): string {
+export function serializeImplementationPlan(metadata: ImplementationPlanMetadata, body: string): string {
   return `---\n${stringify(metadata).trimEnd()}\n---${body}`;
 }
 
-export function implementationPlanRevision(
-  metadata: ImplementationPlanMetadata,
-  body: string
-): string {
+export function implementationPlanRevision(metadata: ImplementationPlanMetadata, body: string): string {
   const stableMetadata = { ...metadata };
   delete stableMetadata.approval;
 
-  return createHash('sha256')
-    .update(serializeImplementationPlan(stableMetadata, body))
-    .digest('hex');
+  return createHash('sha256').update(serializeImplementationPlan(stableMetadata, body)).digest('hex');
 }
 
 export function isImplementationPlanApproved(text: string): boolean {

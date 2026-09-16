@@ -1,9 +1,4 @@
-import {
-  BLOCKER_STATUSES,
-  BLOCKER_TYPES,
-  SPEC_MATURITIES,
-  WORK_ITEM_KINDS
-} from '../constants.js';
+import { BLOCKER_STATUSES, BLOCKER_TYPES, SPEC_MATURITIES, WORK_ITEM_KINDS } from '../constants.js';
 
 export type WorkItemId = `W${number}`;
 export type WorkItemKind = (typeof WORK_ITEM_KINDS)[number];

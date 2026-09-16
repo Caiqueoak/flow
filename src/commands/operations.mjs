@@ -47,10 +47,7 @@ import {
   resetFiles,
   stageFiles
 } from '../infrastructure/git/git.js';
-import {
-  createTemporaryGitIndex,
-  removeTemporaryGitIndex
-} from '../infrastructure/git/git-index.js';
+import { createTemporaryGitIndex, removeTemporaryGitIndex } from '../infrastructure/git/git-index.js';
 
 export function runWorkItem({ args }) {
   const root = projectRoot(args);
@@ -146,9 +143,7 @@ export function runApproval({ args }) {
   }
 
   const file = path.resolve(root, target);
-  const item = loadWorkItems(root).find(
-    (candidate) => path.resolve(candidate.base, IMPLEMENTATION_PLAN_FILE) === file
-  );
+  const item = loadWorkItems(root).find((candidate) => path.resolve(candidate.base, IMPLEMENTATION_PLAN_FILE) === file);
 
   if (!item) {
     fail('Approvals may only record a canonical work-item implementation plan.');
@@ -210,10 +205,7 @@ function writeWorkItemShells(base, input) {
     maturity: 'outlined'
   };
 
-  writeText(
-    path.join(base, SPEC_FILE),
-    `---\n${stringify(metadata).trimEnd()}\n---\n\n${WORK_ITEM_SPEC_TITLE}\n`
-  );
+  writeText(path.join(base, SPEC_FILE), `---\n${stringify(metadata).trimEnd()}\n---\n\n${WORK_ITEM_SPEC_TITLE}\n`);
   writeYaml(path.join(base, TASKS_FILE), {
     schema_version: 3,
     work_item: input.id,
@@ -439,9 +431,7 @@ function ensurePreCommitValidation(root, taskId) {
 }
 
 function ensureTaskGatesPass(root, taskId) {
-  const failedGates = evaluateGates(root, { task: taskId }).filter(
-    (gate) => gate.blocking && gate.status !== 'passed'
-  );
+  const failedGates = evaluateGates(root, { task: taskId }).filter((gate) => gate.blocking && gate.status !== 'passed');
 
   if (failedGates.length) {
     fail(`Task gates failed: ${failedGates.map((gate) => gate.id).join(', ')}.`);
@@ -513,26 +503,17 @@ function editSpecMetadata(item, mutate) {
   const metadata = parse(match[1]);
   mutate(metadata);
 
-  writeText(
-    specFile,
-    `---\n${stringify(metadata).trimEnd()}\n---${text.slice(match[0].length)}`
-  );
+  writeText(specFile, `---\n${stringify(metadata).trimEnd()}\n---${text.slice(match[0].length)}`);
 }
 
 function nextWorkItemId(items) {
-  const highestId = items.reduce(
-    (highest, item) => Math.max(highest, Number(item.id.slice(1))),
-    0
-  );
+  const highestId = items.reduce((highest, item) => Math.max(highest, Number(item.id.slice(1))), 0);
 
   return `${WORK_ITEM_ID_PREFIX}${String(highestId + 1).padStart(ID_PADDING, '0')}`;
 }
 
 function nextTaskId(tasks) {
-  const highestId = tasks.reduce(
-    (highest, task) => Math.max(highest, Number(task.id.slice(1))),
-    0
-  );
+  const highestId = tasks.reduce((highest, task) => Math.max(highest, Number(task.id.slice(1))), 0);
 
   return `T${String(highestId + 1).padStart(ID_PADDING, '0')}`;
 }

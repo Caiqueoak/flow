@@ -11,10 +11,7 @@ export interface GitCommitInput {
 }
 
 export function stagedFiles(root: string, env: ProcessEnvironment = process.env): string[] {
-  return runGit(root, ['diff', '--cached', '--name-only'], env)
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map(normalizeGitPath);
+  return runGit(root, ['diff', '--cached', '--name-only'], env).split(/\r?\n/).filter(Boolean).map(normalizeGitPath);
 }
 
 export function stageFiles(root: string, files: readonly string[], env: ProcessEnvironment = process.env): void {

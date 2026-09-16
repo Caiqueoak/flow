@@ -9,9 +9,7 @@ function taskCommitSubjectPattern(taskId: QualifiedTaskId): RegExp {
   const escapedTaskId = escapeRegex(taskId);
   const commitTypes = TASK_COMMIT_TYPES.join('|');
 
-  return new RegExp(
-    `^(?:${commitTypes})\\([a-z0-9][a-z0-9-]*\\): .+ \\[${escapedTaskId}\\]$`
-  );
+  return new RegExp(`^(?:${commitTypes})\\([a-z0-9][a-z0-9-]*\\): .+ \\[${escapedTaskId}\\]$`);
 }
 
 function escapeRegex(value: string): string {
