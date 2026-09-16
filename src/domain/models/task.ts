@@ -1,4 +1,4 @@
-import type { LIFECYCLE_STATES } from '../constants.js';
+import { LIFECYCLE_STATES } from '../constants.js';
 
 export type TaskId = `T${number}`;
 export type QualifiedTaskId = `W${number}-T${number}`;
