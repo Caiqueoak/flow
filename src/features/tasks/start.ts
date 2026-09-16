@@ -12,8 +12,7 @@ export function startTask(
   item: LoadedWorkItem,
   tasksFile: string,
   tasks: TaskCollection,
-  task: Task,
-  taskId: string
+  task: Task
 ): void {
   ensureWorkItemIsNotBlocked(root, item);
   ensureNoTaskIsInProgress(tasks);
