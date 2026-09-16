@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flow.local/schemas/config.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "flow_version",
+    "runtimes",
+    "engineering"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 4
+    },
+    "flow_version": {
+      "type": "string"
+    },
+    "runtimes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "engineering": {
+      "type": "object"
+    }
+  }
+}

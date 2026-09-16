@@ -1,5 +1,6 @@
 import { parseDocument } from 'yaml';
 import { ArtifactValidationError } from './backlog.mjs';
+import { GATES_SCHEMA_VERSION } from '../domain/contracts.mjs';
 
 const KINDS = new Set(['command', 'builtin']);
 
@@ -9,7 +10,8 @@ export function parseGates(text, { source = 'gates.yaml' } = {}) {
   const value = document.toJS();
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new ArtifactValidationError(`${source} must be a mapping.`);
-  if (value.schema_version !== 1) throw new ArtifactValidationError(`${source} schema_version must be 1.`);
+  if (value.schema_version !== GATES_SCHEMA_VERSION)
+    throw new ArtifactValidationError(`${source} schema_version must be ${GATES_SCHEMA_VERSION}.`);
   if (!Array.isArray(value.gates)) throw new ArtifactValidationError(`${source} gates must be a list.`);
   const ids = new Set();
   const gates = value.gates.map((gate, index) => {
@@ -22,7 +24,16 @@ export function parseGates(text, { source = 'gates.yaml' } = {}) {
     if (!KINDS.has(gate.kind)) throw new ArtifactValidationError(`${gate.id}.kind must be command or builtin.`);
     if (gate.kind === 'command' && (!gate.command || typeof gate.command !== 'string'))
       throw new ArtifactValidationError(`${gate.id} command gate requires command.`);
-    return { ...gate, blocking: gate.blocking !== false };
+    const stage = gate.stage ?? 'full';
+    if (!['task', 'work-item-review', 'full'].includes(stage))
+      throw new ArtifactValidationError(`${gate.id}.stage must be task, work-item-review or full.`);
+    const cost = gate.cost ?? 'medium';
+    if (!['low', 'medium', 'high'].includes(cost))
+      throw new ArtifactValidationError(`${gate.id}.cost must be low, medium or high.`);
+    const scope = gate.scope ?? {};
+    if (!scope || typeof scope !== 'object' || Array.isArray(scope))
+      throw new ArtifactValidationError(`${gate.id}.scope must be a mapping.`);
+    return { ...gate, stage, cost, scope, blocking: gate.blocking !== false };
   });
-  return { schema_version: 1, gates };
+  return { schema_version: GATES_SCHEMA_VERSION, gates };
 }

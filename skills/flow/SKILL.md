@@ -1,21 +1,20 @@
 ---
 name: flow
-description: Repository-resumable software delivery through discovery, approved engineering, complete backlog planning, human-approved implementation plans, serial implementation and review. Use /flow to start or continue this workflow.
+description: CLI-first repository-resumable delivery through deep discovery, approved product/engineering contracts, progressive specs, atomic task commits and review. Use /flow to start or continue.
 ---
 
 # Flow
 
-/flow is the only public agent workflow. Incorporate current developer intent before routing; repository routing does not authorize ignoring new requests.
+Read `invariants.md` once per invocation. Use only the project-local CLI (`npx --no-install flow`); never fetch or substitute another Flow version automatically.
 
-Read invariants.md once per invocation. All Flow CLI commands MUST use the project-local installation: `npx --no-install flow`. If unavailable, stop and ask for local installation; never use a global executable or fetch a different package automatically.
+1. Run `npx --no-install flow doctor --quick --json`. A version difference requires an explicit user decision and, when needed, `flow migrate --plan` before `--apply`.
+2. Run `npx --no-install flow sync`, then `npx --no-install flow validate --json`, then `npx --no-install flow route --json`.
+3. Read the returned instruction and every `required_context` file. Planning, implementation and review require the full approved `engineering.md` immediately before the step.
+4. Execute only that step. Use CLI commands for IDs, dependencies, blockers, approvals, task evidence and every other deterministic mutation. The agent owns qualitative product, architecture, spec, decomposition and trade-off reasoning.
+5. Run the indicated minimum validation, persist through the CLI, then route again until a real human decision, external action, unrecoverable blocker or completion.
 
-1. Run `npx --no-install flow route --json`.
-2. Read the returned instruction from this installed skill and every returned required_context file. Planning, implementation and review require rereading the FULL `.flow/docs/engineering.md` immediately before that step, including after resumption. For a selected work item, use the PRD only for applicable global product rules and use its spec for the bounded delivery scope.
-3. Execute only the routed step, persist canonical artifacts and run its required checks.
-4. Route again. Continue until an actual human decision, external action, unrecoverable blocker or completion.
+Never approve your own proposal or infer consent. Approval records the exact document revision and ISO timestamp. A revision requires new approval.
 
-If stopped for approval, present the exact proposal and ask explicitly. Never approve your own work or treat silence as consent. Human approval must be persisted with status: approved and approved_at: ISO timestamp in the approved document. Clear state.stop_reason only when the current message resolves its decision. Revisions require a new approval, not copying an old approved_at.
+Artifact ownership: every `_flow/work-items/W###-*/` directory is canonical and always contains `spec.md`, `tasks.yaml`, `implementation-plan.md`, and `review.yaml`. Spec frontmatter owns work-item metadata and `maturity`; lifecycle is derived from it, tasks, dependencies, blockers and review. `gates.yaml` contains executable checks. `backlog.yaml` and `graph.md` under `_flow/generated/` are disposable projections: `sync` only reads canonical work-items and only writes that directory. Never commit generated projections. A task is completed by one canonical subject `type(domain): description [W###-T###]`; review completion uses `chore(domain): complete review [W###]`. A deliberate review-time spec edit belongs in that review commit, and nothing outside its work-item folder may enter it. Preserve completed history. Later corrections become a new task or maintenance work-item.
 
-Artifact owners: `docs/prd.md` owns global, cross-work-item product rules and learner-visible constraints; `docs/engineering.md` owns global technical, code, infrastructure, and pattern constraints; `backlog.yaml` owns the work-item DAG; `work-items/W###-slug/spec.md` owns only bounded scope, acceptance, and decisions for that work item, referencing applicable PRD rules without redefining them; `tasks.yaml` owns the task DAG; `implementation-plan.md` owns the approved approach; `state.yaml` owns the cursor; `gates.yaml` owns mechanical checks; `docs/graph.md` is derived. Preserve completed history; changed completed scope becomes new maintenance work.
-
-Engineering changes go through reconcile/step-01-reconcile.md: propose the change, obtain approval and invalidate affected plans. A profile is bootstrap input, never a second policy engine competing with approved engineering.
+Engineering changes go through reconcile. A profile is bootstrap input, never a competing policy engine. Product-impacting technical decisions explicitly update the affected product contract.

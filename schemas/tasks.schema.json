@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flow.local/schemas/tasks.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "work_item",
+    "tasks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "work_item": {
+      "type": "string",
+      "pattern": "^W\\d{3,}$"
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "state",
+          "depends_on"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^T\\d{3,}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed"
+            ]
+          },
+          "depends_on": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^T\\d{3,}$"
+            }
+          },
+          "provenance": {
+            "enum": [
+              "legacy_migration"
+            ]
+          },
+          "legacy_commit": {
+            "type": "string",
+            "description": "Read-only provenance for migrated completed tasks."
+          }
+        }
+      }
+    }
+  }
+}

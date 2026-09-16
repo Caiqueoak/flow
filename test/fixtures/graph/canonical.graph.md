@@ -6,8 +6,8 @@
 
 - 🟩 **Completed** — accepted work.
 - 🟦 **In Progress** — currently executing.
-- 🟨 **Ready** — pending work with all dependencies satisfied.
-- 🟥 **Blocked** — pending work with at least one incomplete work-item dependency.
+- 🟨 **Eligible** — pending work with dependencies and blockers satisfied.
+- 🟥 **Blocked** — pending work with an incomplete dependency or unresolved blocker.
 
 ```mermaid
 %%{init: {'flowchart': {'curve': 'linear', 'nodeSpacing': 32, 'rankSpacing': 54}} }%%
@@ -37,11 +37,11 @@ flowchart TD
 
   classDef completed fill:#dcfce7,stroke:#16a34a,color:#14532d;
   classDef in_progress fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
-  classDef ready fill:#fef3c7,stroke:#d97706,color:#78350f;
+  classDef eligible fill:#fef3c7,stroke:#d97706,color:#78350f;
   classDef blocked fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
   class W001 completed;
   class W002 in_progress;
-  class W003 ready;
+  class W003 eligible;
   class W004,W005,W006 blocked;
 ```
 

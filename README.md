@@ -1,75 +1,97 @@
 # Flow
 
-Repository-resumable software delivery with deterministic workflow checks and explicit human approval.
+## Canonical work-items
 
-## Install and use
+Each `_flow/work-items/W###-*/` directory is the sole source of truth. Creating a work-item writes versionable shells for `spec.md`, `tasks.yaml`, `implementation-plan.md`, and `review.yaml`. A spec may remain `outlined`; tasks require a `ready` spec and implementation requires an approved plan.
+
+Run `flow sync` to materialize `_flow/generated/backlog.yaml` and `_flow/generated/graph.md`. Sync only reads canonical work-items and only writes `_flow/generated/`; it never alters a canonical source. Generated files are disposable and ignored by Git.
+
+Complete a task with one commit whose exact subject is `type(domain): description [W###-T###]` and whose body contains matching `Flow-Work-Item` and `Flow-Task` trailers. Complete review with `flow work-item review-complete W### --domain domain`, which creates `chore(domain): complete review [W###]`. The review commit may contain only that item's `spec.md` and `review.yaml`; a deliberate review-time `spec.md` amendment belongs in the same commit.
+
+CLI-first, repository-resumable delivery for coding agents. Flow keeps deterministic state, IDs, dependency routing, approvals, Git evidence, gates and migrations in the CLI while the agent owns product and engineering judgment.
+
+## Install
 
 ```bash
 npm install --save-dev @caiqueoak/flow
 npx --no-install flow init --runtime codex
+npx --no-install flow doctor --quick --json
 ```
 
-Invoke `/flow` to start or continue. The agent routes from repository state, reads the returned instruction/context, executes one step, persists artifacts, validates and routes again. Consequential decisions require explicit human input; status updates alone are not terminal stops.
+The project records the Flow package version that initialized or explicitly updated its artifacts. Flow never checks npm or upgrades a project automatically.
 
-## Engineering preferences
+## Workflow
 
-The single built-in template is **Readability First**, ID `flow/readability-first@1`. It covers Clean Code, SOLID, mandatory SRP, semantic naming, low coupling, high cohesion, vertical slices, modular ownership, locality and complexity justified by demonstrable value.
+`doctor quick → discovery → PRD → engineering → outlined backlog → selected eligible item → ready spec → tasks and plan → approval → implementation → gates → implementation commit → evidence persistence → review`
 
-The agent-readable template ships with the npm package and is installed with the runtime skill. It is loaded when generating or explicitly revising engineering, not on every task. The approved `.flow/docs/engineering.md` is the project engineering source of truth and must be read in full before planning, implementation and review. Package/profile updates never silently change that contract.
+The backlog contains every known work-item and its DAG, but deep specs are created on demand. `spec_maturity: outlined|ready` is independent of `state: pending|in_progress|completed`. Eligibility is derived from completed dependencies plus resolved external/decision blockers; then routing uses lower priority number and lower numeric ID.
 
-For existing code, `--existing-code improve` (**Improve existing structure**) treats current style as evidence, not authority; `preserve` (**Keep existing structure**) gives consistent conventions stronger weight. Both preserve behavior and external contracts; neither authorizes automatic refactoring. New projects use `not_applicable` when no meaningful code exists.
-
-## Lifecycle and approval
-
-Discovery → PRD approval → engineering approval → complete backlog planning → implementation-plan approval → serial implementation → review.
-
-After product and engineering are approved, create every known work item's directory, `spec.md` and `tasks.yaml` before implementation. Then draft a concrete `implementation-plan.md` per selected work item and request human validation. It identifies exact paths, symbols/contracts, ordered changes, task mapping, engineering compliance, tests, risks, rollback and exclusions. Approval is tied to SHA256 revisions of the exact engineering and spec documents; stale plans return to drafting.
-
-PRD, engineering and plans use YAML frontmatter with `schema_version: 1`, `status: draft|approved`, and `approved_at` when approved. Engineering records baseline profile and existing-code policy. Plans record work_item, engineering_revision and spec_revision. Completed work retains its historical approval; later outcome records or engineering changes do not retroactively invalidate completed delivery.
-
-## Canonical artifacts
-
-- `config.yaml`: runtime/bootstrap preferences; installed package metadata owns version.
-- `docs/prd.md`: global, cross-work-item product truth and learner-visible constraints; `docs/engineering.md`: approved global technical/code/infra truth.
-- `backlog.yaml`: schema 2, W### IDs, W###-kebab-case folders, kinds, priority, dependency DAG and lifecycle.
-- `work-items/W###-slug/spec.md`: bounded scope, delivery decisions, and acceptance for one work item; it references applicable PRD rules without redefining them. `tasks.yaml`: schema 1, work_item, local T### task DAG.
-- `implementation-plan.md`: human-approved implementation approach.
-- `state.yaml`: resume cursor and migration reconciliation status.
-- `gates.yaml`: schema 1, command/builtin checks only; qualitative judgment remains review instructions.
-- `docs/graph.md`: deterministic derived projection; regenerate rather than hand-edit.
-
-Persist only pending, in_progress and completed. Ready/Blocked are derived exclusively from work-item dependency edges. Blockers use `{id, type: external_action|consequential_decision, description, status: unresolved|resolved}` as context for the agent to address within the work item; they do not change execution status. Only one mutating work item/task may be active across the project. Read-only analysis may be parallel; automatic concurrent worktrees are out of scope.
+Generated `backlog.yaml` and `graph.md` are disposable projections under `_flow/generated/`. Product truth lives in `docs/prd.md`, technical truth in `docs/engineering.md`, and work-item maturity/DAG in canonical work-item specs.
 
 ## CLI
 
-All commands use the local installation:
+Run `flow --help` or `flow <command> --help`. Help and parsing share one declarative command registry, so unknown flags and invalid combinations are rejected before writes.
 
-| Command                                  | Purpose                                                                     |
-| ---------------------------------------- | --------------------------------------------------------------------------- |
-| `npx --no-install flow init`             | Configure or add/refresh runtime integrations.                              |
-| `npx --no-install flow migrate`          | Atomic structural migration, followed by semantic reconciliation via /flow. |
-| `npx --no-install flow status`           | Progress and dependency/external blockers.                                  |
-| `npx --no-install flow validate`         | Fast artifact integrity, approvals, DAGs and traceability checks.           |
-| `npx --no-install flow validate --gates` | Full validation, including configured deterministic project gates.          |
-| `npx --no-install flow route --json`     | Next legal step and required context.                                       |
-| `npx --no-install flow graph`            | Regenerate dependency graph.                                                |
-| `npx --no-install flow trace W015-T003`  | Resolve a task's implementation commit.                                     |
+Core read operations:
 
-Use `--help` for options; `--path` selects a project. Existing managed projects cannot change engineering through init; use /flow and approval. Older config is refused without mutation and must be migrated first. Update with your package manager, then rerun init to refresh integrations; there is no separate update/config/gates workflow command.
+```bash
+flow doctor --quick --json
+flow status
+flow route --json
+flow validate [--work-item W015] [--gates]
+flow trace W015-T003
+flow gates list|run [--id ID|--task W015-T003|--work-item W015|--stage task|work-item-review|full|--all]
+```
 
-## Git and migration
+Structured writes:
 
-New completed code tasks have exactly one HEAD-reachable implementation commit with both trailers:
+```bash
+flow work-item create --title "Customer search" --priority 2
+flow work-item dependencies W015 --depends-on W003,W009
+flow work-item blocker-add W015 --id vendor-approval --type external_action --description "Vendor approval"
+flow work-item blocker-resolve W015 --id vendor-approval
+flow work-item promote W015
+flow task create W015 --title "Add query contract"
+flow task start W015-T001
+flow scope validate W015-T001 --files src/query.js,test/query.test.js
+flow task commit W015-T001 --message "feat(search): add customer query [W015-T001]" --files src/query.js,test/query.test.js
+flow approval record _flow/work-items/W015-customer-search/implementation-plan.md
+```
+
+## Git traceability
+
+`W###-T###` is permanent task identity. A repository-mutating task creates exactly one coherent implementation commit. Its objective message contains the task ID for human visibility and its body contains the canonical machine evidence:
 
 ```text
 Flow-Work-Item: W015
 Flow-Task: W015-T003
 ```
 
-Non-code tasks use implementation: none. SHA is derived, not canonical task identity. Pre-commit verification uses `validate --pre-commit W015-T003`; normal validation checks the integrated commit. Avoid squashing task commits when preserving task traceability.
+`flow trace W015-T003` resolves a unique reachable commit only when its subject and both trailers agree. SHA evidence is never stored in tasks.yaml. `flow trace W015` aggregates reachable implementation commits by `Flow-Work-Item`, including task, SHA, title and changed files.
 
-Migration stages transformations before swapping artifacts, rejects collisions/invalid DAGs before mutation, preserves legacy documents and commit evidence, normalizes qualified task IDs/dependencies, and routes first to semantic reconciliation. Completed migrated tasks use implementation: legacy and optional legacy_commit; they do not require invented Git trailers or rewritten historical spec headings. Pending legacy folders may be absent during reconciliation, but complete backlog planning must materialize them before native implementation. Private project artifacts are not committed as fixtures.
+## Gates and performance
 
-## Releases
+`flow validate` performs cheap structural checks and does not run the project test suite. `--gates` is explicit. Gates declare stage (`task`, `work-item-review`, `full`), expected cost and optional task/work-item scope. JSON output includes duration, process and Git-read metrics. Engineering maps changed paths/contracts to the smallest safe test scope and falls back to broader checks when impact is unknown.
 
-Merges to main are released automatically after the test matrix passes. Conventional Commit PR titles drive semantic-release. Installed package metadata is the Flow version source of truth; project config does not duplicate it.
+## Migration
+
+```bash
+flow doctor
+flow migrate --plan --json
+flow migrate --apply
+```
+
+Planning is read-only. Apply rechecks preconditions, transforms a staging copy, validates it, swaps only on success and preserves the prior `_flow` under `_flow-backups`. Structural migration never invents semantic decisions; ambiguous legacy truths route to assisted reconcile.
+
+## Development
+
+```bash
+npm run typecheck
+npm run lint
+npm run format:check
+npm test
+npm run test:package
+npm run pack:check
+```
+
+The npm binary points at ESM build output. Runtime sources remain JavaScript in this staged packaging migration and are not strict TypeScript-checked; a full source conversion is intentionally separate. The published package contains compiled source, skills and generated JSON Schemas.

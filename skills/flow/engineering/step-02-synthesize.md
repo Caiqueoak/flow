@@ -34,4 +34,4 @@ Recommend a complete but proportional technical contract. Keep global product be
 
 Materialize concrete paths, responsibilities, dependency direction, naming examples, stack conventions, tests and justified exceptions. Explicitly state not applicable/deferred areas and why. Review SRP, low coupling/high cohesion, colocated vertical slices, readability and complexity ROI. Do not mandate ceremony or speculative abstraction.
 
-Draft gates.yaml schema_version: 1 with only command/builtin gates using real project tooling. Qualitative review stays instructions, not agentic gates or regex coverage. Do not install tooling or change application code before approval. Route to approval.
+Draft gates.yaml schema_version: 2 with only command/builtin gates using real project tooling. Qualitative review stays instructions, not agentic gates or regex coverage. Do not install tooling or change application code before approval. Route to approval.

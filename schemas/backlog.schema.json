@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flow.local/schemas/backlog.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "work_items"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 4
+    },
+    "work_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "folder",
+          "kind",
+          "title",
+          "state",
+          "priority",
+          "spec_maturity",
+          "depends_on",
+          "blockers"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^W\\d{3,}$",
+            "description": "Permanent work-item identifier."
+          },
+          "folder": {
+            "type": "string",
+            "pattern": "^W\\d{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "kind": {
+            "enum": [
+              "feature",
+              "technical",
+              "maintenance"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "state": {
+            "enum": [
+              "outlined",
+              "blocked",
+              "eligible",
+              "in_progress",
+              "review",
+              "completed"
+            ]
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "spec_maturity": {
+            "enum": [
+              "outlined",
+              "ready"
+            ]
+          },
+          "depends_on": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^W\\d{3,}$"
+            }
+          },
+          "blockers": {
+            "type": "array"
+          }
+        }
+      }
+    }
+  }
+}

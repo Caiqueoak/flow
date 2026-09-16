@@ -5,6 +5,7 @@ import { defaultConfig, readConfig, writeConfig } from '../shared/project-config
 import { projectRoot, valueAfter } from '../shared/project-path.mjs';
 import { installRuntimeSkill } from '../shared/skill-installer.mjs';
 import { BROWNFIELD_POLICIES, ENGINEERING_PROFILES } from '../shared/profiles.mjs';
+import { FLOW_SCHEMA_VERSION, GATES_SCHEMA_VERSION } from '../domain/contracts.mjs';
 
 const RUNTIME_DEFINITIONS = {
   codex: { label: 'Codex', skillsPath: '.codex/skills' },
@@ -73,12 +74,16 @@ async function selectEngineering(args, root, config, existed) {
     });
 }
 
-export async function runInit({ args, packageRoot }) {
+export async function runInit({ args, packageRoot, version }) {
   const root = projectRoot(args);
-  const flowDirectory = path.join(root, '.flow');
+  const flowDirectory = path.join(root, '_flow');
+  if (!fs.existsSync(flowDirectory) && fs.existsSync(path.join(root, '.flow')))
+    fail(
+      'Legacy .flow project requires flow migrate --plan and flow migrate --apply before init. No files were changed.'
+    );
   const existed = fs.existsSync(flowDirectory);
-  const config = readConfig(root) || defaultConfig();
-  if (config.schema_version !== 2)
+  const config = readConfig(root) || defaultConfig(version);
+  if (config.schema_version !== FLOW_SCHEMA_VERSION)
     fail('Existing Flow project requires npx --no-install flow migrate before init. No files were changed.');
   if (existed) info('Flow project already exists. Canonical project artifacts will not be created or modified.');
   await selectEngineering(args, root, config, existed);
@@ -101,7 +106,14 @@ export async function runInit({ args, packageRoot }) {
     added.push(runtime);
   }
   fs.mkdirSync(flowDirectory, { recursive: true });
+  config.flow_version = version;
   writeConfig(root, config);
+  if (!existed) {
+    fs.writeFileSync(path.join(flowDirectory, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
+    fs.mkdirSync(path.join(flowDirectory, 'work-items'), { recursive: true });
+    fs.mkdirSync(path.join(flowDirectory, 'generated'), { recursive: true });
+    fs.writeFileSync(path.join(flowDirectory, 'generated', '.gitignore'), '*\n!.gitignore\n');
+  }
   for (const runtime of config.runtimes)
     info(`✓ ${runtime.type}: ${path.relative(root, installRuntimeSkill(root, runtime, packageRoot))}`);
   info(`Engineering profile: ${ENGINEERING_PROFILES[config.engineering.profile]?.label ?? config.engineering.profile}`);

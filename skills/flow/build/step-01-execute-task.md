@@ -4,6 +4,6 @@ Read the applicable global PRD rules, the FULL engineering.md, spec, tasks and a
 
 Implement the bounded approved change for readability: semantic naming, mandatory SRP, low coupling, high cohesion, locality and justified complexity. If the approach must change materially, revise the plan and ask approval before continuing.
 
-Run targeted tests and npx --no-install flow validate --pre-commit W###-T###. Mark completed only after checks pass. Code tasks get exactly one primary implementation commit with separate trailers Flow-Work-Item: W### and Flow-Task: W###-T###. Non-code tasks use none. Do not assign legacy to new work.
+Inspect the worktree, stage only this task's bounded implementation, focused tests, necessary contracts/migrations and required documentation, then compare the staged diff with the approved spec and plan. Reject unrelated changes. Run the smallest safe tests and `npx --no-install flow validate --pre-commit W###-T###`.
 
-Synchronize metadata and graph, validate traceability with npx --no-install flow trace W###-T###, validate again and route to the next task/review. Do not yield merely for status.
+Commit and complete the task atomically through `npx --no-install flow task commit W###-T### --message "type(domain): description [W###-T###]" --files path/to/file,...`. The command requires the declared files to match the staged set exactly, creates the one canonical implementation commit with matching `Flow-Work-Item` and `Flow-Task` trailers, and persists task completion in that commit. Never create the implementation commit manually and never edit task completion metadata directly. On failure, recover with `flow trace`/`flow doctor` rather than recreating implementation. Validate traceability, validate again and route onward.

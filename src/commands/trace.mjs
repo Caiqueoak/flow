@@ -1,58 +1,109 @@
 import { execFileSync } from 'node:child_process';
 import { info, fail } from '../shared/cli-io.mjs';
 import { projectRoot } from '../shared/project-path.mjs';
-
-export function traceTask(root, qualifiedTaskId) {
-  if (!/^W\d{3,}-T\d{3,}$/.test(qualifiedTaskId))
-    fail(`invalid qualified task ID '${qualifiedTaskId}'. Expected W015-T003.`);
-  return traceTasks(root, [qualifiedTaskId]).get(qualifiedTaskId);
-}
-
-export function traceTasks(root, qualifiedTaskIds) {
-  for (const qualifiedTaskId of qualifiedTaskIds)
-    if (!/^W\d{3,}-T\d{3,}$/.test(qualifiedTaskId))
-      fail(`invalid qualified task ID '${qualifiedTaskId}'. Expected W015-T003.`);
-  const requested = new Set(qualifiedTaskIds);
-  const matches = new Map([...requested].map((task) => [task, []]));
-  let output;
+const task = /^W\d{3,}-T\d{3,}$/,
+  work = /^W\d{3,}$/;
+const subject =
+  /^(feat|fix|docs|style|refactor|test|build|ci|chore|perf|revert)\(([a-z0-9][a-z0-9-]*)\): (.+) \[(W\d{3,}(?:-T\d{3,})?)\]$/;
+function history(root) {
   try {
-    output = execFileSync('git', ['log', 'HEAD', '--format=%H%x1f%s%x1f%B%x1e'], {
-      cwd: root,
-      encoding: 'utf8',
-      maxBuffer: 50 * 1024 * 1024
-    });
+    return execFileSync('git', ['log', 'HEAD', '--format=%H%x1f%ct%x1f%s%x1f%B%x1e'], { cwd: root, encoding: 'utf8' })
+      .split('\x1e')
+      .filter((r) => r.trim())
+      .map((r) => {
+        const [sha, timestamp, subject, body = ''] = r.trim().split('\x1f');
+        return { sha, timestamp: Number(timestamp), subject, body };
+      });
   } catch {
-    fail('git history is unavailable; task traceability requires a Git repository.');
+    fail('git history is unavailable.');
   }
-  for (const entry of output
-    .split('\x1e')
-    .filter(Boolean)
-    .map((record) => {
-      const [sha, subject, ...bodyParts] = record.replace(/^\n+|\n+$/g, '').split('\x1f');
-      return { sha, subject, body: bodyParts.join('\x1f') };
-    })) {
-    const workItems = new Set([...entry.body.matchAll(/^Flow-Work-Item:\s*(W\d{3,})\s*$/gm)].map((match) => match[1]));
-    for (const match of entry.body.matchAll(/^Flow-Task:\s*(W\d{3,}-T\d{3,})\s*$/gm)) {
-      const task = match[1];
-      if (requested.has(task) && workItems.has(task.split('-')[0])) matches.get(task).push(entry);
-    }
-  }
-  return new Map(
-    [...requested].map((task) => {
-      const commits = matches.get(task);
-      if (!commits.length) return [task, { task, commits, status: 'missing' }];
-      if (commits.length > 1) return [task, { task, commits, status: 'ambiguous' }];
-      return [task, { task, commit: commits[0], commits, status: 'resolved' }];
-    })
-  );
 }
-
+function trailers(body) {
+  const values = new Map();
+  for (const line of body.split(/\r?\n/)) {
+    const match = line.match(/^(Flow-Work-Item|Flow-Task):\s*(\S+)\s*$/);
+    if (!match) continue;
+    if (values.has(match[1])) return null;
+    values.set(match[1], match[2]);
+  }
+  return values;
+}
+function isCanonicalTaskCommit(entry, id) {
+  const match = entry.subject.match(subject);
+  if (!match || match[4] !== id) return false;
+  const values = trailers(entry.body);
+  return values?.get('Flow-Task') === id && values.get('Flow-Work-Item') === id.split('-')[0];
+}
+function changedFiles(root, sha) {
+  return execFileSync('git', ['show', '--format=', '--name-only', '--no-renames', sha], { cwd: root, encoding: 'utf8' })
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((file) => file.replace(/\\/g, '/'));
+}
+function evidence(root, entry, id) {
+  const match = entry.subject.match(subject);
+  return { task: id, sha: entry.sha, title: match?.[3] ?? entry.subject, files: changedFiles(root, entry.sha) };
+}
+function invalidEvidence(entries) {
+  return entries.map((entry) => ({ sha: entry.sha, subject: entry.subject }));
+}
+function classify(entries, id) {
+  const wanted = entries.filter((e) => e.subject.endsWith(`[${id}]`)),
+    good = wanted.filter((entry) =>
+      task.test(id)
+        ? isCanonicalTaskCommit(entry, id)
+        : (() => {
+            const match = entry.subject.match(subject);
+            return match && match[4] === id && match[1] === 'chore';
+          })()
+    ),
+    invalid = wanted.filter((e) => !good.includes(e));
+  return {
+    status: invalid.length ? 'invalid' : !good.length ? 'missing' : good.length > 1 ? 'ambiguous' : 'resolved',
+    commits: good,
+    invalid_commits: invalid
+  };
+}
+export function traceTask(root, id) {
+  if (!task.test(id)) fail(`invalid qualified task ID '${id}'.`);
+  const result = classify(history(root), id);
+  return {
+    task: id,
+    status: result.status,
+    commit: result.commits.length === 1 ? evidence(root, result.commits[0], id) : null,
+    invalid_commits: invalidEvidence(result.invalid_commits)
+  };
+}
+export function traceTasks(root, ids) {
+  return new Map(ids.map((id) => [id, traceTask(root, id)]));
+}
+export function traceWorkItem(root, id) {
+  if (!work.test(id)) fail(`invalid work-item ID '${id}'.`);
+  const entries = history(root),
+    tasks = entries.filter((entry) => {
+      const match = entry.subject.match(subject);
+      return match && match[4].startsWith(`${id}-T`) && isCanonicalTaskCommit(entry, match[4]);
+    }),
+    review = classify(entries, id);
+  return {
+    work_item_id: id,
+    tasks: tasks.map((entry) => evidence(root, entry, entry.subject.match(subject)[4])),
+    review: {
+      status: review.status,
+      commit: review.commits.length === 1 ? evidence(root, review.commits[0], id) : null,
+      invalid_commits: invalidEvidence(review.invalid_commits)
+    }
+  };
+}
+function renderEvidence(record) {
+  return `${record.task} ${record.sha} ${record.title}${record.files.length ? `\n${record.files.map((file) => `  ${file}`).join('\n')}` : ''}`;
+}
 export function runTrace({ args }) {
-  const task = args.find((arg) => !arg.startsWith('--'));
-  if (!task) fail('flow trace requires a qualified task ID, e.g. W015-T003.');
-  const result = traceTask(projectRoot(args), task);
+  const id = args.find((x, i) => !x.startsWith('-') && (i === 0 || !args[i - 1].startsWith('--'))),
+    result = task.test(id) ? traceTask(projectRoot(args), id) : traceWorkItem(projectRoot(args), id);
+  if (!id || (!task.test(id) && !work.test(id))) fail('flow trace requires W015-T003 or W015.');
   if (args.includes('--json')) return info(JSON.stringify(result, null, 2));
-  if (result.status === 'missing') fail(`No reachable commit declares Flow-Task: ${task}.`);
-  if (result.status === 'ambiguous') fail(`Multiple reachable commits declare Flow-Task: ${task}.`);
-  info(`${task} -> ${result.commit.sha}\n${result.commit.subject}`);
+  if (task.test(id) && result.status !== 'resolved') fail(`${id}: ${result.status} canonical subject evidence.`);
+  if (task.test(id)) return info(renderEvidence(result.commit));
+  info(result.tasks.map(renderEvidence).join('\n'));
 }

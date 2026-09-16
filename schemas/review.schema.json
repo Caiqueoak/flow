@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flow.local/schemas/review.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "work_item",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "work_item": {
+      "type": "string",
+      "pattern": "^W\\d{3,}$"
+    },
+    "status": {
+      "enum": [
+        "pending",
+        "approved"
+      ]
+    },
+    "reviewed_at": {
+      "type": "string"
+    }
+  }
+}
