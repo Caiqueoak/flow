@@ -19,11 +19,16 @@ export interface ParsedImplementationPlan {
 
 export function parseImplementationPlan(text: string): ParsedImplementationPlan | null {
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---([\s\S]*)$/);
-  if (!match) return null;
+  const frontmatter = match?.[1];
+  const body = match?.[2];
+
+  if (frontmatter === undefined || body === undefined) {
+    return null;
+  }
 
   return {
-    metadata: (parse(match[1]) ?? {}) as ImplementationPlanMetadata,
-    body: match[2]
+    metadata: (parse(frontmatter) ?? {}) as ImplementationPlanMetadata,
+    body
   };
 }
 
