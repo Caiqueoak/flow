@@ -16,7 +16,7 @@ export function startTask(
 ): void {
   ensureWorkItemIsNotBlocked(root, item);
   ensureNoTaskIsInProgress(tasks);
-  ensureDependenciesAreCompleted(task, tasks);
+  ensureDependenciesAreCompleted(item, task, tasks);
   ensureApprovedImplementationPlan(item);
 
   task.state = 'in_progress';
@@ -38,13 +38,13 @@ function ensureNoTaskIsInProgress(tasks: TaskCollection): void {
   }
 }
 
-function ensureDependenciesAreCompleted(task: Task, tasks: TaskCollection): void {
+function ensureDependenciesAreCompleted(item: LoadedWorkItem, task: Task, tasks: TaskCollection): void {
   const dependenciesCompleted = task.depends_on.every(
     (dependencyId) => tasks.tasks.find((candidate) => candidate.id === dependencyId)?.state === 'completed'
   );
 
   if (!dependenciesCompleted) {
-    fail(`${task.id} has incomplete dependencies.`);
+    fail(`${item.id}-${task.id} has incomplete dependencies.`);
   }
 }
 
