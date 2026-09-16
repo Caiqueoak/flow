@@ -83,15 +83,44 @@ flow migrate --apply
 
 Planning is read-only. Apply rechecks preconditions, transforms a staging copy, validates it, swaps only on success and preserves the prior `_flow` under `_flow-backups`. Structural migration never invents semantic decisions; ambiguous legacy truths route to assisted reconcile.
 
+## Architecture
+
+Flow organizes behavior by public command. Each `flow <command>` owns one `src/commands/<command>/` slice with `definition.ts`, `handler.ts`, `usecases/`, and `tests/`. The CLI only parses terminal input, dispatches definitions, and presents output.
+
+Reusable code is organized by explicit responsibility: `contracts`, `artifacts`, `execution`, `flow-project`, `package-assets`, and `environment`. See [the architecture guide](docs/architecture.md), [command guide](docs/commands.md), and [testing guide](docs/testing.md).
+
 ## Development
 
+To use Flow, install Node.js 20.19.0 or later. Contributors use Node 24.x LTS;
+install it with `nvm install 24` and select it with `nvm use` before installing
+dependencies.
+
 ```bash
+nvm use
+npm ci
 npm run typecheck
 npm run lint
 npm run format:check
 npm test
 npm run test:package
 npm run pack:check
+npm run verify
 ```
 
-The npm binary points at ESM build output. Runtime sources remain JavaScript in this staged packaging migration and are not strict TypeScript-checked; a full source conversion is intentionally separate. The published package contains compiled source, skills and generated JSON Schemas.
+The npm binary points at ESM build output. Typed boundaries and new slices use strict TypeScript; remaining stable ESM modules are compiled in the same build while their type migration continues. The published package contains compiled source, skills and generated JSON Schemas.
+
+## Release version
+
+Publishing runs from `main`. After semantic-release publishes a version, CI reads the
+`latest` version from npm and commits that exact value to `package.json` and
+`package-lock.json`. npm is the version authority; do not manually advance these
+versions for a release.
+
+## Local push checks
+
+Husky runs `npm run verify` before every `git push`. This is the development
+validation run by CI on Node 24.x. CI also installs the generated package in a
+clean Node 20.19.0 consumer project before publication.
+
+Unit tests import source modules and never rely on `dist/`. Integration and package
+tests build first, then validate the compiled CLI and published artifacts.

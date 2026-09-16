@@ -1,18 +1,23 @@
 {
   "name": "@caiqueoak/flow",
-  "version": "0.6.0",
+  "version": "0.8.0",
   "description": "Readability-first, agent-agnostic software development workflow for coding agents.",
   "type": "module",
   "scripts": {
-    "clean": "node scripts/clean.mjs",
-    "build": "npm run clean && tsc && node dist/entry.js schemas",
-    "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test test/*.test.mjs",
+    "clean": "tsx scripts/clean.ts",
+    "build": "npm run clean && tsc -p tsconfig.build.json && node dist/entry.js schemas",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "tsx --test src/commands/task/tests/unit/*.test.ts src/package-assets/tests/unit/*.test.ts",
+    "test:integration": "npm run build && tsx --test src/commands/task/tests/integration/*.test.ts src/commands/migrate/tests/integration/*.test.ts",
     "lint": "eslint .",
-    "format": "prettier --write src test scripts skills package.json package-lock.json README.md eslint.config.js prettier.config.mjs tsconfig.json",
-    "format:check": "prettier --check src test scripts skills package.json package-lock.json README.md eslint.config.js prettier.config.mjs tsconfig.json",
+    "format": "prettier --write .github src scripts skills docs AGENTS.md package.json package-lock.json README.md eslint.config.js prettier.config.mjs tsconfig*.json",
+    "format:check": "prettier --check .github src scripts skills docs AGENTS.md package.json package-lock.json README.md eslint.config.js prettier.config.mjs tsconfig*.json",
     "pack:check": "npm run build && npm pack --dry-run",
-    "test:package": "node scripts/test-package.mjs",
+    "test:package": "npm run build && node scripts/test-package.mjs",
+    "check:runtime": "tsx scripts/check-node-version.ts",
+    "verify": "npm run check:runtime && npm run typecheck && npm test && npm run lint && npm run format:check && npm run pack:check && npm run test:package",
+    "prepare": "husky",
     "prepack": "npm run build"
   },
   "bin": {
@@ -26,7 +31,9 @@
     "@types/node": "^22.18.6",
     "eslint": "^9.36.0",
     "globals": "^16.4.0",
+    "husky": "^9.1.7",
     "prettier": "^3.6.2",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.2"
   },
   "files": [
@@ -37,7 +44,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18.18"
+    "node": ">=20.19.0"
   },
   "keywords": [
     "coding-agent",

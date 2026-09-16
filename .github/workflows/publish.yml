@@ -13,42 +13,58 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
-    name: test (Node ${{ matrix.node }})
+  verify:
+    name: verify (Node 24.x)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node: [18.x, 20.x, 22.x]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: ${{ matrix.node }}
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run pack:check
-      - run: npm run test:package
+      - run: npm run verify
+      - name: Pack release artifact
+        run: |
+          mkdir --parents package
+          npm pack --json --ignore-scripts --pack-destination package
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: npm-package
+          path: package/*.tgz
+          if-no-files-found: error
 
-  windows-migration:
-    name: Windows migration smoke (Node 22.x)
+  consumer-compatibility:
+    name: consumer compatibility (Node 20.19.0)
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 20.19.0
+          cache: npm
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: npm-package
+          path: package
+      - run: node scripts/test-package.mjs package/*.tgz
+
+  windows-verify:
+    name: verify on Windows (Node 24.x)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 22.x
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run build
-      - run: node --test --test-name-pattern=migration test/canonical.test.mjs
+      - run: npm run verify
 
   publish:
     name: release npm
-    needs: [test, windows-migration]
+    needs: [verify, windows-verify, consumer-compatibility]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: npm-publish
@@ -64,24 +80,26 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 24.x
+          node-version-file: .nvmrc
           package-manager-cache: false
       - name: Install npm with Trusted Publishing support
         run: npm install --global npm@latest
       - run: npm --version
-      - name: Establish the npm release baseline once
+      - name: Determine version and publish
+        run: npm exec --yes --package=semantic-release@25.0.9 -- semantic-release
+      - name: Synchronize package version from npm
         shell: bash
         run: |
           package_name="$(node -p 'require("./package.json").name')"
           published_version="$(npm view "${package_name}" version)"
-          baseline_tag="v${published_version}"
-          if git rev-parse --verify --quiet "refs/tags/${baseline_tag}"; then
+          npm version "${published_version}" --no-git-tag-version --ignore-scripts --allow-same-version
+
+          if git diff --quiet -- package.json package-lock.json; then
             exit 0
           fi
-          baseline_commit="$(git log -n 1 --format=%H -- package.json)"
+
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git tag --annotate "${baseline_tag}" "${baseline_commit}" --message "Release ${baseline_tag}"
-          git push origin "${baseline_tag}"
-      - name: Determine version and publish
-        run: npm exec --yes --package=semantic-release@25.0.9 -- semantic-release
+          git add package.json package-lock.json
+          git commit --message "chore(release): sync package version to ${published_version} [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
