@@ -7,6 +7,11 @@ import type { Task, TaskCollection, TaskId } from '../../shared/domain/task.js';
 import type { LoadedWorkItem } from '../../shared/domain/work-item.js';
 import { readText } from '../../shared/filesystem/files.js';
 
+const parseTasksBoundary = parseTasks as (
+  text: string,
+  options: { expectedWorkItem: string }
+) => TaskCollection;
+
 export interface TaskContext {
   item: LoadedWorkItem;
   tasksFile: string;
@@ -24,7 +29,7 @@ export function loadTaskContext(root: string, target: string | undefined): TaskC
   ensureWorkItemReady(item!);
 
   const tasksFile = path.join(item!.base, TASKS_FILE);
-  const tasks = parseTasks(readText(tasksFile), { expectedWorkItem: item!.id }) as TaskCollection;
+  const tasks = parseTasksBoundary(readText(tasksFile), { expectedWorkItem: item!.id });
 
   return { item: item!, tasksFile, tasks };
 }
@@ -46,7 +51,7 @@ export function nextTaskId(tasks: readonly Task[]): TaskId {
 }
 
 function workItemIdFromTaskTarget(target: string | undefined): string {
-  return (target ?? '').split('-T')[0];
+  return (target ?? '').split('-T')[0] ?? '';
 }
 
 function ensureWorkItemReady(item: LoadedWorkItem): void {
