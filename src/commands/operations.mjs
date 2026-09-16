@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { fail, info } from '../shared/cli-io.mjs';
