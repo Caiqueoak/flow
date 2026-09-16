@@ -9,15 +9,20 @@ interface ValidationFinding {
   message: string;
 }
 
-const validateProjectBoundary = validateProject as (
+const validateProjectBoundary = validateProject as unknown as (
   root: string,
-  options: { preCommitTask?: string; skipTrace?: boolean }
+  options: { preCommitTask: string; skipTrace: boolean }
 ) => ValidationFinding[];
 
 export function runScope({ args }: { args: string[] }): void {
   const root = projectRoot(args);
   const taskId = positionalArguments(args)[1];
-  const findings = validateProjectBoundary(root, { preCommitTask: taskId, skipTrace: true });
+
+  if (!taskId) {
+    fail('Usage: flow scope validate W###-T### --files <path,...>.');
+  }
+
+  const findings = validateProjectBoundary(root, { preCommitTask: taskId!, skipTrace: true });
 
   if (findings.length) {
     fail(findings.map((finding) => `${finding.code}: ${finding.message}`).join(' | '));
