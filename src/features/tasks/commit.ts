@@ -9,6 +9,22 @@ import { projectRelativePath, readText, writeText, writeYaml } from '../../share
 import { assertExactStagedFiles, createCommit, resetFiles, stageFiles } from '../../shared/git/git.js';
 import { createTemporaryGitIndex, removeTemporaryGitIndex } from '../../shared/git/git-index.js';
 
+interface ValidationFinding {
+  code: string;
+}
+
+interface GateResult {
+  id: string;
+  blocking: boolean;
+  status: string;
+}
+
+const validateProjectBoundary = validateProject as (
+  root: string,
+  options: { preCommitTask?: string; skipTrace?: boolean }
+) => ValidationFinding[];
+const evaluateGatesBoundary = evaluateGates as (root: string, options: { task: string }) => GateResult[];
+
 export function commitTask(
   root: string,
   item: LoadedWorkItem,
@@ -84,19 +100,19 @@ function validatedCommitSubject(args: readonly string[], taskId: QualifiedTaskId
 }
 
 function ensurePreCommitValidation(root: string, taskId: QualifiedTaskId): void {
-  const findings = validateProject(root, { preCommitTask: taskId, skipTrace: true });
+  const findings = validateProjectBoundary(root, { preCommitTask: taskId, skipTrace: true });
 
   if (findings.length) {
-    fail(`Pre-commit validation failed: ${findings.map((finding: { code: string }) => finding.code).join(', ')}.`);
+    fail(`Pre-commit validation failed: ${findings.map((finding) => finding.code).join(', ')}.`);
   }
 }
 
 function ensureTaskGatesPass(root: string, taskId: QualifiedTaskId): void {
-  const failedGates = evaluateGates(root, { task: taskId }).filter(
-    (gate: { blocking: boolean; status: string }) => gate.blocking && gate.status !== 'passed'
+  const failedGates = evaluateGatesBoundary(root, { task: taskId }).filter(
+    (gate) => gate.blocking && gate.status !== 'passed'
   );
 
   if (failedGates.length) {
-    fail(`Task gates failed: ${failedGates.map((gate: { id: string }) => gate.id).join(', ')}.`);
+    fail(`Task gates failed: ${failedGates.map((gate) => gate.id).join(', ')}.`);
   }
 }
