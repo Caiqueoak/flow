@@ -7,13 +7,16 @@
     "clean": "tsx scripts/clean.ts",
     "build": "npm run clean && tsc -p tsconfig.build.json && node dist/entry.js schemas",
     "typecheck": "tsc -p tsconfig.typecheck.json",
-    "test": "npm run build && tsx --test src/commands/task/tests/*.test.ts src/commands/migrate/tests/*.test.ts src/package-assets/tests/*.test.ts",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "tsx --test src/commands/task/tests/unit/*.test.ts src/package-assets/tests/unit/*.test.ts",
+    "test:integration": "npm run build && tsx --test src/commands/task/tests/integration/*.test.ts src/commands/migrate/tests/integration/*.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .github src scripts skills docs AGENTS.md package.json package-lock.json README.md eslint.config.js prettier.config.mjs tsconfig*.json",
     "format:check": "prettier --check .github src scripts skills docs AGENTS.md package.json package-lock.json README.md eslint.config.js prettier.config.mjs tsconfig*.json",
     "pack:check": "npm run build && npm pack --dry-run",
-    "test:package": "tsx scripts/test-package.ts",
-    "verify": "npm run typecheck && npm test && npm run lint && npm run format:check && npm run pack:check && npm run test:package",
+    "test:package": "npm run build && node scripts/test-package.mjs",
+    "check:runtime": "tsx scripts/check-node-version.ts",
+    "verify": "npm run check:runtime && npm run typecheck && npm test && npm run lint && npm run format:check && npm run pack:check && npm run test:package",
     "prepare": "husky",
     "prepack": "npm run build"
   },
@@ -41,7 +44,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18.18"
+    "node": ">=20.19.0"
   },
   "keywords": [
     "coding-agent",

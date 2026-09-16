@@ -49,7 +49,7 @@ function ready(root: string, id = 'W101') {
   return base;
 }
 
-test('work-item creation produces four canonical shells and sync never mutates them', () => {
+test('compiled CLI creates canonical shells and sync never mutates them', () => {
   const root = project();
   assert.equal(run(root, ['work-item', 'create', 'W101', '--title', 'Canonical item']).status, 0);
   const base = path.join(root, '_flow', 'work-items', 'W101-canonical-item');

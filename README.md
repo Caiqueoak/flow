@@ -91,7 +91,13 @@ Reusable code is organized by explicit responsibility: `contracts`, `artifacts`,
 
 ## Development
 
+To use Flow, install Node.js 20.19.0 or later. Contributors use Node 24.x LTS;
+install it with `nvm install 24` and select it with `nvm use` before installing
+dependencies.
+
 ```bash
+nvm use
+npm ci
 npm run typecheck
 npm run lint
 npm run format:check
@@ -112,6 +118,9 @@ versions for a release.
 
 ## Local push checks
 
-Husky runs `npm run verify` before every `git push`. This is the same command run
-by the validation jobs in CI, so a successful local push has passed the full
-repository check suite for the installed Node version.
+Husky runs `npm run verify` before every `git push`. This is the development
+validation run by CI on Node 24.x. CI also installs the generated package in a
+clean Node 20.19.0 consumer project before publication.
+
+Unit tests import source modules and never rely on `dist/`. Integration and package
+tests build first, then validate the compiled CLI and published artifacts.

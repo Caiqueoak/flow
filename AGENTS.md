@@ -25,6 +25,9 @@
 ## Verification
 
 Run `npm run verify` after structural changes. It is the single source of truth for
-the local pre-push hook and CI validation suite.
+the local pre-push hook and development CI validation suite. Use Node 24.x (`nvm use`)
+before running it. The published CLI supports Node 20.19.0 and later; CI verifies
+that consumer contract from the generated tarball. Unit tests must import source
+modules; only integration and package tests may depend on `dist/` after an explicit build.
 
 Read `docs/architecture.md`, `docs/commands.md`, and `docs/testing.md` before changing module ownership.

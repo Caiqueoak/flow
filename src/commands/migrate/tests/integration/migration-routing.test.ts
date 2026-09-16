@@ -9,7 +9,7 @@ const cli = path.resolve('dist/entry.js');
 const run = (root: string, args: string[]) =>
   spawnSync(process.execPath, [cli, ...args, '--path', root], { encoding: 'utf8' });
 
-test('pending semantic migration reconciliation takes precedence over work-item routing', () => {
+test('compiled CLI prioritizes pending migration reconciliation over work-item routing', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-migration-route-'));
   const flow = path.join(root, '.flow');
   fs.mkdirSync(path.join(flow, 'work-items', 'W001-reference-item'), { recursive: true });

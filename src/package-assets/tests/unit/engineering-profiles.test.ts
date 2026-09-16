@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { parseProfileFrontmatter } from '../../../dist/package-assets/engineering-profiles.mjs';
-import { defaultConfig } from '../../../dist/flow-project/configuration.mjs';
+import { parseProfileFrontmatter } from '../../engineering-profiles.mjs';
+import { defaultConfig } from '../../../flow-project/configuration.mjs';
 
 const v1Profile = readFileSync('skills/flow/engineering/profiles/readability-first.md', 'utf8');
 const v2Profile = readFileSync('skills/flow/engineering/profiles/readability-first-v2.md', 'utf8');
