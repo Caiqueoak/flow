@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-const cli = path.resolve('src/cli.mjs');
+const cli = path.resolve('dist/entry.js');
 const run = (root, args) => spawnSync(process.execPath, [cli, ...args, '--path', root], { encoding: 'utf8' });
 
 test('pending semantic migration reconciliation takes precedence over work-item routing', () => {
