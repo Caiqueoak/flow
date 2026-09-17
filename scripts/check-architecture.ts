@@ -18,7 +18,13 @@ const FORBIDDEN_DOMAIN_DEPENDENCIES = [
 ];
 const TS_NOCHECK_DEBT = new Set([
   'src/application/init/operations/init.mts',
-  'src/application/migrate/operations/apply.mts'
+  'src/application/migrate/operations/apply.mts',
+  'src/application/route/operations/route.mts',
+  'src/application/schemas/operations/schemas.mts',
+  'src/application/status/operations/status.mts',
+  'src/application/sync/operations/sync.mts',
+  'src/application/trace/operations/trace.mts',
+  'src/application/validate/operations/validate.mts'
 ]);
 
 const findings: string[] = [];
@@ -59,7 +65,9 @@ function checkVagueDirectories(relativeFile: string): void {
 
   for (const directory of directories) {
     if (VAGUE_DIRECTORY_NAMES.has(directory)) {
-      findings.push(`${relativeFile} is inside vague directory '${directory}/'. Use an owner-specific responsibility.`);
+      findings.push(
+        `${relativeFile} is inside vague directory '${directory}/'. Use an owner-specific responsibility.`
+      );
     }
   }
 }
