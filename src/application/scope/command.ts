@@ -1,6 +1,5 @@
 import { positionalArguments } from '../../presentation/cli/command-input/arguments.js';
-import { projectPathOption } from '../../presentation/cli/command-input/options.js';
-import type { CommandDefinition } from '../../presentation/cli/command-metadata/definition.js';
+import { projectPathOption, type CommandDefinition } from '../command-definition.js';
 import { fail } from '../../presentation/cli/terminal/output.js';
 import { runValidate } from './commands/validate.js';
 
