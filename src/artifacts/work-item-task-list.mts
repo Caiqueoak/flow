@@ -1,7 +1,12 @@
 // @ts-nocheck
 import { parseDocument } from 'yaml';
 import { ArtifactValidationError } from './backlog.mjs';
-import { LIFECYCLE_STATES, TASKS_SCHEMA_VERSION, TASK_ID as TASK_ID_PATTERN } from '../contracts/contracts.js';
+import {
+  LIFECYCLE_STATES,
+  TASKS_SCHEMA_VERSION,
+  TASK_ID as TASK_ID_PATTERN,
+  WORK_ITEM_ID
+} from '../contracts/contracts.js';
 
 const STATES = new Set(LIFECYCLE_STATES);
 const TASK_ID = TASK_ID_PATTERN;
@@ -24,6 +29,7 @@ export function parseTasks(text, { source = 'tasks.yaml', expectedWorkItem = nul
   const value = requireObject(document.toJS(), source);
   if (value.schema_version !== TASKS_SCHEMA_VERSION) fail(`${source} schema_version must be ${TASKS_SCHEMA_VERSION}.`);
   const workItem = requireString(value.work_item, `${source} work_item`);
+  if (!WORK_ITEM_ID.test(workItem)) fail(`${source} work_item must use W followed by a zero-padded numeric sequence.`);
   if (expectedWorkItem && workItem !== expectedWorkItem)
     fail(`${source} belongs to ${workItem}, expected ${expectedWorkItem}.`);
   if (!Array.isArray(value.tasks)) fail(`${source} tasks must be a list.`);

@@ -9,8 +9,9 @@ const cli = path.resolve('dist/entry.js');
 const run = (root: string, args: string[]) =>
   spawnSync(process.execPath, [cli, ...args, '--path', root], { encoding: 'utf8' });
 
-test('compiled CLI prioritizes pending migration reconciliation over work-item routing', () => {
+test('compiled CLI prioritizes pending migration reconciliation over work-item routing', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-migration-route-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const flow = path.join(root, '.flow');
   fs.mkdirSync(path.join(flow, 'work-items', 'W001-reference-item'), { recursive: true });
   fs.writeFileSync(flow + '/config.yaml', 'schema_version: 2\nruntimes: []\nengineering: {}\n');
