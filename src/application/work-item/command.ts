@@ -57,13 +57,18 @@ export const command: CommandDefinition = {
 export function runWorkItem({ args }: { args: string[] }): void {
   const root = projectRoot(args);
   const [action, target] = positionalArguments(args);
+
+  if (!action) {
+    fail('Missing work-item operation.');
+  }
+
   const execute = workItemCommands[action];
 
   if (!execute) {
     fail(`Unknown work-item operation '${action}'.`);
   }
 
-  execute!({ root, target, args });
+  execute({ root, target, args });
 
   if (action !== 'create' && action !== 'review-complete') {
     writeOutput(`${target} updated.`);
