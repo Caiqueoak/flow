@@ -1,13 +1,13 @@
 import path from 'node:path';
 import { loadWorkItems } from '../../../flow-project/work-items.mjs';
-import { IMPLEMENTATION_PLAN_FILE } from '../../../contracts/constants.js';
-import type { LoadedWorkItem } from '../../../contracts/work-item.js';
+import { IMPLEMENTATION_PLAN_FILE } from '../../../domain/project/project.js';
+import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import {
   implementationPlanRevision,
   parseImplementationPlan,
   serializeImplementationPlan
 } from '../../../artifacts/implementation-plan.js';
-import { readText, writeText } from '../../../environment/filesystem.js';
+import { readText, writeText } from '../../../infrastructure/filesystem/index.js';
 
 export function recordApproval({ root, target, approvedAt }: { root: string; target: string; approvedAt: string }): {
   workItemId: string;
