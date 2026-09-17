@@ -1,11 +1,11 @@
 import path from 'node:path';
 import { loadWorkItems } from '../../flow-project/work-items.mjs';
 import { parseTasks } from '../../artifacts/work-item-task-list.mjs';
-import { fail } from '../../cli/terminal/output.js';
-import { ID_PADDING, TASKS_FILE, TASK_ID_PREFIX } from '../../contracts/constants.js';
-import type { Task, TaskCollection, TaskId } from '../../contracts/task.js';
-import type { LoadedWorkItem } from '../../contracts/work-item.js';
-import { readText } from '../../environment/filesystem.js';
+import { fail } from '../../presentation/cli/terminal/output.js';
+import { ID_PADDING, TASKS_FILE } from '../../domain/project/project.js';
+import { TASK_ID_PREFIX, type Task, type TaskCollection, type TaskId } from '../../domain/task/task.js';
+import type { LoadedWorkItem } from '../../domain/work-item/work-item.js';
+import { readText } from '../../infrastructure/filesystem/index.js';
 
 const parseTasksBoundary = parseTasks as unknown as (
   text: string,
