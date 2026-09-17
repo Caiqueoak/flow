@@ -169,7 +169,10 @@ export function runDoctor({ args, version, packageRoot }: DoctorCommandContext):
   }
 }
 
-function checkQuickYaml(flow: string, add: (id: string, ok: boolean, message: string, recovery?: string) => void): void {
+function checkQuickYaml(
+  flow: string,
+  add: (id: string, ok: boolean, message: string, recovery?: string) => void
+): void {
   const file = 'gates.yaml';
   const target = path.join(flow, file);
 

@@ -12,10 +12,7 @@ interface WorkItemLifecycle {
 }
 
 type LoadWorkItems = (root: string) => LoadedWorkItem[];
-type DeriveLifecycle = (
-  item: LoadedWorkItem,
-  workItemsById: Map<WorkItemId, LoadedWorkItem>
-) => WorkItemLifecycle;
+type DeriveLifecycle = (item: LoadedWorkItem, workItemsById: Map<WorkItemId, LoadedWorkItem>) => WorkItemLifecycle;
 
 const loadWorkItemsBoundary = loadWorkItems as LoadWorkItems;
 const deriveLifecycleBoundary = lifecycle as DeriveLifecycle;

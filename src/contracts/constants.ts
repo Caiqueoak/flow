@@ -10,11 +10,7 @@ export {
   WORK_ITEMS_DIRECTORY,
   WORK_ITEM_SPEC_TITLE
 } from '../domain/project/project.js';
-export {
-  LIFECYCLE_STATES,
-  TASK_COMMIT_TYPES,
-  TASK_ID_PREFIX
-} from '../domain/task/task.js';
+export { LIFECYCLE_STATES, TASK_COMMIT_TYPES, TASK_ID_PREFIX } from '../domain/task/task.js';
 export {
   BLOCKER_STATUSES,
   BLOCKER_TYPES,

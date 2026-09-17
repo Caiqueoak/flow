@@ -1,7 +1,4 @@
-import {
-  positionalArguments,
-  projectRelativeFiles
-} from '../../../presentation/cli/command-input/arguments.js';
+import { positionalArguments, projectRelativeFiles } from '../../../presentation/cli/command-input/arguments.js';
 import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
 import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
 import { assertExactStagedFiles } from '../../../infrastructure/git/index.js';

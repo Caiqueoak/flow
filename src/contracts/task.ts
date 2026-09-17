@@ -1,7 +1,1 @@
-export type {
-  LifecycleState,
-  QualifiedTaskId,
-  Task,
-  TaskCollection,
-  TaskId
-} from '../domain/task/task.js';
+export type { LifecycleState, QualifiedTaskId, Task, TaskCollection, TaskId } from '../domain/task/task.js';

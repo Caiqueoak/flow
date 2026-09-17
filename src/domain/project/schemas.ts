@@ -1,10 +1,6 @@
 import { GATES_SCHEMA_VERSION } from '../gate/gate.js';
 import { FLOW_SCHEMA_VERSION } from './project.js';
-import {
-  LIFECYCLE_STATES,
-  TASK_ID_PATTERN,
-  TASKS_SCHEMA_VERSION
-} from '../task/task.js';
+import { LIFECYCLE_STATES, TASK_ID_PATTERN, TASKS_SCHEMA_VERSION } from '../task/task.js';
 import {
   BACKLOG_SCHEMA_VERSION,
   BLOCKER_STATUSES,

@@ -62,9 +62,7 @@ function checkVagueDirectories(relativeFile: string): void {
 
   for (const directory of directories) {
     if (VAGUE_DIRECTORY_NAMES.has(directory)) {
-      findings.push(
-        `${relativeFile} is inside vague directory '${directory}/'. Use an owner-specific responsibility.`
-      );
+      findings.push(`${relativeFile} is inside vague directory '${directory}/'. Use an owner-specific responsibility.`);
     }
   }
 }
