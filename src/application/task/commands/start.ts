@@ -1,26 +1,27 @@
 import path from 'node:path';
-import { lifecycle, loadWorkItems } from '../../../flow-project/work-items.mjs';
-import { fail } from '../../../cli/terminal/output.js';
+import { isImplementationPlanApproved } from '../../../artifacts/implementation-plan.js';
+import { projectRoot } from '../../../cli/command-input/project-root.js';
+import { fail, writeOutput } from '../../../cli/terminal/output.js';
 import { IMPLEMENTATION_PLAN_FILE } from '../../../contracts/constants.js';
 import type { Task, TaskCollection } from '../../../contracts/task.js';
 import type { LoadedWorkItem } from '../../../contracts/work-item.js';
-import { isImplementationPlanApproved } from '../../../artifacts/implementation-plan.js';
 import { readText, writeYaml } from '../../../environment/filesystem.js';
+import { lifecycle, loadWorkItems } from '../../../flow-project/work-items.mjs';
+import { findTask, loadTaskContext } from '../task-context.js';
 
-export function startTask(
-  root: string,
-  item: LoadedWorkItem,
-  tasksFile: string,
-  tasks: TaskCollection,
-  task: Task
-): void {
-  ensureWorkItemIsNotBlocked(root, item);
-  ensureNoTaskIsInProgress(tasks);
-  ensureDependenciesAreCompleted(item, task, tasks);
-  ensureApprovedImplementationPlan(item);
+export function runStart(target: string | undefined, args: readonly string[]): void {
+  const root = projectRoot(args);
+  const context = loadTaskContext(root, target);
+  const task = findTask(context.tasks.tasks, target);
+
+  ensureWorkItemIsNotBlocked(root, context.item);
+  ensureNoTaskIsInProgress(context.tasks);
+  ensureDependenciesAreCompleted(context.item, task, context.tasks);
+  ensureApprovedImplementationPlan(context.item);
 
   task.state = 'in_progress';
-  writeYaml(tasksFile, tasks);
+  writeYaml(context.tasksFile, context.tasks);
+  writeOutput(`${target} started.`);
 }
 
 function ensureWorkItemIsNotBlocked(root: string, item: LoadedWorkItem): void {

@@ -1,14 +1,21 @@
+import { positionalArguments } from '../../cli/command-input/arguments.js';
 import { projectPathOption } from '../../cli/command-input/options.js';
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { positionalArguments } from '../../cli/command-input/arguments.js';
-import { fail, writeOutput } from '../../cli/terminal/output.js';
-import { projectRoot } from '../../cli/command-input/project-root.js';
-import type { QualifiedTaskId } from '../../contracts/task.js';
-import { commitTask } from './usecases/commit.js';
-import { createTask } from './usecases/create.js';
-import { startTask } from './usecases/start.js';
-import { updateTask } from './usecases/set.js';
-import { findTask, loadTaskContext } from './task-context.js';
+import { fail } from '../../cli/terminal/output.js';
+import { runCommit } from './commands/commit.js';
+import { runCreate } from './commands/create.js';
+import { runSet } from './commands/set.js';
+import { runStart } from './commands/start.js';
+
+const taskCommands = {
+  create: runCreate,
+  set: runSet,
+  start: runStart,
+  commit: runCommit
+} as const;
+
+type TaskCommandName = keyof typeof taskCommands;
+
 export const command: CommandDefinition = {
   name: 'task',
   description: 'Create, update, start or commit tasks.',
@@ -28,20 +35,12 @@ export const command: CommandDefinition = {
 };
 
 export function runTask({ args }: { args: string[] }): void {
-  const root = projectRoot(args);
   const [action, target] = positionalArguments(args);
-  const context = loadTaskContext(root, target);
-  if (action === 'create') return createTask(context.item, context.tasksFile, context.tasks, args);
-  const task = findTask(context.tasks.tasks, target);
-  if (action === 'start') {
-    startTask(root, context.item, context.tasksFile, context.tasks, task);
-    return writeOutput(`${target} started.`);
+  const execute = taskCommands[action as TaskCommandName];
+
+  if (!execute) {
+    fail(`Unknown task operation '${action}'.`);
   }
-  if (action === 'set') {
-    updateTask(context.tasksFile, context.tasks, task, args);
-    return writeOutput(`${target} updated.`);
-  }
-  if (action === 'commit')
-    return commitTask(root, context.item, context.tasksFile, context.tasks, task, target as QualifiedTaskId, args);
-  fail(`Unknown task operation '${action}'.`);
+
+  execute!(target, args);
 }

@@ -1,13 +1,15 @@
-import { evaluateGates } from '../../../flow-project/gate-evaluation.mjs';
-import { validateProject } from '../../../flow-project/validation.mjs';
 import { optionValue, projectRelativeFiles } from '../../../cli/command-input/arguments.js';
+import { projectRoot } from '../../../cli/command-input/project-root.js';
 import { fail, writeOutput } from '../../../cli/terminal/output.js';
-import { isValidTaskCommitSubject } from '../../../execution/task-commit.js';
 import type { QualifiedTaskId, Task, TaskCollection } from '../../../contracts/task.js';
 import type { LoadedWorkItem } from '../../../contracts/work-item.js';
 import { projectRelativePath, readText, writeText, writeYaml } from '../../../environment/filesystem.js';
 import { assertExactStagedFiles, createCommit, resetFiles, stageFiles } from '../../../environment/git.js';
 import { createTemporaryGitIndex, removeTemporaryGitIndex } from '../../../environment/temporary-git-index.js';
+import { isValidTaskCommitSubject } from '../../../execution/task-commit.js';
+import { evaluateGates } from '../../../flow-project/gate-evaluation.mjs';
+import { validateProject } from '../../../flow-project/validation.mjs';
+import { findTask, loadTaskContext } from '../task-context.js';
 
 interface ValidationFinding {
   code: string;
@@ -19,33 +21,6 @@ interface GateResult {
   status: string;
 }
 
-const validateProjectBoundary = validateProject as unknown as (
-  root: string,
-  options: { preCommitTask: string; skipTrace: boolean }
-) => ValidationFinding[];
-const evaluateGatesBoundary = evaluateGates as unknown as (root: string, options: { task: string }) => GateResult[];
-
-export function commitTask(
-  root: string,
-  item: LoadedWorkItem,
-  tasksFile: string,
-  tasks: TaskCollection,
-  task: Task,
-  taskId: QualifiedTaskId,
-  args: readonly string[]
-): void {
-  ensureTaskIsInProgress(task, taskId);
-  const subject = validatedCommitSubject(args, taskId);
-
-  ensurePreCommitValidation(root, taskId);
-  const files = projectRelativeFiles(root, args);
-  assertExactStagedFiles(root, files);
-  ensureTaskGatesPass(root, taskId);
-
-  persistTaskCommit({ root, item, tasksFile, tasks, task, taskId, subject, files });
-  writeOutput(`${taskId} committed.`);
-}
-
 interface PersistTaskCommitInput {
   root: string;
   item: LoadedWorkItem;
@@ -55,6 +30,39 @@ interface PersistTaskCommitInput {
   taskId: QualifiedTaskId;
   subject: string;
   files: string[];
+}
+
+const validateProjectBoundary = validateProject as unknown as (
+  root: string,
+  options: { preCommitTask: string; skipTrace: boolean }
+) => ValidationFinding[];
+const evaluateGatesBoundary = evaluateGates as unknown as (root: string, options: { task: string }) => GateResult[];
+
+export function runCommit(target: string | undefined, args: readonly string[]): void {
+  const root = projectRoot(args);
+  const context = loadTaskContext(root, target);
+  const task = findTask(context.tasks.tasks, target);
+  const taskId = target as QualifiedTaskId;
+
+  ensureTaskIsInProgress(task, taskId);
+  const subject = validatedCommitSubject(args, taskId);
+
+  ensurePreCommitValidation(root, taskId);
+  const files = projectRelativeFiles(root, args);
+  assertExactStagedFiles(root, files);
+  ensureTaskGatesPass(root, taskId);
+
+  persistTaskCommit({
+    root,
+    item: context.item,
+    tasksFile: context.tasksFile,
+    tasks: context.tasks,
+    task,
+    taskId,
+    subject,
+    files
+  });
+  writeOutput(`${taskId} committed.`);
 }
 
 function persistTaskCommit(input: PersistTaskCommitInput): void {
