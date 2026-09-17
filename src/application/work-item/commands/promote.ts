@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { SPEC_HEADINGS, validateSpec } from '../../../artifacts/work-item-specification.mjs';
-import { fail } from '../../../cli/terminal/output.js';
-import { SPEC_FILE } from '../../../contracts/constants.js';
-import type { LoadedWorkItem } from '../../../contracts/work-item.js';
-import { readText } from '../../../environment/filesystem.js';
+import { fail } from '../../../presentation/cli/terminal/output.js';
+import { SPEC_FILE } from '../../../domain/project/project.js';
+import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
+import { readText } from '../../../infrastructure/filesystem/index.js';
 import { editSpecMetadata } from '../work-item-context.js';
 
 export function promoteWorkItem(item: LoadedWorkItem): void {
