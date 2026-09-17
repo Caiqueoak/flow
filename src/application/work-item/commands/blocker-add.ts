@@ -1,5 +1,5 @@
-import { requiredOption } from '../../../cli/command-input/arguments.js';
-import type { BlockerType, LoadedWorkItem } from '../../../contracts/work-item.js';
+import { requiredOption } from '../../../presentation/cli/command-input/arguments.js';
+import type { BlockerType, LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import { editSpecMetadata } from '../work-item-context.js';
 
 export function addWorkItemBlocker(item: LoadedWorkItem, args: readonly string[]): void {
