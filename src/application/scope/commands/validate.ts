@@ -1,8 +1,8 @@
-import { validateProject } from '../../../flow-project/validation.mjs';
 import { positionalArguments, projectRelativeFiles } from '../../../cli/command-input/arguments.js';
+import { projectRoot } from '../../../cli/command-input/project-root.js';
 import { fail, writeOutput } from '../../../cli/terminal/output.js';
 import { assertExactStagedFiles } from '../../../environment/git.js';
-import { projectRoot } from '../../../cli/command-input/project-root.js';
+import { validateProject } from '../../../flow-project/validation.mjs';
 
 interface ValidationFinding {
   code: string;
@@ -14,7 +14,7 @@ const validateProjectBoundary = validateProject as unknown as (
   options: { preCommitTask: string; skipTrace: boolean }
 ) => ValidationFinding[];
 
-export function runScope({ args }: { args: string[] }): void {
+export function runValidate({ args }: { args: string[] }): void {
   const root = projectRoot(args);
   const taskId = positionalArguments(args)[1];
 
