@@ -1,5 +1,11 @@
 import path from 'node:path';
-import { fail, optionValue, positionalArguments, projectRoot, recordOutput as writeOutput } from '../command-runtime.js';
+import {
+  fail,
+  optionValue,
+  positionalArguments,
+  projectRoot,
+  recordOutput as writeOutput
+} from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
 import { recordApproval } from './commands/record.js';
 

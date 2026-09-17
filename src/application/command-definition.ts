@@ -22,8 +22,7 @@ export interface CommandInvocation {
 }
 
 export type CommandOutcome =
-  | { kind: 'text'; lines: readonly string[]; exitCode?: number }
-  | { kind: 'json'; value: unknown; exitCode?: number };
+  { kind: 'text'; lines: readonly string[]; exitCode?: number } | { kind: 'json'; value: unknown; exitCode?: number };
 
 export interface CommandDefinition {
   name: string;

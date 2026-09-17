@@ -55,7 +55,11 @@ export function promptText(message: string, defaultValue = ''): Promise<string> 
   return activeRun.getStore()?.prompts.text(message, defaultValue) ?? unavailablePrompts.text(message, defaultValue);
 }
 
-export function promptSelect(input: { title: string; options: PromptOption[]; defaultIndex?: number }): Promise<string> {
+export function promptSelect(input: {
+  title: string;
+  options: PromptOption[];
+  defaultIndex?: number;
+}): Promise<string> {
   return activeRun.getStore()?.prompts.select(input) ?? unavailablePrompts.select(input);
 }
 
@@ -78,7 +82,12 @@ export function requiredOption(args: readonly string[], option: string): string 
 }
 
 export function commaSeparatedValues(value: string | undefined): string[] {
-  return value?.split(',').map((entry) => entry.trim()).filter(Boolean) ?? [];
+  return (
+    value
+      ?.split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean) ?? []
+  );
 }
 
 export function projectRoot(args: readonly string[]): string {

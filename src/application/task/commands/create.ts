@@ -1,8 +1,4 @@
-import {
-  commaSeparatedValues,
-  optionValue,
-  requiredOption
-} from '../../command-runtime.js';
+import { commaSeparatedValues, optionValue, requiredOption } from '../../command-runtime.js';
 import { projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
 import type { TaskId } from '../../../domain/task/task.js';
 import { writeYaml } from '../../../infrastructure/filesystem/index.js';

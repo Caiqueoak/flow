@@ -18,11 +18,7 @@ import {
   type WorkItemId,
   type WorkItemKind
 } from '../../../domain/work-item/work-item.js';
-import {
-  commaSeparatedValues,
-  optionValue,
-  requiredOption
-} from '../../command-runtime.js';
+import { commaSeparatedValues, optionValue, requiredOption } from '../../command-runtime.js';
 import { fail, recordOutput as writeOutput } from '../../command-runtime.js';
 import { ensureDirectory, writeText, writeYaml } from '../../../infrastructure/filesystem/index.js';
 import { loadProjectWorkItems } from '../work-item-context.js';

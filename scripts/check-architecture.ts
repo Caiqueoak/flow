@@ -88,7 +88,12 @@ function checkDomainDependencies(relativeFile: string, source: string): void {
   checkLayerDependencies(relativeFile, source, FORBIDDEN_DOMAIN_DEPENDENCIES, 'domain');
 }
 
-function checkLayerDependencies(relativeFile: string, source: string, forbiddenDependencies: string[], layer: string): void {
+function checkLayerDependencies(
+  relativeFile: string,
+  source: string,
+  forbiddenDependencies: string[],
+  layer: string
+): void {
   for (const specifier of importSpecifiers(source)) {
     const dependency = normalizeResolvedImport(relativeFile, specifier);
     if (!dependency) continue;
