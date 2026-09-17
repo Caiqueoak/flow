@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseGates } from '../../../artifacts/gate-definitions.mjs';
-import { projectRoot } from '../../../cli/command-input/project-root.js';
-import { fail, writeOutput } from '../../../cli/terminal/output.js';
+import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
+import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
 import { evaluateGates, selectGates } from '../../../flow-project/gate-evaluation.mjs';
 
 interface GateFilters {
