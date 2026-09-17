@@ -1,11 +1,17 @@
-import { optionValue, projectRelativeFiles } from '../../../cli/command-input/arguments.js';
-import { projectRoot } from '../../../cli/command-input/project-root.js';
-import { fail, writeOutput } from '../../../cli/terminal/output.js';
-import type { QualifiedTaskId, Task, TaskCollection } from '../../../contracts/task.js';
-import type { LoadedWorkItem } from '../../../contracts/work-item.js';
-import { projectRelativePath, readText, writeText, writeYaml } from '../../../environment/filesystem.js';
-import { assertExactStagedFiles, createCommit, resetFiles, stageFiles } from '../../../environment/git.js';
-import { createTemporaryGitIndex, removeTemporaryGitIndex } from '../../../environment/temporary-git-index.js';
+import { optionValue, projectRelativeFiles } from '../../../presentation/cli/command-input/arguments.js';
+import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
+import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+import type { QualifiedTaskId, Task, TaskCollection } from '../../../domain/task/task.js';
+import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
+import { projectRelativePath, readText, writeText, writeYaml } from '../../../infrastructure/filesystem/index.js';
+import {
+  assertExactStagedFiles,
+  createCommit,
+  createTemporaryGitIndex,
+  removeTemporaryGitIndex,
+  resetFiles,
+  stageFiles
+} from '../../../infrastructure/git/index.js';
 import { isValidTaskCommitSubject } from '../../../execution/task-commit.js';
 import { evaluateGates } from '../../../flow-project/gate-evaluation.mjs';
 import { validateProject } from '../../../flow-project/validation.mjs';
