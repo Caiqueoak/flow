@@ -32,7 +32,7 @@ interface DoctorResult {
   healthy: boolean;
   mode: 'quick' | 'full';
   configured_version?: string | null;
-  executed_version?: string;
+  executed_version?: string | undefined;
   checks: DoctorCheck[];
 }
 
