@@ -1,5 +1,5 @@
-import { projectPathOption } from '../../cli/command-input/options.js';
-import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
+import { projectPathOption } from '../../presentation/cli/command-input/options.js';
+import type { CommandDefinition } from '../../presentation/cli/command-metadata/definition.js';
 import { runTrace } from './operations/trace.mjs';
 
 export const command: CommandDefinition = {
