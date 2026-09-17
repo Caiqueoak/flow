@@ -102,6 +102,10 @@ Before putting code in `shared`, identify its natural owner. `TaskId` belongs to
 
 Promote code to shared scope only when ownership is genuinely cross-cutting and reuse is real.
 
+## Transitional compatibility
+
+During staged refactors, forwarding modules may temporarily preserve existing imports while ownership moves to its final layer. These modules do not own behavior and must be removed after their consumers migrate; they are migration scaffolding, not part of the target architecture.
+
 ## System boundaries
 
 Filesystem, Git, external processes, runtime integrations and persistence are explicit infrastructure effects. Domain decisions stay pure whenever practical and must not be buried in infrastructure.
