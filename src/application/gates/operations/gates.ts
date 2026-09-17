@@ -13,6 +13,24 @@ interface GateFilters {
   all: boolean;
 }
 
+interface GateView {
+  id: string;
+  stage: string;
+  cost: string;
+  command?: string;
+  rule?: string;
+}
+
+interface GateResult {
+  id: string;
+  status: string;
+  blocking: boolean;
+  duration_ms: number;
+}
+
+const selectGatesBoundary = selectGates as unknown as (gates: unknown[], filters: GateFilters) => GateView[];
+const evaluateGatesBoundary = evaluateGates as unknown as (root: string, filters: GateFilters) => GateResult[];
+
 export function listGates(args: readonly string[]): void {
   const { selected } = loadSelectedGates(args, true);
 
@@ -30,7 +48,7 @@ export function runGates(args: readonly string[]): void {
     fail('No gates matched; use --all or a scope filter.');
   }
 
-  const results = evaluateGates(root, filters);
+  const results = evaluateGatesBoundary(root, filters);
 
   if (args.includes('--json')) {
     writeOutput(JSON.stringify(results, null, 2));
@@ -45,7 +63,11 @@ export function runGates(args: readonly string[]): void {
   }
 }
 
-function loadSelectedGates(args: readonly string[], defaultToAll: boolean) {
+function loadSelectedGates(args: readonly string[], defaultToAll: boolean): {
+  root: string;
+  filters: GateFilters;
+  selected: GateView[];
+} {
   const root = projectRoot(args);
   const file = path.join(root, '_flow', 'gates.yaml');
 
@@ -59,7 +81,8 @@ function loadSelectedGates(args: readonly string[], defaultToAll: boolean) {
     filters.all = true;
   }
 
-  const selected = selectGates(parseGates(fs.readFileSync(file, 'utf8')).gates, filters);
+  const gates = parseGates(fs.readFileSync(file, 'utf8')).gates as unknown[];
+  const selected = selectGatesBoundary(gates, filters);
   return { root, filters, selected };
 }
 
