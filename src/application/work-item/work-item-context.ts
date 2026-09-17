@@ -1,10 +1,10 @@
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { loadWorkItems } from '../../flow-project/work-items.mjs';
-import { fail } from '../../cli/terminal/output.js';
-import { SPEC_FILE } from '../../contracts/constants.js';
-import type { LoadedWorkItem, WorkItemSpecMetadata } from '../../contracts/work-item.js';
-import { readText, writeText } from '../../environment/filesystem.js';
+import { fail } from '../../presentation/cli/terminal/output.js';
+import { SPEC_FILE } from '../../domain/project/project.js';
+import type { LoadedWorkItem, WorkItemSpecMetadata } from '../../domain/work-item/work-item.js';
+import { readText, writeText } from '../../infrastructure/filesystem/index.js';
 
 export function loadProjectWorkItems(root: string): LoadedWorkItem[] {
   return loadWorkItems(root) as LoadedWorkItem[];
