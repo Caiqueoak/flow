@@ -1,7 +1,7 @@
-import { positionalArguments } from '../../cli/command-input/arguments.js';
-import { projectPathOption } from '../../cli/command-input/options.js';
-import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { fail } from '../../cli/terminal/output.js';
+import { positionalArguments } from '../../presentation/cli/command-input/arguments.js';
+import { projectPathOption } from '../../presentation/cli/command-input/options.js';
+import type { CommandDefinition } from '../../presentation/cli/command-metadata/definition.js';
+import { fail } from '../../presentation/cli/terminal/output.js';
 import { runValidate } from './commands/validate.js';
 
 const scopeCommands = {
@@ -24,11 +24,14 @@ export const command: CommandDefinition = {
 
 export function runScope({ args }: { args: string[] }): void {
   const [action] = positionalArguments(args);
-  const execute = scopeCommands[action as ScopeCommandName];
 
-  if (!execute) {
+  if (!isScopeCommandName(action)) {
     fail(`Unknown scope operation '${action}'.`);
   }
 
-  execute!({ args });
+  scopeCommands[action]({ args });
+}
+
+function isScopeCommandName(value: string | undefined): value is ScopeCommandName {
+  return value !== undefined && value in scopeCommands;
 }
