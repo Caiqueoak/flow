@@ -1,5 +1,5 @@
-import { optionValue } from '../../../cli/command-input/arguments.js';
-import type { LoadedWorkItem, WorkItemKind } from '../../../contracts/work-item.js';
+import { optionValue } from '../../../presentation/cli/command-input/arguments.js';
+import type { LoadedWorkItem, WorkItemKind } from '../../../domain/work-item/work-item.js';
 import { editSpecMetadata } from '../work-item-context.js';
 
 export function updateWorkItemIdentity(item: LoadedWorkItem, args: readonly string[]): void {
