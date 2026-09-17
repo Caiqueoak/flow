@@ -94,7 +94,7 @@ function checkDomainDependencies(relativeFile: string, source: string): void {
 
 function importSpecifiers(source: string): string[] {
   const imports = source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g);
-  return Array.from(imports, (match) => match[2]);
+  return Array.from(imports, (match) => match[2]!);
 }
 
 function normalizeResolvedImport(relativeFile: string, specifier: string): string | null {
