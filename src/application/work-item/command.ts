@@ -1,4 +1,10 @@
-import { fail, positionalArguments, projectRoot, recordOutput as writeOutput } from '../command-runtime.js';
+import {
+  fail,
+  positionalArguments,
+  projectRoot,
+  recordOutput as writeOutput,
+  resolveSubcommand
+} from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
 import { addWorkItemBlocker } from './commands/blocker-add.js';
 import { resolveWorkItemBlocker } from './commands/blocker-resolve.js';
@@ -47,6 +53,7 @@ export const command: CommandDefinition = {
   ],
   effects: 'Writes only artifacts in the target work-item folder.',
   when: 'For deterministic backlog mutations.',
+  subcommands: Object.keys(workItemCommands),
   load: async () => ({ runWorkItem }),
   run: 'runWorkItem'
 };
@@ -59,11 +66,7 @@ export function runWorkItem({ args }: { args: string[] }): void {
     fail('Missing work-item operation.');
   }
 
-  const execute = workItemCommands[action];
-
-  if (!execute) {
-    fail(`Unknown work-item operation '${action}'.`);
-  }
+  const execute = resolveSubcommand(workItemCommands, action, `Unknown work-item operation '${action}'.`);
 
   execute({ root, target, args });
 

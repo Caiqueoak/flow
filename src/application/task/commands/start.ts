@@ -1,11 +1,12 @@
 import path from 'node:path';
-import { isImplementationPlanApproved } from '../../../artifacts/implementation-plan.js';
+import { isImplementationPlanApproved } from '../../../domain/project/implementation-plan.js';
 import { fail, projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
 import { IMPLEMENTATION_PLAN_FILE } from '../../../domain/project/project.js';
 import type { Task, TaskCollection } from '../../../domain/task/task.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import { readText, writeYaml } from '../../../infrastructure/filesystem/index.js';
-import { lifecycle, loadWorkItems } from '../../../flow-project/work-items.mjs';
+import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
+import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 import { findTask, loadTaskContext } from '../task-context.js';
 
 export function runStart(target: string | undefined, args: readonly string[]): void {

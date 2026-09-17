@@ -6,7 +6,7 @@ import {
   recordOutput as writeOutput
 } from '../../command-runtime.js';
 import { assertExactStagedFiles } from '../../../infrastructure/git/index.js';
-import { validateProject } from '../../../flow-project/validation.mjs';
+import { validateProject } from '../../project-validation.mjs';
 
 interface ValidationFinding {
   code: string;

@@ -4,7 +4,8 @@ import {
   optionValue,
   positionalArguments,
   projectRoot,
-  recordOutput as writeOutput
+  recordOutput as writeOutput,
+  resolveSubcommand
 } from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
 import { recordApproval } from './commands/record.js';
@@ -12,8 +13,6 @@ import { recordApproval } from './commands/record.js';
 const approvalCommands = {
   record: runRecord
 } as const;
-
-type ApprovalCommandName = keyof typeof approvalCommands;
 
 export const command: CommandDefinition = {
   name: 'approval',
@@ -23,6 +22,7 @@ export const command: CommandDefinition = {
   flags: [projectPathOption, { name: '--at', value: '<timestamp>' }],
   effects: 'Updates approved frontmatter.',
   when: 'Only after explicit approval of the exact document.',
+  subcommands: Object.keys(approvalCommands),
   load: async () => ({ runApproval }),
   run: 'runApproval'
 };
@@ -30,11 +30,11 @@ export const command: CommandDefinition = {
 export function runApproval({ args }: { args: string[] }): void {
   const [action, target] = positionalArguments(args);
 
-  if (!isApprovalCommandName(action) || !target) {
+  if (!target) {
     fail('Usage: flow approval record <implementation-plan.md>.');
   }
 
-  approvalCommands[action](target, args);
+  resolveSubcommand(approvalCommands, action, 'Usage: flow approval record <implementation-plan.md>.')(target, args);
 }
 
 function runRecord(target: string, args: readonly string[]): void {
@@ -45,10 +45,6 @@ function runRecord(target: string, args: readonly string[]): void {
   const approvedAt = approvalTimestamp(optionValue(args, '--at'));
   const result = recordApproval({ root: projectRoot(args), target, approvedAt });
   writeOutput(`${result.workItemId} implementation plan approved.`);
-}
-
-function isApprovalCommandName(value: string | undefined): value is ApprovalCommandName {
-  return value !== undefined && value in approvalCommands;
 }
 
 function approvalTimestamp(value: string | undefined): string {

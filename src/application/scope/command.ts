@@ -1,12 +1,10 @@
-import { fail, positionalArguments } from '../command-runtime.js';
+import { positionalArguments, resolveSubcommand } from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
 import { runValidate } from './commands/validate.js';
 
 const scopeCommands = {
   validate: runValidate
 } as const;
-
-type ScopeCommandName = keyof typeof scopeCommands;
 
 export const command: CommandDefinition = {
   name: 'scope',
@@ -16,6 +14,7 @@ export const command: CommandDefinition = {
   flags: [projectPathOption, { name: '--files', value: '<path,...>' }, { name: '--json' }],
   effects: 'Read-only staged Git inspection and structural validation.',
   when: 'Immediately before a task implementation commit.',
+  subcommands: Object.keys(scopeCommands),
   load: async () => ({ runScope }),
   run: 'runScope'
 };
@@ -23,13 +22,5 @@ export const command: CommandDefinition = {
 export function runScope({ args }: { args: string[] }): void {
   const [action] = positionalArguments(args);
 
-  if (!isScopeCommandName(action)) {
-    fail(`Unknown scope operation '${action}'.`);
-  }
-
-  scopeCommands[action]({ args });
-}
-
-function isScopeCommandName(value: string | undefined): value is ScopeCommandName {
-  return value !== undefined && value in scopeCommands;
+  resolveSubcommand(scopeCommands, action, `Unknown scope operation '${action}'.`)({ args });
 }

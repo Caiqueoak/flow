@@ -1,3 +1,7 @@
 # 001: Command slices own the CLI boundary
 
-Flow organizes application code by public CLI command. A command slice owns its definition, handler, use cases, and tests. Cross-command behavior belongs to a concrete horizontal module only when it has an explicit responsibility outside a single command.
+## Status
+
+Superseded by [ADR 002](002-layered-command-architecture.md).
+
+The command-oriented application structure remains, but domain knowledge and external effects now belong to the explicit domain and infrastructure layers defined by ADR 002.

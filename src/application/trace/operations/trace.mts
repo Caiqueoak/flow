@@ -1,53 +1,71 @@
-// @ts-nocheck
-import { execFileSync } from 'node:child_process';
 import { fail, projectRoot, recordOutput as info } from '../../command-runtime.js';
+import { gitChangedFiles, gitHistory } from '../../../infrastructure/git/index.js';
 const task = /^W\d{3,}-T\d{3,}$/,
   work = /^W\d{3,}$/;
 const subject =
   /^(feat|fix|docs|style|refactor|test|build|ci|chore|perf|revert)\(([a-z0-9][a-z0-9-]*)\): (.+) \[(W\d{3,}(?:-T\d{3,})?)\]$/;
-function history(root) {
+
+interface HistoryEntry {
+  sha: string;
+  timestamp: number;
+  subject: string;
+  body: string;
+}
+
+interface Evidence {
+  task: string;
+  sha: string;
+  title: string;
+  files: string[];
+}
+
+interface Classification {
+  status: 'invalid' | 'missing' | 'ambiguous' | 'resolved';
+  commits: HistoryEntry[];
+  invalid_commits: HistoryEntry[];
+}
+
+function history(root: string): HistoryEntry[] {
   try {
-    return execFileSync('git', ['log', 'HEAD', '--format=%H%x1f%ct%x1f%s%x1f%B%x1e'], { cwd: root, encoding: 'utf8' })
+    return gitHistory(root)
       .split('\x1e')
-      .filter((r) => r.trim())
-      .map((r) => {
-        const [sha, timestamp, subject, body = ''] = r.trim().split('\x1f');
-        return { sha, timestamp: Number(timestamp), subject, body };
+      .filter((record) => record.trim())
+      .map((record) => {
+        const [sha = '', timestamp = '0', commitSubject = '', body = ''] = record.trim().split('\x1f');
+        return { sha, timestamp: Number(timestamp), subject: commitSubject, body };
       });
   } catch {
     fail('git history is unavailable.');
   }
 }
-function trailers(body) {
-  const values = new Map();
+function trailers(body: string): Map<string, string> | null {
+  const values = new Map<string, string>();
   for (const line of body.split(/\r?\n/)) {
     const match = line.match(/^(Flow-Work-Item|Flow-Task):\s*(\S+)\s*$/);
     if (!match) continue;
-    if (values.has(match[1])) return null;
-    values.set(match[1], match[2]);
+    const key = match[1]!;
+    if (values.has(key)) return null;
+    values.set(key, match[2]!);
   }
   return values;
 }
-function isCanonicalTaskCommit(entry, id) {
+function isCanonicalTaskCommit(entry: HistoryEntry, id: string): boolean {
   const match = entry.subject.match(subject);
   if (!match || match[4] !== id) return false;
   const values = trailers(entry.body);
-  return values?.get('Flow-Task') === id && values.get('Flow-Work-Item') === id.split('-')[0];
+  return values?.get('Flow-Task') === id && values?.get('Flow-Work-Item') === id.split('-')[0];
 }
-function changedFiles(root, sha) {
-  return execFileSync('git', ['show', '--format=', '--name-only', '--no-renames', sha], { cwd: root, encoding: 'utf8' })
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((file) => file.replace(/\\/g, '/'));
+function changedFiles(root: string, sha: string): string[] {
+  return gitChangedFiles(root, sha);
 }
-function evidence(root, entry, id) {
+function evidence(root: string, entry: HistoryEntry, id: string): Evidence {
   const match = entry.subject.match(subject);
   return { task: id, sha: entry.sha, title: match?.[3] ?? entry.subject, files: changedFiles(root, entry.sha) };
 }
-function invalidEvidence(entries) {
+function invalidEvidence(entries: readonly HistoryEntry[]): Array<{ sha: string; subject: string }> {
   return entries.map((entry) => ({ sha: entry.sha, subject: entry.subject }));
 }
-function classify(entries, id) {
+function classify(entries: readonly HistoryEntry[], id: string): Classification {
   const wanted = entries.filter((e) => e.subject.endsWith(`[${id}]`)),
     good = wanted.filter((entry) =>
       task.test(id)
@@ -64,46 +82,52 @@ function classify(entries, id) {
     invalid_commits: invalid
   };
 }
-export function traceTask(root, id) {
+export function traceTask(root: string, id: string) {
   if (!task.test(id)) fail(`invalid qualified task ID '${id}'.`);
   const result = classify(history(root), id);
   return {
     task: id,
     status: result.status,
-    commit: result.commits.length === 1 ? evidence(root, result.commits[0], id) : null,
+    commit: result.commits.length === 1 ? evidence(root, result.commits[0]!, id) : null,
     invalid_commits: invalidEvidence(result.invalid_commits)
   };
 }
-export function traceTasks(root, ids) {
+export function traceTasks(root: string, ids: readonly string[]) {
   return new Map(ids.map((id) => [id, traceTask(root, id)]));
 }
-export function traceWorkItem(root, id) {
+export function traceWorkItem(root: string, id: string) {
   if (!work.test(id)) fail(`invalid work-item ID '${id}'.`);
   const entries = history(root),
     tasks = entries.filter((entry) => {
       const match = entry.subject.match(subject);
-      return match && match[4].startsWith(`${id}-T`) && isCanonicalTaskCommit(entry, match[4]);
+      return Boolean(match?.[4]?.startsWith(`${id}-T`) && isCanonicalTaskCommit(entry, match[4]));
     }),
     review = classify(entries, id);
   return {
     work_item_id: id,
-    tasks: tasks.map((entry) => evidence(root, entry, entry.subject.match(subject)[4])),
+    tasks: tasks.map((entry) => evidence(root, entry, entry.subject.match(subject)![4]!)),
     review: {
       status: review.status,
-      commit: review.commits.length === 1 ? evidence(root, review.commits[0], id) : null,
+      commit: review.commits.length === 1 ? evidence(root, review.commits[0]!, id) : null,
       invalid_commits: invalidEvidence(review.invalid_commits)
     }
   };
 }
-function renderEvidence(record) {
+function renderEvidence(record: Evidence): string {
   return `${record.task} ${record.sha} ${record.title}${record.files.length ? `\n${record.files.map((file) => `  ${file}`).join('\n')}` : ''}`;
 }
-export function runTrace({ args }) {
-  const id = args.find((x, i) => !x.startsWith('-') && (i === 0 || !args[i - 1].startsWith('--'))),
-    result = task.test(id) ? traceTask(projectRoot(args), id) : traceWorkItem(projectRoot(args), id);
+export function runTrace({ args }: { args: string[] }): void {
+  const id = args.find((value, index) => !value.startsWith('-') && (index === 0 || !args[index - 1]?.startsWith('--')));
   if (!id || (!task.test(id) && !work.test(id))) fail('flow trace requires W015-T003 or W015.');
-  if (args.includes('--json')) return info(JSON.stringify(result, null, 2));
-  if (task.test(id) && result.status !== 'resolved') fail(`${id}: ${result.status} canonical subject evidence.`);
-  if (task.test(id)) return info(renderEvidence(result.commit));
-  info(result.tasks.map(renderEvidence).join('\n'));
+  const root = projectRoot(args);
+  if (task.test(id)) {
+    const taskResult = traceTask(root, id);
+    if (args.includes('--json')) return info(JSON.stringify(taskResult, null, 2));
+    if (taskResult.status !== 'resolved' || !taskResult.commit)
+      fail(`${id}: ${taskResult.status} canonical subject evidence.`);
+    return info(renderEvidence(taskResult.commit));
+  }
+  const workItemResult = traceWorkItem(root, id);
+  if (args.includes('--json')) return info(JSON.stringify(workItemResult, null, 2));
+  info(workItemResult.tasks.map(renderEvidence).join('\n'));
 }

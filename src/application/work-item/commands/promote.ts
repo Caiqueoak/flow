@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { SPEC_HEADINGS, validateSpec } from '../../../artifacts/work-item-specification.mjs';
+import { SPEC_HEADINGS, validateSpec } from '../../../domain/work-item/specification.mjs';
 import { fail } from '../../command-runtime.js';
 import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';

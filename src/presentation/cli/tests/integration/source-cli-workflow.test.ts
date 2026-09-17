@@ -50,6 +50,36 @@ function setRecordedFlowVersion(root: string, version: string) {
   fs.writeFileSync(configPath, stringify(config, { lineWidth: 0 }));
 }
 
+test('global help lists the stable public command surface', async () => {
+  const output: string[] = [];
+  const original = console.log;
+  console.log = (...values: unknown[]) => output.push(values.map(String).join(' '));
+  try {
+    await runCli(['--help']);
+  } finally {
+    console.log = original;
+  }
+
+  const help = output.join('\n');
+  for (const command of [
+    'init',
+    'doctor',
+    'migrate',
+    'status',
+    'validate',
+    'route',
+    'sync',
+    'trace',
+    'gates',
+    'work-item',
+    'task',
+    'approval',
+    'scope'
+  ]) {
+    assert.match(help, new RegExp(`^  ${command}\\s`, 'm'));
+  }
+});
+
 test('source CLI lifecycle has observable, deterministic transitions', async (t) => {
   const root = project(t);
   const base = path.join(root, '_flow', 'work-items', 'W101-source-workflow');

@@ -1,6 +1,7 @@
 import { projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
 import type { LoadedWorkItem, WorkItemId } from '../../../domain/work-item/work-item.js';
-import { loadWorkItems, lifecycle } from '../../../flow-project/work-items.mjs';
+import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
+import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 
 interface StatusCommandContext {
   args: string[];
