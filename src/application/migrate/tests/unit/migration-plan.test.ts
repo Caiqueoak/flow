@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
-import { migrateProject, migrationPlan } from '../../operations/apply.mjs';
+import { captureCommandOutcome } from '../../../command-runtime.js';
+import { migrateProject, migrationPlan, runMigrate } from '../../operations/apply.mjs';
 
 function temporaryProject(t: test.TestContext, prefix: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -58,13 +59,16 @@ test('blocks a newer major project from being rewritten by an older target', (t)
   assert.deepEqual(plan.incompatibilities, ["Cannot migrate from newer Flow version '1.0.0' to older target '0.8.0'."]);
 });
 
-test('requires explicit support for forward major-version migrations', (t) => {
+test('allows forward migration across package major versions', (t) => {
   const root = canonicalProject(t, '0.8.0');
 
-  const plan = migrationPlan(root, '1.0.0');
+  const plan = migrationPlan(root, '2.0.1');
+  const result = migrateProject(root, { targetVersion: '2.0.1' });
 
-  assert.equal(plan.can_apply, false);
-  assert.deepEqual(plan.incompatibilities, ["Unsupported major-version migration from '0.8.0' to '1.0.0'."]);
+  assert.equal(plan.can_apply, true);
+  assert.deepEqual(plan.incompatibilities, []);
+  assert.equal(result.rescued, false);
+  assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).flow_version, '2.0.1');
 });
 
 test('rejects malformed recorded Flow versions', (t) => {
@@ -156,7 +160,7 @@ test('migrates a legacy backlog already stored in _flow', (t) => {
   );
 });
 
-test('rejects invalid legacy data without partially replacing the source project', (t) => {
+test('archives invalid legacy formats and rebuilds a valid project for reconciliation', (t) => {
   const scenarios: Array<[string, unknown[], RegExp]> = [
     ['state', [{ ...legacyItem, state: 'invented' }], /Unknown legacy state/],
     ['ID', [{ ...legacyItem, id: 'none' }], /Cannot normalize ID/],
@@ -166,9 +170,22 @@ test('rejects invalid legacy data without partially replacing the source project
   for (const [label, items, expected] of scenarios) {
     const root = legacyProject(t, items);
     const before = fs.readFileSync(path.join(root, '.flow', 'backlog.yaml'), 'utf8');
-    assert.throws(() => migrateProject(root, { targetVersion: '0.8.0' }), expected, label);
-    assert.equal(fs.readFileSync(path.join(root, '.flow', 'backlog.yaml'), 'utf8'), before, label);
-    assert.equal(fs.existsSync(path.join(root, '_flow')), false, label);
+    const result = migrateProject(root, { targetVersion: '2.0.1' });
+
+    assert.equal(result.rescued, true, label);
+    assert.match(result.rescue_reason ?? '', expected, label);
+    assert.equal(fs.existsSync(path.join(root, '.flow')), false, label);
+    assert.equal(
+      fs.readFileSync(path.join(root, '_flow', 'docs', 'migration-backup', 'backlog.yaml'), 'utf8'),
+      before,
+      label
+    );
+    assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).flow_version, '2.0.1');
+    assert.equal(
+      parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status,
+      'pending_reconciliation'
+    );
+    assert.equal(fs.existsSync(path.join(root, '_flow', 'generated', 'backlog.yaml')), true, label);
     assert.deepEqual(
       fs.readdirSync(root).filter((name) => name.startsWith('_flow-migration-')),
       [],
@@ -177,16 +194,86 @@ test('rejects invalid legacy data without partially replacing the source project
   }
 });
 
-test('rejects a normalized destination collision without changing canonical data', (t) => {
+test('rescues a normalized destination collision without losing either source directory', (t) => {
   const root = legacyProject(t, [legacyItem]);
   const workItems = path.join(root, '.flow', 'work-items');
   fs.mkdirSync(path.join(workItems, 'old-feature'));
   fs.mkdirSync(path.join(workItems, 'W001-old-feature'));
 
-  assert.throws(() => migrateProject(root, { targetVersion: '0.8.0' }), /destination already exists/);
-  assert.equal(fs.existsSync(path.join(workItems, 'old-feature')), true);
-  assert.equal(fs.existsSync(path.join(workItems, 'W001-old-feature')), true);
-  assert.equal(fs.existsSync(path.join(root, '_flow')), false);
+  const result = migrateProject(root, { targetVersion: '0.8.0' });
+
+  assert.equal(result.rescued, true);
+  assert.match(result.rescue_reason ?? '', /destination already exists/);
+  const archive = path.join(root, '_flow', 'docs', 'migration-backup', 'work-items');
+  assert.equal(fs.existsSync(path.join(archive, 'old-feature')), true);
+  assert.equal(fs.existsSync(path.join(archive, 'W001-old-feature')), true);
+});
+
+test('rescues malformed canonical configuration', (t) => {
+  const root = canonicalProject(t, '0.8.0');
+  fs.writeFileSync(path.join(root, '_flow', 'config.yaml'), 'schema_version: [invalid\n');
+
+  const plan = migrationPlan(root, '2.0.1');
+  const result = migrateProject(root, { targetVersion: '2.0.1' });
+
+  assert.equal(plan.can_apply, true);
+  assert.ok(plan.changes.includes('archive unconvertible Flow artifacts for assisted reconciliation'));
+  assert.equal(result.rescued, true);
+  assert.equal(fs.existsSync(path.join(root, '_flow', 'docs', 'migration-backup', 'config.yaml')), true);
+  assert.deepEqual(parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).runtimes, []);
+});
+
+test('preserves safe runtime registrations when canonical artifacts require rescue', (t) => {
+  const root = canonicalProject(t, '0.8.0');
+  fs.writeFileSync(
+    path.join(root, '_flow', 'config.yaml'),
+    'schema_version: 4\nflow_version: 0.8.0\nruntimes:\n  - type: codex\n    skills_path: .codex/skills\nengineering:\n  profile: flow/readability-first@1\n  existing_code_policy: improve\n'
+  );
+  fs.mkdirSync(path.join(root, '_flow', 'work-items', 'unsupported-folder'));
+
+  const result = migrateProject(root, { targetVersion: '2.0.1' });
+  const config = parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8'));
+
+  assert.equal(result.rescued, true);
+  assert.deepEqual(config.runtimes, [{ type: 'codex', skills_path: '.codex/skills' }]);
+  assert.equal(config.engineering.profile, 'flow/readability-first@2');
+  assert.equal(config.engineering.existing_code_policy, 'improve');
+});
+
+test('does not turn operational write failures into format rescue', (t) => {
+  const root = canonicalProject(t, '0.8.0');
+  const before = fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8');
+  const originalWrite = fs.writeFileSync;
+  fs.writeFileSync = ((file: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, options?: unknown) => {
+    if (String(file).includes('_flow-migration-') && path.basename(String(file)) === 'config.yaml') {
+      const error = new Error('simulated permission failure') as NodeJS.ErrnoException;
+      error.code = 'EACCES';
+      error.syscall = 'open';
+      throw error;
+    }
+    return originalWrite(file, data, options as never);
+  }) as typeof fs.writeFileSync;
+  try {
+    assert.throws(() => migrateProject(root, { targetVersion: '2.0.1' }), /simulated permission failure/);
+  } finally {
+    fs.writeFileSync = originalWrite;
+  }
+
+  assert.equal(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8'), before);
+  assert.equal(fs.existsSync(path.join(root, '_flow', 'docs', 'migration-backup')), false);
+  assert.deepEqual(
+    fs.readdirSync(root).filter((name) => name.startsWith('_flow-migration-')),
+    []
+  );
+});
+
+test('human-readable plans show apply status and blockers', async (t) => {
+  const root = canonicalProject(t, '0.9.0');
+  const outcome = await captureCommandOutcome(() => runMigrate({ args: ['--plan', '--path', root], version: '0.8.0' }));
+  const output = outcome.kind === 'text' ? outcome.lines.join('\n') : '';
+
+  assert.match(output, /Apply allowed: no/);
+  assert.match(output, /Cannot migrate from newer Flow version '0\.9\.0' to older target '0\.8\.0'/);
 });
 
 function canonicalWorkItem(root: string) {
