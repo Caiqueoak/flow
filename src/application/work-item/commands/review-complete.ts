@@ -1,15 +1,21 @@
 import path from 'node:path';
 import { parseReview } from '../../../artifacts/work-item-review.mjs';
+import { isImplementationPlanApproved } from '../../../artifacts/implementation-plan.js';
 import { validateProject } from '../../../flow-project/validation.mjs';
 import { evaluateGates } from '../../../flow-project/gate-evaluation.mjs';
-import { requiredOption } from '../../../cli/command-input/arguments.js';
-import { fail, writeOutput } from '../../../cli/terminal/output.js';
-import { IMPLEMENTATION_PLAN_FILE, REVIEW_FILE, SPEC_FILE } from '../../../contracts/constants.js';
-import type { LoadedWorkItem, WorkItemReview } from '../../../contracts/work-item.js';
-import { isImplementationPlanApproved } from '../../../artifacts/implementation-plan.js';
-import { projectRelativePath, readText, writeYaml } from '../../../environment/filesystem.js';
-import { assertOnlyStagedFiles, createCommit, resetFiles, stageFiles } from '../../../environment/git.js';
-import { createTemporaryGitIndex, removeTemporaryGitIndex } from '../../../environment/temporary-git-index.js';
+import { requiredOption } from '../../../presentation/cli/command-input/arguments.js';
+import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { IMPLEMENTATION_PLAN_FILE, REVIEW_FILE, SPEC_FILE } from '../../../domain/project/project.js';
+import type { LoadedWorkItem, WorkItemReview } from '../../../domain/work-item/work-item.js';
+import { projectRelativePath, readText, writeYaml } from '../../../infrastructure/filesystem/index.js';
+import {
+  assertOnlyStagedFiles,
+  createCommit,
+  createTemporaryGitIndex,
+  removeTemporaryGitIndex,
+  resetFiles,
+  stageFiles
+} from '../../../infrastructure/git/index.js';
 
 interface ValidationFinding {
   code: string;
