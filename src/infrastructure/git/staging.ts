@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { fail } from '../../presentation/cli/terminal/output.js';
+import { UserInputError } from '../../domain/errors.js';
 import type { ProcessEnvironment } from './models.js';
 import { stagedFiles } from './status.js';
 
@@ -29,7 +29,7 @@ export function assertExactStagedFiles(
     return;
   }
 
-  fail(
+  throw new UserInputError(
     `Staged scope differs from --files.${missing.length ? ` Missing: ${missing.join(', ')}.` : ''}${unexpected.length ? ` Unexpected: ${unexpected.join(', ')}.` : ''}`
   );
 }
@@ -39,6 +39,6 @@ export function assertOnlyStagedFiles(root: string, allowedFiles: readonly strin
   const unexpected = stagedFiles(root).filter((file) => !allowed.has(file));
 
   if (unexpected.length) {
-    fail(`Staged scope contains unexpected files: ${unexpected.join(', ')}.`);
+    throw new UserInputError(`Staged scope contains unexpected files: ${unexpected.join(', ')}.`);
   }
 }

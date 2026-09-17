@@ -1,5 +1,6 @@
 import { runCli } from './dispatch-command.js';
-import { CliError, writeOutput } from './terminal/output.js';
+import { writeOutput } from './terminal/output.js';
+import { UserInputError } from '../../domain/errors.js';
 
 try {
   await runCli();
@@ -7,7 +8,7 @@ try {
   if (isPromptAbort(error)) {
     writeOutput('\nFlow command canceled.');
     process.exitCode = 130;
-  } else if (error instanceof CliError) {
+  } else if (error instanceof UserInputError) {
     console.error(`flow: ${error.message}`);
     process.exitCode = error.exitCode;
   } else {

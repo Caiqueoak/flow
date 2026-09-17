@@ -1,9 +1,8 @@
-export class CliError extends Error {
-  constructor(
-    message: string,
-    public readonly exitCode = 1
-  ) {
-    super(message);
+import { UserInputError } from '../../../domain/errors.js';
+
+export class CliError extends UserInputError {
+  constructor(message: string, exitCode = 1) {
+    super(message, exitCode);
     this.name = 'CliError';
   }
 }
