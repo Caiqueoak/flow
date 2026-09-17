@@ -5,11 +5,7 @@ export interface RuntimeConfiguration {
   skills_path: string;
 }
 
-export function installRuntimeSkill(
-  root: string,
-  runtime: RuntimeConfiguration,
-  packageRoot: string
-): string {
+export function installRuntimeSkill(root: string, runtime: RuntimeConfiguration, packageRoot: string): string {
   ensureProjectLocalSkillsPath(runtime.skills_path);
 
   const target = path.join(root, runtime.skills_path, 'flow');
