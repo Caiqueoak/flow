@@ -1,11 +1,11 @@
 import path from 'node:path';
 import { isImplementationPlanApproved } from '../../../artifacts/implementation-plan.js';
-import { projectRoot } from '../../../cli/command-input/project-root.js';
-import { fail, writeOutput } from '../../../cli/terminal/output.js';
-import { IMPLEMENTATION_PLAN_FILE } from '../../../contracts/constants.js';
-import type { Task, TaskCollection } from '../../../contracts/task.js';
-import type { LoadedWorkItem } from '../../../contracts/work-item.js';
-import { readText, writeYaml } from '../../../environment/filesystem.js';
+import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
+import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { IMPLEMENTATION_PLAN_FILE } from '../../../domain/project/project.js';
+import type { Task, TaskCollection } from '../../../domain/task/task.js';
+import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
+import { readText, writeYaml } from '../../../infrastructure/filesystem/index.js';
 import { lifecycle, loadWorkItems } from '../../../flow-project/work-items.mjs';
 import { findTask, loadTaskContext } from '../task-context.js';
 
