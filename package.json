@@ -17,7 +17,8 @@
     "pack:check": "npm run build && npm pack --dry-run",
     "test:package": "npm run build && node scripts/test-package.mjs",
     "check:runtime": "tsx scripts/check-node-version.ts",
-    "verify": "npm run check:runtime && npm run typecheck && npm run test:coverage && npm run lint && npm run format:check && npm run pack:check && npm run test:package",
+    "check:architecture": "tsx scripts/check-architecture.ts",
+    "verify": "npm run check:runtime && npm run check:architecture && npm run typecheck && npm run test:coverage && npm run lint && npm run format:check && npm run pack:check && npm run test:package",
     "prepare": "husky",
     "prepack": "npm run build"
   },
