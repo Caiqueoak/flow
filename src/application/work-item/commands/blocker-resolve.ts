@@ -1,5 +1,4 @@
-import { requiredOption } from '../../../presentation/cli/command-input/arguments.js';
-import { fail } from '../../../presentation/cli/terminal/output.js';
+import { fail, requiredOption } from '../../command-runtime.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import { editSpecMetadata } from '../work-item-context.js';
 

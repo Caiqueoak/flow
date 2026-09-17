@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { loadWorkItems } from '../../flow-project/work-items.mjs';
 import { parseTasks } from '../../artifacts/work-item-task-list.mjs';
-import { fail } from '../../presentation/cli/terminal/output.js';
+import { fail } from '../command-runtime.js';
 import { ID_PADDING, TASKS_FILE } from '../../domain/project/project.js';
 import { TASK_ID_PREFIX, type Task, type TaskCollection, type TaskId } from '../../domain/task/task.js';
 import type { LoadedWorkItem } from '../../domain/work-item/work-item.js';

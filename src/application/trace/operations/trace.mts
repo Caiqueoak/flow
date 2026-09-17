@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { execFileSync } from 'node:child_process';
-import { fail, writeOutput as info } from '../../../cli/terminal/output.js';
-import { projectRoot } from '../../../cli/command-input/project-root.js';
+import { fail, projectRoot, recordOutput as info } from '../../command-runtime.js';
 const task = /^W\d{3,}-T\d{3,}$/,
   work = /^W\d{3,}$/;
 const subject =

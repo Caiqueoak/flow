@@ -9,6 +9,8 @@ import {
 } from './command-metadata/registry.js';
 import { CliError, writeOutput } from './terminal/output.js';
 import type { CommandContext } from './command-metadata/definition.js';
+import { captureCommandOutcome } from '../../application/command-runtime.js';
+import { promptMultiSelect, promptSelect, promptText } from './terminal/prompts.js';
 
 interface PackageManifest {
   name: string;
@@ -42,12 +44,22 @@ export async function runCli(args = process.argv.slice(2)): Promise<void> {
   const run = module[command.run];
   if (typeof run !== 'function') throw new Error(`Command '${command.name}' has no runnable handler.`);
 
-  await (run as CommandRunner)({
-    args: args.slice(1),
-    packageRoot: packageRoot(),
-    packageName: manifest.name,
-    version: manifest.version
-  });
+  const outcome = await captureCommandOutcome(
+    () =>
+      (run as CommandRunner)({
+        args: args.slice(1),
+        packageRoot: packageRoot(),
+        packageName: manifest.name,
+        version: manifest.version
+      }),
+    { text: promptText, select: promptSelect, multiSelect: promptMultiSelect }
+  );
+  if (outcome.kind === 'text') {
+    for (const line of outcome.lines) writeOutput(line);
+  } else {
+    writeOutput(JSON.stringify(outcome.value, null, 2));
+  }
+  if (outcome.exitCode) process.exitCode = outcome.exitCode;
 }
 
 function packageManifest(): PackageManifest {

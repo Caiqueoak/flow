@@ -16,6 +16,8 @@ const FORBIDDEN_DOMAIN_DEPENDENCIES = [
   '/package-assets/',
   '/presentation/'
 ];
+const FORBIDDEN_APPLICATION_DEPENDENCIES = ['/cli/', '/presentation/'];
+const FORBIDDEN_INFRASTRUCTURE_DEPENDENCIES = ['/cli/', '/presentation/'];
 const TS_NOCHECK_DEBT = new Set([
   'src/application/init/operations/init.mts',
   'src/application/migrate/operations/apply.mts',
@@ -35,6 +37,13 @@ for (const file of sourceFiles(SOURCE_ROOT)) {
 
   if (relativeFile.startsWith('src/domain/')) {
     checkDomainDependencies(relativeFile, source);
+  }
+  if (relativeFile.startsWith('src/application/')) {
+    checkLayerDependencies(relativeFile, source, FORBIDDEN_APPLICATION_DEPENDENCIES, 'application');
+    checkProcessExitCode(relativeFile, source);
+  }
+  if (relativeFile.startsWith('src/infrastructure/')) {
+    checkLayerDependencies(relativeFile, source, FORBIDDEN_INFRASTRUCTURE_DEPENDENCIES, 'infrastructure');
   }
 }
 
@@ -76,15 +85,24 @@ function checkTsNoCheck(relativeFile: string, source: string): void {
 }
 
 function checkDomainDependencies(relativeFile: string, source: string): void {
+  checkLayerDependencies(relativeFile, source, FORBIDDEN_DOMAIN_DEPENDENCIES, 'domain');
+}
+
+function checkLayerDependencies(relativeFile: string, source: string, forbiddenDependencies: string[], layer: string): void {
   for (const specifier of importSpecifiers(source)) {
     const dependency = normalizeResolvedImport(relativeFile, specifier);
     if (!dependency) continue;
 
-    const forbidden = FORBIDDEN_DOMAIN_DEPENDENCIES.find((segment) => dependency.includes(segment));
+    const forbidden = forbiddenDependencies.find((segment) => dependency.includes(segment));
     if (forbidden) {
-      findings.push(`${relativeFile} depends on '${specifier}', crossing the domain boundary through ${forbidden}.`);
+      findings.push(`${relativeFile} depends on '${specifier}', crossing the ${layer} boundary through ${forbidden}.`);
     }
   }
+}
+
+function checkProcessExitCode(relativeFile: string, source: string): void {
+  if (source.includes('process.exitCode'))
+    findings.push(`${relativeFile} sets process.exitCode. Presentation owns process exit state.`);
 }
 
 function importSpecifiers(source: string): string[] {

@@ -1,6 +1,5 @@
-import { positionalArguments } from '../../presentation/cli/command-input/arguments.js';
+import { fail, positionalArguments } from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
-import { fail } from '../../presentation/cli/terminal/output.js';
 import { runCommit } from './commands/commit.js';
 import { runCreate } from './commands/create.js';
 import { runSet } from './commands/set.js';

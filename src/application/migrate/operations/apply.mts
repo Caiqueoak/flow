@@ -2,8 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
-import { writeOutput as info } from '../../../cli/terminal/output.js';
-import { projectRoot } from '../../../cli/command-input/project-root.js';
+import { projectRoot, recordOutput as info } from '../../command-runtime.js';
 import { emptyState, stringifyState } from '../../../execution/execution-state.mjs';
 import { parseBacklog } from '../../../artifacts/backlog.mjs';
 import { parseGates } from '../../../artifacts/gate-definitions.mjs';

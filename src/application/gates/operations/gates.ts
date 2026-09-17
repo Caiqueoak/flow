@@ -1,8 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseGates } from '../../../artifacts/gate-definitions.mjs';
-import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
-import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { fail, projectRoot, recordOutput as writeOutput, setExitCode } from '../../command-runtime.js';
 import { evaluateGates, selectGates } from '../../../flow-project/gate-evaluation.mjs';
 
 interface GateFilters {
@@ -59,7 +58,7 @@ export function runGates(args: readonly string[]): void {
   }
 
   if (results.some((result) => result.blocking && result.status !== 'passed')) {
-    process.exitCode = 1;
+    setExitCode(1);
   }
 }
 

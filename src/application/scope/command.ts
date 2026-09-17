@@ -1,6 +1,5 @@
-import { positionalArguments } from '../../presentation/cli/command-input/arguments.js';
+import { fail, positionalArguments } from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
-import { fail } from '../../presentation/cli/terminal/output.js';
 import { runValidate } from './commands/validate.js';
 
 const scopeCommands = {

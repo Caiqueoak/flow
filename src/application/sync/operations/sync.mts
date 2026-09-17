@@ -1,5 +1,4 @@
-import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
-import { writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
 import { syncProject } from '../../../flow-project/projections.mjs';
 
 interface SyncCommandContext {

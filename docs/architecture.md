@@ -60,7 +60,7 @@ Command routing is declarative. Root commands and compound subcommands are repre
 
 The canonical command definition is the SSOT for routing and, where practical, name, description, arguments, flags and help generation.
 
-A root `command.ts` is a thin public boundary. It adapts CLI input, resolves a subcommand when applicable, invokes application behavior and presents the result.
+A root `command.ts` is application orchestration. It receives normalized invocation data, resolves a subcommand when applicable, and returns a command outcome. Presentation owns raw argv parsing, terminal rendering, prompts, and process exit state.
 
 ## Internal vocabulary
 

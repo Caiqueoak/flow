@@ -1,11 +1,16 @@
 // @ts-nocheck
 import fs from 'node:fs';
 import path from 'node:path';
-import { optionValue as valueAfter } from '../../../cli/command-input/arguments.js';
-import { fail, writeOutput as info } from '../../../cli/terminal/output.js';
-import { promptMultiSelect, promptSelect, promptText } from '../../../cli/terminal/prompts.js';
+import {
+  fail,
+  optionValue as valueAfter,
+  promptMultiSelect,
+  promptSelect,
+  promptText,
+  recordOutput as info
+} from '../../command-runtime.js';
 import { defaultConfig, readConfig, writeConfig } from '../../../flow-project/configuration.mjs';
-import { projectRoot } from '../../../cli/command-input/project-root.js';
+import { projectRoot } from '../../command-runtime.js';
 import { installRuntimeSkill } from '../../../package-assets/runtime-skills.mjs';
 import { BROWNFIELD_POLICIES, ENGINEERING_PROFILES } from '../../../package-assets/engineering-profiles.mjs';
 import { FLOW_SCHEMA_VERSION, GATES_SCHEMA_VERSION } from '../../../contracts/contracts.js';

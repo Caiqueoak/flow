@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { JSON_SCHEMAS } from '../../../domain/project/schemas.js';
-import { writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { recordOutput as writeOutput } from '../../command-runtime.js';
 
 interface SchemasCommandContext {
   packageRoot: string;

@@ -1,6 +1,4 @@
-import { positionalArguments, projectRelativeFiles } from '../../../presentation/cli/command-input/arguments.js';
-import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
-import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { fail, positionalArguments, projectRelativeFiles, projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
 import { assertExactStagedFiles } from '../../../infrastructure/git/index.js';
 import { validateProject } from '../../../flow-project/validation.mjs';
 

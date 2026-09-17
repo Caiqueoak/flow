@@ -1,7 +1,5 @@
-import { positionalArguments } from '../../presentation/cli/command-input/arguments.js';
-import { projectRoot } from '../../presentation/cli/command-input/project-root.js';
+import { fail, positionalArguments, projectRoot, recordOutput as writeOutput } from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
-import { fail, writeOutput } from '../../presentation/cli/terminal/output.js';
 import { addWorkItemBlocker } from './commands/blocker-add.js';
 import { resolveWorkItemBlocker } from './commands/blocker-resolve.js';
 import { createWorkItem } from './commands/create.js';

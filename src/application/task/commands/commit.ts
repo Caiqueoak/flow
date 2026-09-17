@@ -1,6 +1,4 @@
-import { optionValue, projectRelativeFiles } from '../../../presentation/cli/command-input/arguments.js';
-import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
-import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { fail, optionValue, projectRelativeFiles, projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
 import { isValidTaskCommitSubject } from '../../../domain/task/commit.js';
 import type { QualifiedTaskId, Task, TaskCollection } from '../../../domain/task/task.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';

@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { isImplementationPlanApproved } from '../../../artifacts/implementation-plan.js';
-import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
-import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { fail, projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
 import { IMPLEMENTATION_PLAN_FILE } from '../../../domain/project/project.js';
 import type { Task, TaskCollection } from '../../../domain/task/task.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';

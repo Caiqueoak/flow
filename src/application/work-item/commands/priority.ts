@@ -1,4 +1,4 @@
-import { optionValue } from '../../../presentation/cli/command-input/arguments.js';
+import { optionValue } from '../../command-runtime.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import { editSpecMetadata } from '../work-item-context.js';
 

@@ -1,4 +1,4 @@
-import { requiredOption } from '../../../presentation/cli/command-input/arguments.js';
+import { requiredOption } from '../../command-runtime.js';
 import type { BlockerType, LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import { editSpecMetadata } from '../work-item-context.js';
 

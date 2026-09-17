@@ -22,8 +22,8 @@ import {
   commaSeparatedValues,
   optionValue,
   requiredOption
-} from '../../../presentation/cli/command-input/arguments.js';
-import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+} from '../../command-runtime.js';
+import { fail, recordOutput as writeOutput } from '../../command-runtime.js';
 import { ensureDirectory, writeText, writeYaml } from '../../../infrastructure/filesystem/index.js';
 import { loadProjectWorkItems } from '../work-item-context.js';
 

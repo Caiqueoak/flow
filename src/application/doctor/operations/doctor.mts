@@ -1,8 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
-import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
-import { writeOutput as info } from '../../../presentation/cli/terminal/output.js';
+import { projectRoot, recordOutput as info, setExitCode } from '../../command-runtime.js';
 import { readConfig } from '../../../flow-project/configuration.mjs';
 import { validateProject } from '../../../flow-project/validation.mjs';
 
@@ -165,7 +164,7 @@ export function runDoctor({ args, version, packageRoot }: DoctorCommandContext):
   }
 
   if (!result.healthy) {
-    process.exitCode = 1;
+    setExitCode(1);
   }
 }
 

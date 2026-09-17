@@ -2,9 +2,8 @@ import {
   commaSeparatedValues,
   optionValue,
   requiredOption
-} from '../../../presentation/cli/command-input/arguments.js';
-import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
-import { writeOutput } from '../../../presentation/cli/terminal/output.js';
+} from '../../command-runtime.js';
+import { projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
 import type { TaskId } from '../../../domain/task/task.js';
 import { writeYaml } from '../../../infrastructure/filesystem/index.js';
 import { loadTaskContext, nextTaskId } from '../task-context.js';

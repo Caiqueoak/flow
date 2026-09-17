@@ -1,6 +1,5 @@
 // @ts-nocheck
-import { fail, writeOutput } from '../../../cli/terminal/output.js';
-import { projectRoot } from '../../../cli/command-input/project-root.js';
+import { fail, projectRoot, recordOutput as writeOutput, setExitCode } from '../../command-runtime.js';
 import { validateProject } from '../../../flow-project/validation.mjs';
 
 export { validateProject } from '../../../flow-project/validation.mjs';
@@ -16,6 +15,6 @@ export function runValidate({ args }) {
   else for (const finding of findings) writeOutput(`${finding.code}: ${finding.message}`);
   if (findings.length) {
     if (!args.includes('--json')) fail(`${findings.length} validation finding(s).`);
-    process.exitCode = 1;
+    setExitCode(1);
   }
 }

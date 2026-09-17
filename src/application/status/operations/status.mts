@@ -1,5 +1,4 @@
-import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
-import { writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
 import type { LoadedWorkItem, WorkItemId } from '../../../domain/work-item/work-item.js';
 import { loadWorkItems, lifecycle } from '../../../flow-project/work-items.mjs';
 
