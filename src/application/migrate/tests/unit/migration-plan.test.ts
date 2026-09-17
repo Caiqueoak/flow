@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
-import { migrateProject, migrationPlan } from '../../usecases/apply.mjs';
+import { migrateProject, migrationPlan } from '../../operations/apply.mjs';
 
 function temporaryProject(t: test.TestContext, prefix: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
