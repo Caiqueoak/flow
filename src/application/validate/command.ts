@@ -1,6 +1,7 @@
 import { projectPathOption } from '../../cli/command-input/options.js';
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { runValidate } from './usecases/validate.mjs';
+import { runValidate } from './operations/validate.mjs';
+
 export const command: CommandDefinition = {
   name: 'validate',
   description: 'Run fast structural validation; gates are opt-in.',

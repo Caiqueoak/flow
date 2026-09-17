@@ -1,5 +1,6 @@
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { runSchemas } from './usecases/schemas.mjs';
+import { runSchemas } from './operations/schemas.mjs';
+
 export const command: CommandDefinition = {
   name: 'schemas',
   description: 'Generate JSON Schemas from central contracts.',

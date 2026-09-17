@@ -1,6 +1,7 @@
 import { projectPathOption } from '../../cli/command-input/options.js';
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { runTrace } from './usecases/trace.mjs';
+import { runTrace } from './operations/trace.mjs';
+
 export const command: CommandDefinition = {
   name: 'trace',
   description: 'Resolve a permanent task ID against reachable Git history.',

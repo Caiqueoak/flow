@@ -1,6 +1,7 @@
 import { projectPathOption } from '../../cli/command-input/options.js';
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { runSync } from './usecases/sync.mjs';
+import { runSync } from './operations/sync.mjs';
+
 export const command: CommandDefinition = {
   name: 'sync',
   description: 'Materialize disposable projections from canonical work-items.',

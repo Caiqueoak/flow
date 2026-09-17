@@ -1,6 +1,7 @@
 import { projectPathOption } from '../../cli/command-input/options.js';
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { runMigrate } from './usecases/apply.mjs';
+import { runMigrate } from './operations/apply.mjs';
+
 export const command: CommandDefinition = {
   name: 'migrate',
   description: 'Plan or apply deterministic, recoverable structural migrations.',

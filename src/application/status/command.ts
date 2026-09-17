@@ -1,6 +1,7 @@
 import { projectPathOption } from '../../cli/command-input/options.js';
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { runStatus } from './usecases/status.mjs';
+import { runStatus } from './operations/status.mjs';
+
 export const command: CommandDefinition = {
   name: 'status',
   description: 'Show persisted progress and derived eligibility/blocking.',

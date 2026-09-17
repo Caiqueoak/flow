@@ -1,6 +1,6 @@
 import { projectPathOption } from '../../cli/command-input/options.js';
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { runInit } from './usecases/init.mjs';
+import { runInit } from './operations/init.mjs';
 
 export const command: CommandDefinition = {
   name: 'init',

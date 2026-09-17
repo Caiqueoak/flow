@@ -1,6 +1,7 @@
 import { projectPathOption } from '../../cli/command-input/options.js';
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { runDoctor } from './usecases/doctor.mjs';
+import { runDoctor } from './operations/doctor.mjs';
+
 export const command: CommandDefinition = {
   name: 'doctor',
   description: 'Diagnose versions, artifacts, schemas and integrations without writing.',
