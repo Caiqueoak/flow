@@ -23,6 +23,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Install npm with release compatibility
+        run: npm install --global npm@latest
+      - run: npm --version
       - run: npm run verify
       - name: Pack release artifact
         run: |
@@ -87,13 +90,13 @@ jobs:
         run: npm install --global npm@latest
       - run: npm --version
       - name: Determine version and publish
+        env:
+          HUSKY: 0
         run: npm exec --yes --package=semantic-release@25.0.9 -- semantic-release
-      - name: Synchronize package version from npm
+      - name: Synchronize package version from release workspace
         shell: bash
         run: |
-          package_name="$(node -p 'require("./package.json").name')"
-          published_version="$(npm view "${package_name}" version)"
-          npm version "${published_version}" --no-git-tag-version --ignore-scripts --allow-same-version
+          released_version="$(node -p 'require("./package.json").version')"
 
           if git diff --quiet -- package.json package-lock.json; then
             exit 0
@@ -102,5 +105,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add package.json package-lock.json
-          git commit --message "chore(release): sync package version to ${published_version} [skip ci]"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git commit --message "chore(release): sync package version to ${released_version} [skip ci]"
+          HUSKY=0 git push origin "HEAD:${GITHUB_REF_NAME}"
