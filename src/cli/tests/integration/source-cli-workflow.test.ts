@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { parse } from 'yaml';
+import { parse, stringify } from 'yaml';
 import { runCli } from '../../dispatch-command.js';
 import { migrateProject } from '../../../commands/migrate/usecases/apply.mjs';
 
@@ -41,6 +41,13 @@ function project(t: test.TestContext) {
   execFileSync('git', ['config', 'user.email', 'flow@test.local'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Flow Test'], { cwd: root });
   return root;
+}
+
+function setRecordedFlowVersion(root: string, version: string) {
+  const configPath = path.join(root, '_flow', 'config.yaml');
+  const config = parse(fs.readFileSync(configPath, 'utf8'));
+  config.flow_version = version;
+  fs.writeFileSync(configPath, stringify(config, { lineWidth: 0 }));
 }
 
 test('source CLI lifecycle has observable, deterministic transitions', async (t) => {
@@ -134,7 +141,10 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
     assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), { action: 'stop', reason: 'finished' });
     const plan = JSON.parse(await flow(root, ['migrate', '--plan', '--json']));
     assert.deepEqual(plan.changes, []);
+
+    setRecordedFlowVersion(root, '0.8.0');
     const migration = migrateProject(root, { targetVersion: '0.9.0' });
+
     assert.equal(migration.unchanged, false);
     assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).flow_version, '0.9.0');
     assert.equal(fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8'), canonicalBeforeReview);
