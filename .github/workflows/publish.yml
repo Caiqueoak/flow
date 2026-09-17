@@ -82,6 +82,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
+      - run: npm ci
       - name: Install npm with Trusted Publishing support
         run: npm install --global npm@latest
       - run: npm --version
