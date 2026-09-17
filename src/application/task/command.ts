@@ -36,11 +36,14 @@ export const command: CommandDefinition = {
 
 export function runTask({ args }: { args: string[] }): void {
   const [action, target] = positionalArguments(args);
-  const execute = taskCommands[action as TaskCommandName];
 
-  if (!execute) {
+  if (!isTaskCommandName(action)) {
     fail(`Unknown task operation '${action}'.`);
   }
 
-  execute!(target, args);
+  taskCommands[action](target, args);
+}
+
+function isTaskCommandName(value: string | undefined): value is TaskCommandName {
+  return value !== undefined && value in taskCommands;
 }
