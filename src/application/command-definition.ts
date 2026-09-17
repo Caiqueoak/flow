@@ -13,11 +13,17 @@ export interface CommandArgument {
 }
 
 export interface CommandInvocation {
-  args: readonly string[];
+  positionals: readonly string[];
+  options: ReadonlyMap<string, string | true>;
+  projectRoot: string;
   packageRoot: string;
   packageName: string;
   version: string;
 }
+
+export type CommandOutcome =
+  | { kind: 'text'; lines: readonly string[]; exitCode?: number }
+  | { kind: 'json'; value: unknown; exitCode?: number };
 
 export interface CommandDefinition {
   name: string;

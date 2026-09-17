@@ -1,6 +1,13 @@
 export type {
   CommandArgument,
   CommandDefinition,
-  CommandInvocation as CommandContext,
   CommandOption
 } from '../../../application/command-definition.js';
+
+/** @deprecated Convert command executors to CommandInvocation. */
+export interface CommandContext {
+  args: string[];
+  packageRoot: string;
+  packageName: string;
+  version: string;
+}

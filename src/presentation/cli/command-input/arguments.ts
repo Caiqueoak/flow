@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { CommandDefinition, CommandInvocation } from '../../../application/command-definition.js';
 import { fail } from '../terminal/output.js';
 
 export function positionalArguments(args: readonly string[]): string[] {
@@ -32,6 +33,47 @@ export function projectRelativeFiles(root: string, args: readonly string[]): str
   if (normalized.some((file) => file.startsWith('_flow/generated/')))
     fail('Generated projections must never be committed.');
   return normalized;
+}
+
+export function parseCommandInvocation(
+  command: CommandDefinition,
+  args: readonly string[],
+  packageMetadata: Omit<CommandInvocation, 'positionals' | 'options' | 'projectRoot'>
+): CommandInvocation {
+  const options = new Map<string, string | true>();
+  const positionals: string[] = [];
+
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (!value) continue;
+    if (!value.startsWith('-')) {
+      positionals.push(value);
+      continue;
+    }
+
+    const definition = command.flags?.find((flag) => flag.name === value);
+    if (!definition) throw new Error(`unknown option '${value}' for flow ${command.name}.`);
+    if (!definition.value) {
+      options.set(value, true);
+      continue;
+    }
+
+    const optionValue = args[++index];
+    if (!optionValue || optionValue.startsWith('-')) throw new Error(`${value} requires ${definition.value}.`);
+    options.set(value, optionValue);
+  }
+
+  return {
+    ...packageMetadata,
+    positionals,
+    options,
+    projectRoot: path.resolve(optionString(options, '--path') ?? process.cwd())
+  };
+}
+
+function optionString(options: ReadonlyMap<string, string | true>, name: string): string | undefined {
+  const value = options.get(name);
+  return typeof value === 'string' ? value : undefined;
 }
 
 function normalizeProjectRelativePath(root: string, file: string): string {
