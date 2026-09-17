@@ -1,6 +1,7 @@
 import { optionValue, projectRelativeFiles } from '../../../presentation/cli/command-input/arguments.js';
 import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
 import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { isValidTaskCommitSubject } from '../../../domain/task/commit.js';
 import type { QualifiedTaskId, Task, TaskCollection } from '../../../domain/task/task.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import { projectRelativePath, readText, writeText, writeYaml } from '../../../infrastructure/filesystem/index.js';
@@ -12,7 +13,6 @@ import {
   resetFiles,
   stageFiles
 } from '../../../infrastructure/git/index.js';
-import { isValidTaskCommitSubject } from '../../../execution/task-commit.js';
 import { evaluateGates } from '../../../flow-project/gate-evaluation.mjs';
 import { validateProject } from '../../../flow-project/validation.mjs';
 import { findTask, loadTaskContext } from '../task-context.js';
