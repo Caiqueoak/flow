@@ -1,6 +1,17 @@
+import { positionalArguments } from '../../cli/command-input/arguments.js';
 import { projectPathOption } from '../../cli/command-input/options.js';
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { runGates } from './usecases/gates.mjs';
+import { fail } from '../../cli/terminal/output.js';
+import { runList } from './commands/list.js';
+import { runRun } from './commands/run.js';
+
+const gateCommands = {
+  list: runList,
+  run: runRun
+} as const;
+
+type GateCommandName = keyof typeof gateCommands;
+
 export const command: CommandDefinition = {
   name: 'gates',
   description: 'List or selectively run deterministic project gates.',
@@ -20,3 +31,14 @@ export const command: CommandDefinition = {
   load: async () => ({ runGates }),
   run: 'runGates'
 };
+
+export function runGates({ args }: { args: string[] }): void {
+  const [action] = positionalArguments(args);
+  const execute = gateCommands[action as GateCommandName];
+
+  if (!execute) {
+    fail("flow gates requires 'list' or 'run'.");
+  }
+
+  execute!({ args });
+}
