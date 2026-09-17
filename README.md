@@ -81,7 +81,7 @@ flow migrate --plan --json
 flow migrate --apply
 ```
 
-Planning is read-only. Apply rechecks preconditions, transforms a staging copy, validates it, swaps only on success and preserves the prior `_flow` under `_flow-backups`. Structural migration never invents semantic decisions; ambiguous legacy truths route to assisted reconcile.
+Planning is read-only and reports whether apply is allowed, including any blockers. Apply accepts forward package-version migrations, rechecks preconditions, transforms a staging copy, validates it, swaps only on success and preserves the prior `_flow` under `_flow-backups`. If an older data format cannot be converted safely, Flow creates a minimal current project and preserves the complete old directory under `_flow/docs/migration-backup/` for assisted reconciliation. Structural migration never invents semantic decisions.
 
 ## Architecture
 

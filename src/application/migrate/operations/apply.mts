@@ -6,7 +6,12 @@ import { parseBacklog } from '../../../domain/work-item/backlog.mjs';
 import { parseGates } from '../../../domain/gate/gate-definition.mjs';
 import { syncProject } from '../../../infrastructure/projections/project.mjs';
 import { validateProject } from '../../project-validation.mjs';
-import { readConfig, writeConfig, defaultConfig } from '../../../infrastructure/persistence/configuration.mjs';
+import {
+  readConfig,
+  writeConfig,
+  defaultConfig,
+  type RuntimeConfiguration
+} from '../../../infrastructure/persistence/configuration.mjs';
 import { FLOW_SCHEMA_VERSION } from '../../../domain/project/project.js';
 import { BACKLOG_SCHEMA_VERSION } from '../../../domain/work-item/work-item.js';
 import { GATES_SCHEMA_VERSION } from '../../../domain/gate/gate.js';
@@ -74,6 +79,14 @@ export interface MigrationPlan {
   affected_approvals: string[];
   human_decisions: string[];
   can_apply: boolean;
+}
+
+export interface MigrationResult {
+  unresolved: string[];
+  unchanged: boolean;
+  backup?: string;
+  rescued?: boolean;
+  rescue_reason?: string;
 }
 
 const STATES: Record<string, LifecycleState> = {
@@ -272,9 +285,6 @@ function migrationIncompatibilities(source: string, target: string): string[] {
   if (compareFlowVersions(sourceVersion, targetVersion) > 0)
     return [`Cannot migrate from newer Flow version '${source}' to older target '${target}'.`];
 
-  if (sourceVersion.major !== targetVersion.major)
-    return [`Unsupported major-version migration from '${source}' to '${target}'.`];
-
   return [];
 }
 
@@ -297,18 +307,33 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
   const flow = usesLegacyDirectory ? legacyFlow : currentFlow;
   if (!migrationPathExists(flow)) throw new Error('_flow does not exist.');
   const rawConfigFile = path.join(flow, 'config.yaml');
-  const rawConfig = migrationPathExists(rawConfigFile) ? asRecord(parse(readMigrationText(rawConfigFile))) : {};
+  let rawConfig: Record<string, unknown> = {};
+  let unreadableConfig = false;
+  try {
+    rawConfig = migrationPathExists(rawConfigFile) ? asRecord(parse(readMigrationText(rawConfigFile))) : {};
+  } catch {
+    // An unreadable historical config is a format problem that --apply can rescue.
+    unreadableConfig = true;
+  }
   const framework = asRecord(rawConfig.framework);
-  const config = usesLegacyDirectory
-    ? {
-        flow_version:
-          typeof rawConfig.flow_version === 'string'
-            ? rawConfig.flow_version
-            : typeof framework.version === 'string'
-              ? framework.version
-              : null
-      }
-    : readConfig(root);
+  let config: { flow_version: string | null } | null;
+  if (usesLegacyDirectory)
+    config = {
+      flow_version:
+        typeof rawConfig.flow_version === 'string'
+          ? rawConfig.flow_version
+          : typeof framework.version === 'string'
+            ? framework.version
+            : null
+    };
+  else {
+    try {
+      config = readConfig(root);
+    } catch {
+      config = null;
+      unreadableConfig = true;
+    }
+  }
   const files = migrationDirectoryNames(flow);
   const legacy = files.filter((name) =>
     ['BACKLOG.yaml', 'PRD.md', 'ENGINEERING.md', 'STATE.md', 'DECISIONS.md', 'SUMMARY.md', 'GRAPH.md'].includes(name)
@@ -319,17 +344,22 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
   if (!config?.flow_version || config.flow_version !== targetVersion)
     changes.push('record executed Flow package version');
   if (legacy.length) changes.push('normalize legacy artifact names and IDs');
+  if (unreadableConfig) changes.push('archive unconvertible Flow artifacts for assisted reconciliation');
   if (!usesLegacyDirectory) changes.push(...inspectCurrent(root, targetVersion));
   const backlogFile = path.join(flow, 'backlog.yaml');
   if (usesLegacyDirectory && migrationPathExists(backlogFile)) {
-    const backlog = parse(readMigrationText(backlogFile)) as LegacyBacklog;
-    backlog.schema_version = BACKLOG_SCHEMA_VERSION;
-    if ((backlog.work_items ?? []).some((item) => !item.spec_maturity))
-      changes.push('derive initial spec_maturity from existing artifacts');
-    for (const item of backlog.work_items ?? []) {
-      const planFile = path.join(flow, 'work-items', item.folder ?? '', 'implementation-plan.md');
-      if ((item.state ?? item.status) !== 'completed' && migrationPathExists(planFile))
-        invalidatedPlans.push(`${item.id}: work-items/${item.folder}/implementation-plan.md`);
+    try {
+      const backlog = parse(readMigrationText(backlogFile)) as LegacyBacklog;
+      backlog.schema_version = BACKLOG_SCHEMA_VERSION;
+      if ((backlog.work_items ?? []).some((item) => !item.spec_maturity))
+        changes.push('derive initial spec_maturity from existing artifacts');
+      for (const item of backlog.work_items ?? []) {
+        const planFile = path.join(flow, 'work-items', item.folder ?? '', 'implementation-plan.md');
+        if ((item.state ?? item.status) !== 'completed' && migrationPathExists(planFile))
+          invalidatedPlans.push(`${item.id}: work-items/${item.folder}/implementation-plan.md`);
+      }
+    } catch {
+      changes.push('archive unconvertible Flow artifacts for assisted reconciliation');
     }
   }
   const source = config?.flow_version ?? 'legacy';
@@ -394,7 +424,65 @@ function upgradeCanonicalStaged(root: string, targetVersion: string): void {
   }
 }
 
-export function migrateProject(root: string, { targetVersion = '0.6.0' }: { targetVersion?: string } = {}) {
+function recoverRuntimeConfigurations(sourceFlow: string): RuntimeConfiguration[] {
+  try {
+    const raw = asRecord(parse(readMigrationText(path.join(sourceFlow, 'config.yaml'))));
+    if (!Array.isArray(raw.runtimes)) return [];
+    const seen = new Set<string>();
+    return raw.runtimes.flatMap((entry): RuntimeConfiguration[] => {
+      const runtime = asRecord(entry);
+      if (
+        typeof runtime.type !== 'string' ||
+        !runtime.type ||
+        seen.has(runtime.type) ||
+        typeof runtime.skills_path !== 'string' ||
+        !runtime.skills_path ||
+        path.isAbsolute(runtime.skills_path) ||
+        runtime.skills_path.split(/[\\/]/).includes('..')
+      )
+        return [];
+      seen.add(runtime.type);
+      return [{ type: runtime.type, skills_path: runtime.skills_path }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function rebuildStagedForReconciliation(staging: string, sourceFlow: string, targetVersion: string): void {
+  const staged = path.join(staging, '_flow');
+  removeMigrationPath(staged);
+  ensureMigrationDirectory(path.join(staged, 'docs'));
+  copyMigrationDirectory(sourceFlow, path.join(staged, 'docs', 'migration-backup'));
+  ensureMigrationDirectory(path.join(staged, 'work-items'));
+
+  const config = defaultConfig(targetVersion);
+  config.runtimes = recoverRuntimeConfigurations(sourceFlow);
+  config.engineering.existing_code_policy = 'improve';
+  writeConfig(staging, config);
+  writeMigrationText(path.join(staged, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
+
+  const state = emptyState();
+  state.execution.phase = 'reconcile';
+  state.execution.step = 'resolve_conflicts';
+  state.migration.status = 'pending_reconciliation';
+  writeMigrationText(path.join(staged, 'state.yaml'), stringifyState(state));
+  syncProject(staging);
+}
+
+function isOperationalMigrationError(error: unknown): boolean {
+  if (!isRecord(error) || typeof error.code !== 'string' || typeof error.syscall !== 'string') return false;
+  return !['ENOENT', 'EEXIST', 'ENOTEMPTY'].includes(error.code);
+}
+
+function migrationErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export function migrateProject(
+  root: string,
+  { targetVersion = '0.6.0' }: { targetVersion?: string } = {}
+): MigrationResult {
   const plan = migrationPlan(root, targetVersion);
   if (!plan.can_apply) throw new Error(plan.incompatibilities.join(' '));
   const targetFlow = path.join(root, '_flow');
@@ -406,14 +494,26 @@ export function migrateProject(root: string, { targetVersion = '0.6.0' }: { targ
   const backup = path.join(staging, 'backup');
   const staged = path.join(staging, '_flow');
   let preserveStaging = false;
+  let rescued = false;
+  let rescueReason: string | undefined;
   try {
     copyMigrationDirectory(sourceFlow, staged);
-    if (usesLegacyDirectory || hasLegacyBacklog(staged)) migrateStaged(staging, targetVersion);
-    else upgradeCanonicalStaged(staging, targetVersion);
-    syncProject(staging);
-    const findings = validateProject(staging);
-    if (findings.length)
-      throw new Error(`Migration staging validation failed: ${findings.map((x) => x.code).join(', ')}.`);
+    try {
+      if (usesLegacyDirectory || hasLegacyBacklog(staged)) migrateStaged(staging, targetVersion);
+      else upgradeCanonicalStaged(staging, targetVersion);
+      syncProject(staging);
+      const findings = validateProject(staging);
+      if (findings.length)
+        throw new Error(`Migration staging validation failed: ${findings.map((x) => x.code).join(', ')}.`);
+    } catch (error: unknown) {
+      if (isOperationalMigrationError(error)) throw error;
+      rescued = true;
+      rescueReason = migrationErrorMessage(error);
+      rebuildStagedForReconciliation(staging, sourceFlow, targetVersion);
+      const findings = validateProject(staging);
+      if (findings.length)
+        throw new Error(`Migration rescue staging validation failed: ${findings.map((x) => x.code).join(', ')}.`);
+    }
     renameMigrationPath(sourceFlow, backup);
     try {
       renameMigrationPath(staged, targetFlow);
@@ -425,7 +525,13 @@ export function migrateProject(root: string, { targetVersion = '0.6.0' }: { targ
     ensureMigrationDirectory(backupRoot);
     const backupTarget = path.join(backupRoot, `migration-${Date.now()}`);
     renameMigrationPath(backup, backupTarget);
-    return { unresolved: ['semantic reconciliation'], unchanged: false, backup: backupTarget };
+    return {
+      unresolved: ['semantic reconciliation'],
+      unchanged: false,
+      backup: backupTarget,
+      rescued,
+      ...(rescueReason ? { rescue_reason: rescueReason } : {})
+    };
   } catch (error: unknown) {
     preserveStaging = Boolean(isRecord(error) && error.preserveRecoveryData);
     throw error;
@@ -442,17 +548,25 @@ export function runMigrate({ args, version }: { args: string[]; version: string 
   const root = projectRoot(args);
   if (args.includes('--plan')) {
     const plan = migrationPlan(root, version);
+    const changes = plan.changes.length
+      ? plan.changes.map((change) => `- ${change}`).join('\n')
+      : 'No structural changes required.';
+    const compatibility = plan.can_apply
+      ? 'Apply allowed: yes'
+      : `Apply allowed: no\nBlockers:\n${plan.incompatibilities.map((reason) => `- ${reason}`).join('\n')}`;
     return info(
       args.includes('--json')
         ? JSON.stringify(plan, null, 2)
-        : `Migration ${plan.from_version} -> ${plan.to_version}\n${plan.changes.length ? plan.changes.map((change) => `- ${change}`).join('\n') : 'No structural changes required.'}`
+        : `Migration ${plan.from_version} -> ${plan.to_version}\n${compatibility}\n${changes}`
     );
   }
   const result = migrateProject(root, { targetVersion: version });
   info(
     result.unchanged
       ? 'Already migrated; no files changed.'
-      : 'Structural migration complete. Invoke /flow for semantic reconciliation before implementation.'
+      : result.rescued
+        ? 'The old Flow format could not be converted safely. A valid current _flow was created and the complete prior data was preserved under _flow/docs/migration-backup. Invoke /flow for assisted reconciliation.'
+        : 'Structural migration complete. Invoke /flow for semantic reconciliation before implementation.'
   );
 }
 
