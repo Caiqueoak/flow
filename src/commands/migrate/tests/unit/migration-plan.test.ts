@@ -24,7 +24,7 @@ function canonicalProject(t: test.TestContext, flowVersion: string) {
   return root;
 }
 
-test('plans a validated structural migration for an unrecognized recorded Flow version', (t) => {
+test('allows a forward migration from a recorded Flow version', (t) => {
   const root = canonicalProject(t, '0.8.0');
 
   const plan = migrationPlan(root, '0.9.0');
@@ -34,6 +34,46 @@ test('plans a validated structural migration for an unrecognized recorded Flow v
   assert.equal(plan.can_apply, true);
   assert.deepEqual(plan.incompatibilities, []);
   assert.ok((plan.changes as string[]).includes('record executed Flow package version'));
+});
+
+test('blocks migration to an older Flow version', (t) => {
+  const root = canonicalProject(t, '0.9.0');
+
+  const plan = migrationPlan(root, '0.8.0');
+
+  assert.equal(plan.can_apply, false);
+  assert.deepEqual(plan.incompatibilities, ["Cannot migrate from newer Flow version '0.9.0' to older target '0.8.0'."]);
+  assert.throws(
+    () => migrateProject(root, { targetVersion: '0.8.0' }),
+    /Cannot migrate from newer Flow version '0\.9\.0' to older target '0\.8\.0'/
+  );
+});
+
+test('blocks a newer major project from being rewritten by an older target', (t) => {
+  const root = canonicalProject(t, '1.0.0');
+
+  const plan = migrationPlan(root, '0.8.0');
+
+  assert.equal(plan.can_apply, false);
+  assert.deepEqual(plan.incompatibilities, ["Cannot migrate from newer Flow version '1.0.0' to older target '0.8.0'."]);
+});
+
+test('requires explicit support for forward major-version migrations', (t) => {
+  const root = canonicalProject(t, '0.8.0');
+
+  const plan = migrationPlan(root, '1.0.0');
+
+  assert.equal(plan.can_apply, false);
+  assert.deepEqual(plan.incompatibilities, ["Unsupported major-version migration from '0.8.0' to '1.0.0'."]);
+});
+
+test('rejects malformed recorded Flow versions', (t) => {
+  const root = canonicalProject(t, 'future');
+
+  const plan = migrationPlan(root, '0.8.0');
+
+  assert.equal(plan.can_apply, false);
+  assert.deepEqual(plan.incompatibilities, ["Unknown source version 'future'. Expected a semantic version such as 0.8.0."]);
 });
 
 test('continues to block a project with ambiguous Flow directories', (t) => {
