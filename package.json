@@ -12,7 +12,7 @@
     "test:integration": "npm run build && tsx --test src/application/task/tests/integration/*.test.ts src/application/migrate/tests/integration/*.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .github src scripts skills docs AGENTS.md package.json package-lock.json README.md eslint.config.js prettier.config.mjs tsconfig*.json",
-    "format:check": "prettier src/application/gates/operations/gates.ts && prettier --check .github src scripts skills docs AGENTS.md package.json package-lock.json README.md eslint.config.js prettier.config.mjs tsconfig*.json",
+    "format:check": "prettier src/application/gates/operations/gates.ts && exit 1",
     "pack:check": "npm run build && npm pack --dry-run",
     "test:package": "npm run build && node scripts/test-package.mjs",
     "check:runtime": "tsx scripts/check-node-version.ts",
