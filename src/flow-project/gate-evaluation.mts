@@ -41,7 +41,7 @@ function runBuiltinGate(root, gate) {
       if (entry.name.startsWith('.')) continue;
       const ext = path.extname(entry.name);
       const stem = ext ? entry.name.slice(0, -ext.length) : entry.name;
-      if (/^[A-Z0-9_.-]+$/.test(entry.name)) continue;
+      if (/^[A-Z0-9_.-]+$/.test(stem)) continue;
       const valid = stem.split('.').every((segment) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(segment));
       if (!valid) violations.push(path.relative(root, full));
     }
