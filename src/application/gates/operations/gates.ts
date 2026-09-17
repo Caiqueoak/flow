@@ -102,5 +102,5 @@ function hasExplicitFilter(filters: GateFilters): boolean {
 
 function option(args: readonly string[], name: string): string | null {
   const index = args.indexOf(name);
-  return index < 0 ? null : (args[index + 1] ?? null);
+  return index < 0 ? null : args[index + 1] ?? null;
 }
