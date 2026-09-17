@@ -22,15 +22,15 @@ Dependency rules:
 
 ## Ownership
 
-| Location | Owns |
-| --- | --- |
-| `src/presentation/cli/` | CLI bootstrap, parsing, command registry, dispatch, prompts and output |
-| `src/application/<command>/` | One public root command and its application orchestration |
-| `src/application/<command>/commands/` | Public subcommands with a literal 1:1 mapping to CLI tokens |
-| `src/application/<command>/operations/` | Private operations used to implement that command slice |
-| `src/domain/<concept>/` | Domain models, rules, validation and schemas owned by the concept |
-| `src/infrastructure/` | Git, filesystem, persistence, projections, runtime assets and processes |
-| `src/shared/` | Minimal cross-cutting errors/models with no natural owner |
+| Location                                | Owns                                                                    |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| `src/presentation/cli/`                 | CLI bootstrap, parsing, command registry, dispatch, prompts and output  |
+| `src/application/<command>/`            | One public root command and its application orchestration               |
+| `src/application/<command>/commands/`   | Public subcommands with a literal 1:1 mapping to CLI tokens             |
+| `src/application/<command>/operations/` | Private operations used to implement that command slice                 |
+| `src/domain/<concept>/`                 | Domain models, rules, validation and schemas owned by the concept       |
+| `src/infrastructure/`                   | Git, filesystem, persistence, projections, runtime assets and processes |
+| `src/shared/`                           | Minimal cross-cutting errors/models with no natural owner               |
 
 ## Public API mapping
 
