@@ -55,5 +55,18 @@ function packageManifest(): PackageManifest {
 }
 
 function packageRoot(): string {
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  let current = path.dirname(fileURLToPath(import.meta.url));
+
+  while (true) {
+    if (fs.existsSync(path.join(current, 'package.json'))) {
+      return current;
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) {
+      throw new Error('Unable to locate Flow package root.');
+    }
+
+    current = parent;
+  }
 }
