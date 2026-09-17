@@ -1,5 +1,5 @@
-import { commaSeparatedValues, optionValue } from '../../../cli/command-input/arguments.js';
-import type { LoadedWorkItem, WorkItemId } from '../../../contracts/work-item.js';
+import { commaSeparatedValues, optionValue } from '../../../presentation/cli/command-input/arguments.js';
+import type { LoadedWorkItem, WorkItemId } from '../../../domain/work-item/work-item.js';
 import { editSpecMetadata } from '../work-item-context.js';
 
 export function updateWorkItemDependencies(item: LoadedWorkItem, args: readonly string[]): void {
