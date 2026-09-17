@@ -1,4 +1,4 @@
-import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
+import type { CommandDefinition } from '../../presentation/cli/command-metadata/definition.js';
 import { runSchemas } from './operations/schemas.mjs';
 
 export const command: CommandDefinition = {
