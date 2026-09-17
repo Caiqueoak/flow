@@ -1,19 +1,37 @@
+import { positionalArguments } from '../../cli/command-input/arguments.js';
+import { projectRoot } from '../../cli/command-input/project-root.js';
 import { projectPathOption } from '../../cli/command-input/options.js';
 import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { positionalArguments } from '../../cli/command-input/arguments.js';
 import { fail, writeOutput } from '../../cli/terminal/output.js';
-import { projectRoot } from '../../cli/command-input/project-root.js';
-import { createWorkItem } from './usecases/create.js';
-import { promoteWorkItem } from './usecases/promote.js';
-import { completeWorkItemReview } from './usecases/review-complete.js';
-import {
-  addWorkItemBlocker,
-  resolveWorkItemBlocker,
-  updateWorkItemDependencies,
-  updateWorkItemIdentity,
-  updateWorkItemPriority
-} from './usecases/set.js';
+import { addWorkItemBlocker } from './commands/blocker-add.js';
+import { resolveWorkItemBlocker } from './commands/blocker-resolve.js';
+import { createWorkItem } from './commands/create.js';
+import { updateWorkItemDependencies } from './commands/dependencies.js';
+import { updateWorkItemPriority } from './commands/priority.js';
+import { promoteWorkItem } from './commands/promote.js';
+import { completeWorkItemReview } from './commands/review-complete.js';
+import { updateWorkItemIdentity } from './commands/set.js';
 import { findWorkItem } from './work-item-context.js';
+
+interface WorkItemCommandContext {
+  root: string;
+  target: string | undefined;
+  args: readonly string[];
+}
+
+type WorkItemCommandHandler = (context: WorkItemCommandContext) => void;
+
+const workItemCommands: Record<string, WorkItemCommandHandler> = {
+  create: ({ root, target, args }) => createWorkItem(root, target, args),
+  set: ({ root, target, args }) => updateWorkItemIdentity(findWorkItem(root, target), args),
+  priority: ({ root, target, args }) => updateWorkItemPriority(findWorkItem(root, target), args),
+  dependencies: ({ root, target, args }) => updateWorkItemDependencies(findWorkItem(root, target), args),
+  'blocker-add': ({ root, target, args }) => addWorkItemBlocker(findWorkItem(root, target), args),
+  'blocker-resolve': ({ root, target, args }) => resolveWorkItemBlocker(findWorkItem(root, target), args),
+  promote: ({ root, target }) => promoteWorkItem(findWorkItem(root, target)),
+  'review-complete': ({ root, target, args }) => completeWorkItemReview(root, findWorkItem(root, target), args)
+};
+
 export const command: CommandDefinition = {
   name: 'work-item',
   description: 'Create or deterministically update backlog work-items.',
@@ -39,15 +57,15 @@ export const command: CommandDefinition = {
 export function runWorkItem({ args }: { args: string[] }): void {
   const root = projectRoot(args);
   const [action, target] = positionalArguments(args);
-  if (action === 'create') return createWorkItem(root, target, args);
-  const item = findWorkItem(root, target);
-  if (action === 'promote') promoteWorkItem(item);
-  else if (action === 'set') updateWorkItemIdentity(item, args);
-  else if (action === 'priority') updateWorkItemPriority(item, args);
-  else if (action === 'dependencies') updateWorkItemDependencies(item, args);
-  else if (action === 'blocker-add') addWorkItemBlocker(item, args);
-  else if (action === 'blocker-resolve') resolveWorkItemBlocker(item, args);
-  else if (action === 'review-complete') return completeWorkItemReview(root, item, args);
-  else fail(`Unknown work-item operation '${action}'.`);
-  writeOutput(`${item.id} updated.`);
+  const execute = workItemCommands[action];
+
+  if (!execute) {
+    fail(`Unknown work-item operation '${action}'.`);
+  }
+
+  execute!({ root, target, args });
+
+  if (action !== 'create' && action !== 'review-complete') {
+    writeOutput(`${target} updated.`);
+  }
 }

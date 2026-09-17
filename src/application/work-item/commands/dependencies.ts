@@ -1,0 +1,9 @@
+import { commaSeparatedValues, optionValue } from '../../../cli/command-input/arguments.js';
+import type { LoadedWorkItem, WorkItemId } from '../../../contracts/work-item.js';
+import { editSpecMetadata } from '../work-item-context.js';
+
+export function updateWorkItemDependencies(item: LoadedWorkItem, args: readonly string[]): void {
+  editSpecMetadata(item, (metadata) => {
+    metadata.depends_on = commaSeparatedValues(optionValue(args, '--depends-on')) as WorkItemId[];
+  });
+}
