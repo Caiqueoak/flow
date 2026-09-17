@@ -1,9 +1,9 @@
 import path from 'node:path';
-import { optionValue, positionalArguments } from '../../cli/command-input/arguments.js';
-import { projectRoot } from '../../cli/command-input/project-root.js';
-import { projectPathOption } from '../../cli/command-input/options.js';
-import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { fail, writeOutput } from '../../cli/terminal/output.js';
+import { optionValue, positionalArguments } from '../../presentation/cli/command-input/arguments.js';
+import { projectRoot } from '../../presentation/cli/command-input/project-root.js';
+import { projectPathOption } from '../../presentation/cli/command-input/options.js';
+import type { CommandDefinition } from '../../presentation/cli/command-metadata/definition.js';
+import { fail, writeOutput } from '../../presentation/cli/terminal/output.js';
 import { recordApproval } from './commands/record.js';
 
 const approvalCommands = {
@@ -26,13 +26,12 @@ export const command: CommandDefinition = {
 
 export function runApproval({ args }: { args: string[] }): void {
   const [action, target] = positionalArguments(args);
-  const execute = approvalCommands[action as ApprovalCommandName];
 
-  if (!execute || !target) {
+  if (!isApprovalCommandName(action) || !target) {
     fail('Usage: flow approval record <implementation-plan.md>.');
   }
 
-  execute!(target!, args);
+  approvalCommands[action](target, args);
 }
 
 function runRecord(target: string, args: readonly string[]): void {
@@ -43,6 +42,10 @@ function runRecord(target: string, args: readonly string[]): void {
   const approvedAt = approvalTimestamp(optionValue(args, '--at'));
   const result = recordApproval({ root: projectRoot(args), target, approvedAt });
   writeOutput(`${result.workItemId} implementation plan approved.`);
+}
+
+function isApprovalCommandName(value: string | undefined): value is ApprovalCommandName {
+  return value !== undefined && value in approvalCommands;
 }
 
 function approvalTimestamp(value: string | undefined): string {
