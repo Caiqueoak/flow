@@ -1,3 +1,3 @@
 #!/usr/bin/env node
 
-await import('./cli/bootstrap.js');
+await import('./presentation/cli/bootstrap.js');

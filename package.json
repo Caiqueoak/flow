@@ -9,15 +9,16 @@
     "typecheck": "tsc -p tsconfig.typecheck.json",
     "test": "npm run test:unit && npm run test:integration",
     "test:coverage": "c8 npm test",
-    "test:unit": "tsx --test src/artifacts/tests/unit/*.test.ts src/commands/*/tests/unit/*.test.ts src/execution/tests/unit/*.test.ts src/flow-project/tests/unit/*.test.ts src/package-assets/tests/unit/*.test.ts",
-    "test:integration": "npm run build && tsx --test src/cli/tests/integration/*.test.ts src/commands/task/tests/integration/*.test.ts src/commands/migrate/tests/integration/*.test.ts",
+    "test:unit": "tsx --test src/artifacts/tests/unit/*.test.ts src/application/*/tests/unit/*.test.ts src/execution/tests/unit/*.test.ts src/flow-project/tests/unit/*.test.ts src/package-assets/tests/unit/*.test.ts",
+    "test:integration": "npm run build && tsx --test src/presentation/cli/tests/integration/*.test.ts src/application/task/tests/integration/*.test.ts src/application/migrate/tests/integration/*.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .github src scripts skills docs AGENTS.md package.json package-lock.json README.md eslint.config.js prettier.config.mjs tsconfig*.json",
     "format:check": "prettier --check .github src scripts skills docs AGENTS.md package.json package-lock.json README.md eslint.config.js prettier.config.mjs tsconfig*.json",
     "pack:check": "npm run build && npm pack --dry-run",
     "test:package": "npm run build && node scripts/test-package.mjs",
     "check:runtime": "tsx scripts/check-node-version.ts",
-    "verify": "npm run check:runtime && npm run typecheck && npm run test:coverage && npm run lint && npm run format:check && npm run pack:check && npm run test:package",
+    "check:architecture": "tsx scripts/check-architecture.ts",
+    "verify": "npm run check:runtime && npm run check:architecture && npm run typecheck && npm run test:coverage && npm run lint && npm run format:check && npm run pack:check && npm run test:package",
     "prepare": "husky",
     "prepack": "npm run build"
   },
@@ -35,7 +36,8 @@
       "src/**/*.test.*",
       "src/contracts/task.ts",
       "src/contracts/work-item.ts",
-      "src/cli/command-metadata/definition.ts"
+      "src/cli/command-metadata/definition.ts",
+      "src/presentation/cli/command-metadata/definition.ts"
     ],
     "reporter": [
       "text",
