@@ -50,7 +50,7 @@
     "branches": 70
   },
   "bin": {
-    "flow": "./dist/entry.js"
+    "flow": "dist/entry.js"
   },
   "dependencies": {
     "yaml": "^2.9.0"
