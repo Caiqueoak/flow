@@ -1,4 +1,4 @@
-import { fail, positionalArguments } from '../command-runtime.js';
+import { positionalArguments, resolveSubcommand } from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
 import { runCommit } from './commands/commit.js';
 import { runCreate } from './commands/create.js';
@@ -11,8 +11,6 @@ const taskCommands = {
   start: runStart,
   commit: runCommit
 } as const;
-
-type TaskCommandName = keyof typeof taskCommands;
 
 export const command: CommandDefinition = {
   name: 'task',
@@ -28,6 +26,7 @@ export const command: CommandDefinition = {
   ],
   effects: 'Task commit creates the one canonical implementation commit.',
   when: 'Only after spec maturity is ready.',
+  subcommands: Object.keys(taskCommands),
   load: async () => ({ runTask }),
   run: 'runTask'
 };
@@ -35,13 +34,5 @@ export const command: CommandDefinition = {
 export function runTask({ args }: { args: string[] }): void {
   const [action, target] = positionalArguments(args);
 
-  if (!isTaskCommandName(action)) {
-    fail(`Unknown task operation '${action}'.`);
-  }
-
-  taskCommands[action](target, args);
-}
-
-function isTaskCommandName(value: string | undefined): value is TaskCommandName {
-  return value !== undefined && value in taskCommands;
+  resolveSubcommand(taskCommands, action, `Unknown task operation '${action}'.`)(target, args);
 }

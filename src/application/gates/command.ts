@@ -1,4 +1,4 @@
-import { fail, positionalArguments } from '../command-runtime.js';
+import { positionalArguments, resolveSubcommand } from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
 import { runList } from './commands/list.js';
 import { runRun } from './commands/run.js';
@@ -7,8 +7,6 @@ const gateCommands = {
   list: runList,
   run: runRun
 } as const;
-
-type GateCommandName = keyof typeof gateCommands;
 
 export const command: CommandDefinition = {
   name: 'gates',
@@ -26,6 +24,7 @@ export const command: CommandDefinition = {
   ],
   effects: 'list is read-only; run executes selected commands.',
   when: 'For the smallest safe verification scope.',
+  subcommands: Object.keys(gateCommands),
   load: async () => ({ runGates }),
   run: 'runGates'
 };
@@ -33,13 +32,5 @@ export const command: CommandDefinition = {
 export function runGates({ args }: { args: string[] }): void {
   const [action] = positionalArguments(args);
 
-  if (!isGateCommandName(action)) {
-    fail("flow gates requires 'list' or 'run'.");
-  }
-
-  gateCommands[action]({ args });
-}
-
-function isGateCommandName(value: string | undefined): value is GateCommandName {
-  return value !== undefined && value in gateCommands;
+  resolveSubcommand(gateCommands, action, "flow gates requires 'list' or 'run'.")({ args });
 }

@@ -1,9 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 import { projectRoot, recordOutput as info, setExitCode } from '../../command-runtime.js';
-import { readConfig } from '../../../flow-project/configuration.mjs';
-import { validateProject } from '../../../flow-project/validation.mjs';
+import { readConfig } from '../../../infrastructure/persistence/configuration.mjs';
+import { validateProject } from '../../project-validation.mjs';
+import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
 
 interface RuntimeConfiguration {
   skills_path: string;
@@ -56,7 +56,7 @@ export function diagnoseProject(
   const flow = path.join(root, '_flow');
   const legacyFlow = path.join(root, '.flow');
 
-  if (!fs.existsSync(flow) && fs.existsSync(legacyFlow)) {
+  if (!fileExists(flow) && fileExists(legacyFlow)) {
     add(
       'flow-directory',
       false,
@@ -73,9 +73,9 @@ export function diagnoseProject(
     };
   }
 
-  add('flow-directory', fs.existsSync(flow), '_flow directory is present.', 'Run flow init.');
+  add('flow-directory', fileExists(flow), '_flow directory is present.', 'Run flow init.');
 
-  if (!fs.existsSync(flow)) {
+  if (!fileExists(flow)) {
     return { healthy: false, mode: quick ? 'quick' : 'full', checks };
   }
 
@@ -98,7 +98,7 @@ export function diagnoseProject(
     );
 
     const skillCompatible = (config.runtimes ?? []).every((runtime) =>
-      fs.existsSync(path.join(root, runtime.skills_path, 'flow', 'SKILL.md'))
+      fileExists(path.join(root, runtime.skills_path, 'flow', 'SKILL.md'))
     );
 
     add(
@@ -112,7 +112,7 @@ export function diagnoseProject(
   for (const required of ['config.yaml', 'gates.yaml', 'work-items']) {
     add(
       `artifact:${required}`,
-      fs.existsSync(path.join(flow, required)),
+      fileExists(path.join(flow, required)),
       `${required} is present.`,
       'Restore it or run flow init.'
     );
@@ -121,7 +121,7 @@ export function diagnoseProject(
   for (const schema of ['config', 'backlog', 'tasks', 'review', 'gates']) {
     add(
       `schema:${schema}`,
-      fs.existsSync(path.join(packageRoot, 'schemas', `${schema}.schema.json`)),
+      fileExists(path.join(packageRoot, 'schemas', `${schema}.schema.json`)),
       `${schema} schema is packaged.`,
       'Reinstall the Flow package.'
     );
@@ -175,10 +175,10 @@ function checkQuickYaml(
   const file = 'gates.yaml';
   const target = path.join(flow, file);
 
-  if (!fs.existsSync(target)) return;
+  if (!fileExists(target)) return;
 
   try {
-    parse(fs.readFileSync(target, 'utf8'));
+    parse(readText(target));
     add(`yaml:${file}`, true, `${file} parses.`);
   } catch (error) {
     add(`yaml:${file}`, false, errorMessage(error), 'Repair or migrate the artifact.');

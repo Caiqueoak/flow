@@ -1,8 +1,8 @@
-import fs from 'node:fs';
 import path from 'node:path';
-import { parseGates } from '../../../artifacts/gate-definitions.mjs';
+import { parseGates } from '../../../domain/gate/gate-definition.mjs';
 import { fail, projectRoot, recordOutput as writeOutput, setExitCode } from '../../command-runtime.js';
-import { evaluateGates, selectGates } from '../../../flow-project/gate-evaluation.mjs';
+import { evaluateGates, selectGates } from '../../../infrastructure/process/gate-evaluation.mjs';
+import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
 
 interface GateFilters {
   ids: string[];
@@ -73,7 +73,7 @@ function loadSelectedGates(
   const root = projectRoot(args);
   const file = path.join(root, '_flow', 'gates.yaml');
 
-  if (!fs.existsSync(file)) {
+  if (!fileExists(file)) {
     fail('gates.yaml does not exist.');
   }
 
@@ -83,7 +83,7 @@ function loadSelectedGates(
     filters.all = true;
   }
 
-  const gates = parseGates(fs.readFileSync(file, 'utf8')).gates as unknown[];
+  const gates = parseGates(readText(file)).gates as unknown[];
   const selected = selectGatesBoundary(gates, filters);
 
   return { root, filters, selected };

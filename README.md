@@ -85,9 +85,9 @@ Planning is read-only. Apply rechecks preconditions, transforms a staging copy, 
 
 ## Architecture
 
-Flow organizes behavior by public command. Each `flow <command>` owns one `src/commands/<command>/` slice with `definition.ts`, `handler.ts`, `usecases/`, and `tests/`. The CLI only parses terminal input, dispatches definitions, and presents output.
+Flow uses layered boundaries with CLI-mirrored application slices. Each `flow <command>` owns `src/application/<command>/command.ts`; public subcommands map 1:1 to files under `commands/`. Presentation parses and renders, domain modules own rules, and infrastructure makes filesystem, Git, process, persistence, projection, and runtime effects explicit.
 
-Reusable code is organized by explicit responsibility: `contracts`, `artifacts`, `execution`, `flow-project`, `package-assets`, and `environment`. See [the architecture guide](docs/architecture.md), [command guide](docs/commands.md), and [testing guide](docs/testing.md).
+See [the architecture guide](docs/architecture.md), [command guide](docs/commands.md), and [testing guide](docs/testing.md).
 
 ## Development
 
@@ -107,7 +107,7 @@ npm run pack:check
 npm run verify
 ```
 
-The npm binary points at ESM build output. Typed boundaries and new slices use strict TypeScript; remaining stable ESM modules are compiled in the same build while their type migration continues. The published package contains compiled source, skills and generated JSON Schemas.
+The npm binary points at ESM build output. Source modules use strict TypeScript with NodeNext imports. The published package contains compiled source, skills and generated JSON Schemas.
 
 ## Release version
 

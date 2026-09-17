@@ -1,22 +1,36 @@
-// @ts-nocheck
-import fs from 'node:fs';
 import path from 'node:path';
 import { projectRoot, recordOutput as info } from '../../command-runtime.js';
-import { loadWorkItems, lifecycle } from '../../../flow-project/work-items.mjs';
-import { parseState } from '../../../execution/execution-state.mjs';
+import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
+import { lifecycle } from '../../../domain/work-item/lifecycle.js';
+import { parseState } from '../../../domain/workflow/execution-state.mjs';
+import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
 
-const step = (phase, instruction, extra = {}) => ({ action: 'continue', phase, instruction, ...extra });
+interface RouteResult {
+  action: 'continue' | 'stop';
+  phase?: string;
+  instruction?: string;
+  reason?: string;
+  work_item?: string;
+  task?: string;
+}
 
-function migrationRoute(root) {
+const step = (phase: string, instruction: string, extra: Partial<RouteResult> = {}): RouteResult => ({
+  action: 'continue',
+  phase,
+  instruction,
+  ...extra
+});
+
+function migrationRoute(root: string): RouteResult | null {
   const file = path.join(root, '_flow', 'state.yaml');
-  if (!fs.existsSync(file)) return null;
-  const state = parseState(fs.readFileSync(file, 'utf8'));
+  if (!fileExists(file)) return null;
+  const state = parseState(readText(file));
   return state.migration.status === 'pending_reconciliation'
     ? step('reconcile', 'migration/step-01-reconcile.md')
     : null;
 }
 
-export function routeProject(root) {
+export function routeProject(root: string): RouteResult {
   const migration = migrationRoute(root);
   if (migration) return migration;
 
@@ -27,7 +41,7 @@ export function routeProject(root) {
     const task = active.tasks.tasks.find((t) => t.state === 'in_progress');
     return step('implementation', 'build/step-01-execute-task.md', {
       work_item: active.id,
-      task: `${active.id}-${task.id}`
+      task: `${active.id}-${task!.id}`
     });
   }
   const candidate = items
@@ -57,7 +71,7 @@ export function routeProject(root) {
       })
     : step('reconcile', 'reconcile/step-01-reconcile.md', { work_item: candidate.id });
 }
-export function runRoute({ args }) {
+export function runRoute({ args }: { args: string[] }): void {
   const r = routeProject(projectRoot(args));
   info(
     args.includes('--json')

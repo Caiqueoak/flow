@@ -2,24 +2,24 @@
 
 ## Architecture
 
-- A public CLI command owns `src/commands/<command>/`.
-- `definition.ts` describes the public command, `handler.ts` orchestrates it, and `usecases/` holds named command operations.
-- Keep command tests in `src/commands/<command>/tests/`.
-- Shared behavior uses concrete roots only: `contracts`, `artifacts`, `execution`, `flow-project`, `package-assets`, and `environment`.
-- Keep tests for those roots in their own `tests/` directory.
+- Presentation concerns live under `src/presentation/`; application commands live under `src/application/`.
+- A public root command owns `src/application/<command>/command.ts` and its tests.
+- Public subcommands map 1:1 to `src/application/<command>/commands/<token>.ts`; private mechanics belong in `operations/`.
+- Domain rules and models live with `project`, `work-item`, `task`, `gate`, or `workflow` under `src/domain/`.
+- Filesystem, Git, persistence, projections, processes, and runtime assets live under `src/infrastructure/`.
 
 ## Dependency direction
 
-`cli -> commands -> flow-project/artifacts/execution/contracts`.
+`presentation -> application -> domain/infrastructure`.
 
-`flow-project` may use `environment`; `environment` only talks to Node and external programs. No horizontal module may import `cli` or `commands`.
+Domain never imports application, presentation, or infrastructure. Infrastructure may depend on domain contracts but never on application or presentation. Presentation owns raw CLI input, terminal output, prompts, and exit state.
 
 ## Code conventions
 
 - Use TypeScript and NodeNext `.js` specifiers for local imports.
 - Put orchestration before the helpers it calls; keep the happy path readable top to bottom.
-- Prefer explicit names over generic `shared`, `utils`, `helpers`, `core`, `domain`, or `platform` folders.
-- A use case must not parse raw CLI arguments, write terminal output, or set an exit code.
+- Prefer explicit owners over generic `shared`, `utils`, `helpers`, `core`, or `platform` folders.
+- Application operations must not write terminal output or set process exit state.
 - Do not add barrel files solely for convenience.
 
 ## Verification

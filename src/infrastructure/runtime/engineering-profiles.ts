@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { parse } from 'yaml';
+import { ENGINEERING_PROFILE_IDS } from '../../domain/project/engineering-profile.js';
 
 export interface EngineeringProfile {
   id: string;
@@ -50,7 +51,7 @@ export const ENGINEERING_PROFILES: Record<string, EngineeringProfile | undefined
   [READABILITY_FIRST_PROFILE.id]: READABILITY_FIRST_PROFILE
 };
 
-export const ENGINEERING_PROFILE_IDS = [READABILITY_FIRST_PROFILE_V1.id, READABILITY_FIRST_PROFILE.id] as const;
+export { ENGINEERING_PROFILE_IDS };
 
 export const BROWNFIELD_POLICIES: Record<string, BrownfieldPolicy | undefined> = {
   improve: {

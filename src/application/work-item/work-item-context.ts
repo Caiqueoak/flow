@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
-import { loadWorkItems } from '../../flow-project/work-items.mjs';
+import { loadWorkItems } from '../../infrastructure/persistence/work-items.mjs';
 import { fail } from '../command-runtime.js';
 import { SPEC_FILE } from '../../domain/project/project.js';
 import type { LoadedWorkItem, WorkItemSpecMetadata } from '../../domain/work-item/work-item.js';

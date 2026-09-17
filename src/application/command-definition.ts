@@ -33,6 +33,7 @@ export interface CommandDefinition {
   effects: string;
   when: string;
   hidden?: boolean;
+  subcommands?: readonly string[];
   load: () => Promise<Record<string, unknown>>;
   run: string;
 }

@@ -81,6 +81,17 @@ export function requiredOption(args: readonly string[], option: string): string 
   return optionValue(args, option) ?? fail(`${option} is required.`);
 }
 
+/** Resolves one public subcommand from its declarative local registry. */
+export function resolveSubcommand<T>(
+  commands: Readonly<Record<string, T>>,
+  name: string | undefined,
+  errorMessage: string
+): T {
+  const command = name === undefined ? undefined : commands[name];
+  if (command === undefined) fail(errorMessage);
+  return command;
+}
+
 export function commaSeparatedValues(value: string | undefined): string[] {
   return (
     value

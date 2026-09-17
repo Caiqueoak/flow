@@ -1,5 +1,9 @@
 import fs from 'node:fs';
 
+export function fileExists(file: string): boolean {
+  return fs.existsSync(file);
+}
+
 export function readText(file: string): string {
   return fs.readFileSync(file, 'utf8');
 }

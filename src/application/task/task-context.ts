@@ -1,6 +1,6 @@
 import path from 'node:path';
-import { loadWorkItems } from '../../flow-project/work-items.mjs';
-import { parseTasks } from '../../artifacts/work-item-task-list.mjs';
+import { loadWorkItems } from '../../infrastructure/persistence/work-items.mjs';
+import { parseTasks } from '../../domain/task/task-list.mjs';
 import { fail } from '../command-runtime.js';
 import { ID_PADDING, TASKS_FILE } from '../../domain/project/project.js';
 import { TASK_ID_PREFIX, type Task, type TaskCollection, type TaskId } from '../../domain/task/task.js';

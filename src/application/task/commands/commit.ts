@@ -17,8 +17,8 @@ import {
   resetFiles,
   stageFiles
 } from '../../../infrastructure/git/index.js';
-import { evaluateGates } from '../../../flow-project/gate-evaluation.mjs';
-import { validateProject } from '../../../flow-project/validation.mjs';
+import { evaluateGates } from '../../../infrastructure/process/gate-evaluation.mjs';
+import { validateProject } from '../../project-validation.mjs';
 import { findTask, loadTaskContext } from '../task-context.js';
 
 interface ValidationFinding {

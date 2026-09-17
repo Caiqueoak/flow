@@ -31,6 +31,8 @@ export const commands: readonly CommandDefinition[] = [
   schemaGeneration
 ];
 
+validateUniqueCommands(commands);
+
 export function commandByName(name: string): CommandDefinition | undefined {
   return commands.find((command) => command.name === name);
 }
@@ -83,4 +85,15 @@ function renderOption(option: NonNullable<CommandDefinition['flags']>[number]): 
   const choices = option.values ? ` (${option.values.join('|')})` : '';
   const defaultValue = option.default ? ` [default: ${option.default}]` : '';
   return `  ${option.name}${value}${choices}${defaultValue} — ${option.description ?? 'Command option.'}`;
+}
+
+function validateUniqueCommands(definitions: readonly CommandDefinition[]): void {
+  const roots = new Set<string>();
+  for (const definition of definitions) {
+    if (roots.has(definition.name)) throw new Error(`Duplicate command registration '${definition.name}'.`);
+    roots.add(definition.name);
+    const subcommands = definition.subcommands ?? [];
+    if (new Set(subcommands).size !== subcommands.length)
+      throw new Error(`Duplicate subcommand registration under '${definition.name}'.`);
+  }
 }
