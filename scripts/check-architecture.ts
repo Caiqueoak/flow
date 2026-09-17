@@ -20,9 +20,6 @@ const TS_NOCHECK_DEBT = new Set([
   'src/application/init/operations/init.mts',
   'src/application/migrate/operations/apply.mts',
   'src/application/route/operations/route.mts',
-  'src/application/schemas/operations/schemas.mts',
-  'src/application/status/operations/status.mts',
-  'src/application/sync/operations/sync.mts',
   'src/application/trace/operations/trace.mts',
   'src/application/validate/operations/validate.mts'
 ]);
