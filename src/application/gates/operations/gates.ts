@@ -28,17 +28,17 @@ interface GateResult {
   duration_ms: number;
 }
 
-const selectGatesBoundary = selectGates as unknown as (gates: unknown[], filters: GateFilters) => GateView[];
-const evaluateGatesBoundary = evaluateGates as unknown as (root: string, filters: GateFilters) => GateResult[];
+type SelectGates = (gates: unknown[], filters: GateFilters) => GateView[];
+type EvaluateGates = (root: string, filters: GateFilters) => GateResult[];
+
+const selectGatesBoundary = selectGates as unknown as SelectGates;
+const evaluateGatesBoundary = evaluateGates as unknown as EvaluateGates;
 
 export function listGates(args: readonly string[]): void {
   const { selected } = loadSelectedGates(args, true);
+  const output = args.includes('--json') ? JSON.stringify(selected, null, 2) : formatGates(selected);
 
-  writeOutput(
-    args.includes('--json')
-      ? JSON.stringify(selected, null, 2)
-      : selected.map((gate) => `${gate.id}\t${gate.stage}\t${gate.cost}\t${gate.command ?? gate.rule}`).join('\n')
-  );
+  writeOutput(output);
 }
 
 export function runGates(args: readonly string[]): void {
@@ -83,6 +83,7 @@ function loadSelectedGates(args: readonly string[], defaultToAll: boolean): {
 
   const gates = parseGates(fs.readFileSync(file, 'utf8')).gates as unknown[];
   const selected = selectGatesBoundary(gates, filters);
+
   return { root, filters, selected };
 }
 
@@ -100,7 +101,15 @@ function hasExplicitFilter(filters: GateFilters): boolean {
   return Boolean(filters.ids.length || filters.task || filters.workItem || filters.stage || filters.all);
 }
 
+function formatGates(gates: GateView[]): string {
+  return gates.map(formatGate).join('\n');
+}
+
+function formatGate(gate: GateView): string {
+  return `${gate.id}\t${gate.stage}\t${gate.cost}\t${gate.command ?? gate.rule}`;
+}
+
 function option(args: readonly string[], name: string): string | null {
   const index = args.indexOf(name);
-  return index < 0 ? null : args[index + 1] ?? null;
+  return index < 0 ? null : (args[index + 1] ?? null);
 }
