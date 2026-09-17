@@ -73,7 +73,9 @@ test('rejects malformed recorded Flow versions', (t) => {
   const plan = migrationPlan(root, '0.8.0');
 
   assert.equal(plan.can_apply, false);
-  assert.deepEqual(plan.incompatibilities, ["Unknown source version 'future'. Expected a semantic version such as 0.8.0."]);
+  assert.deepEqual(plan.incompatibilities, [
+    "Unknown source version 'future'. Expected a semantic version such as 0.8.0."
+  ]);
 });
 
 test('continues to block a project with ambiguous Flow directories', (t) => {
