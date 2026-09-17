@@ -1,7 +1,7 @@
-import { positionalArguments } from '../../cli/command-input/arguments.js';
-import { projectPathOption } from '../../cli/command-input/options.js';
-import type { CommandDefinition } from '../../cli/command-metadata/definition.js';
-import { fail } from '../../cli/terminal/output.js';
+import { positionalArguments } from '../../presentation/cli/command-input/arguments.js';
+import { projectPathOption } from '../../presentation/cli/command-input/options.js';
+import type { CommandDefinition } from '../../presentation/cli/command-metadata/definition.js';
+import { fail } from '../../presentation/cli/terminal/output.js';
 import { runList } from './commands/list.js';
 import { runRun } from './commands/run.js';
 
@@ -34,11 +34,14 @@ export const command: CommandDefinition = {
 
 export function runGates({ args }: { args: string[] }): void {
   const [action] = positionalArguments(args);
-  const execute = gateCommands[action as GateCommandName];
 
-  if (!execute) {
+  if (!isGateCommandName(action)) {
     fail("flow gates requires 'list' or 'run'.");
   }
 
-  execute!({ args });
+  gateCommands[action]({ args });
+}
+
+function isGateCommandName(value: string | undefined): value is GateCommandName {
+  return value !== undefined && value in gateCommands;
 }
