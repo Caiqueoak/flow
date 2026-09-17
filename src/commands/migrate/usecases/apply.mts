@@ -217,6 +217,37 @@ function inspectCurrent(root, targetVersion) {
   return [...new Set(changes)];
 }
 
+function parseFlowVersion(version) {
+  const match = String(version).match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return null;
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3])
+  };
+}
+
+function compareFlowVersions(left, right) {
+  return left.major - right.major || left.minor - right.minor || left.patch - right.patch;
+}
+
+function migrationIncompatibilities(source, target) {
+  if (source === 'legacy') return [];
+
+  const sourceVersion = parseFlowVersion(source);
+  const targetVersion = parseFlowVersion(target);
+  if (!sourceVersion) return [`Unknown source version '${source}'. Expected a semantic version such as 0.8.0.`];
+  if (!targetVersion) return [`Unknown target version '${target}'. Expected a semantic version such as 0.8.0.`];
+
+  if (compareFlowVersions(sourceVersion, targetVersion) > 0)
+    return [`Cannot migrate from newer Flow version '${source}' to older target '${target}'.`];
+
+  if (sourceVersion.major !== targetVersion.major)
+    return [`Unsupported major-version migration from '${source}' to '${target}'.`];
+
+  return [];
+}
+
 export function migrationPlan(root, targetVersion = '0.6.0') {
   const currentFlow = path.join(root, '_flow');
   const legacyFlow = path.join(root, '.flow');
@@ -264,18 +295,19 @@ export function migrationPlan(root, targetVersion = '0.6.0') {
     }
   }
   const source = config?.flow_version ?? 'legacy';
+  const incompatibilities = migrationIncompatibilities(source, targetVersion);
   return {
     from_version: source,
     to_version: targetVersion,
     changes,
     files_affected: [...legacy, 'config.yaml', 'backlog.yaml', 'state.yaml', 'gates.yaml'],
-    incompatibilities: [],
+    incompatibilities,
     invalidated_plans: invalidatedPlans,
     affected_approvals: invalidatedPlans,
     human_decisions: changes.length
       ? ['Reconcile preserved product, engineering, spec and traceability semantics before implementation.']
       : [],
-    can_apply: true
+    can_apply: incompatibilities.length === 0
   };
 }
 
