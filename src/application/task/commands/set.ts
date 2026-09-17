@@ -1,8 +1,8 @@
-import { commaSeparatedValues, optionValue } from '../../../cli/command-input/arguments.js';
-import { projectRoot } from '../../../cli/command-input/project-root.js';
-import { fail, writeOutput } from '../../../cli/terminal/output.js';
-import type { TaskId } from '../../../contracts/task.js';
-import { writeYaml } from '../../../environment/filesystem.js';
+import { commaSeparatedValues, optionValue } from '../../../presentation/cli/command-input/arguments.js';
+import { projectRoot } from '../../../presentation/cli/command-input/project-root.js';
+import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+import type { TaskId } from '../../../domain/task/task.js';
+import { writeYaml } from '../../../infrastructure/filesystem/index.js';
 import { findTask, loadTaskContext } from '../task-context.js';
 
 export function runSet(target: string | undefined, args: readonly string[]): void {
