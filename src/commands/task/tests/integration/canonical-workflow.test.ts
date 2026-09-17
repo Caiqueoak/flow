@@ -7,6 +7,10 @@ import test from 'node:test';
 import { parse } from 'yaml';
 
 const cli = path.resolve('dist/entry.js');
+const temporaryRoots = new Set<string>();
+test.after(() => {
+  for (const root of temporaryRoots) fs.rmSync(root, { recursive: true, force: true });
+});
 const run = (root: string, args: string[]) =>
   spawnSync(process.execPath, [cli, ...args, '--path', root], { encoding: 'utf8' });
 const headings = [
@@ -25,6 +29,7 @@ const headings = [
 ];
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-canonical-'));
+  temporaryRoots.add(root);
   execFileSync('git', ['init', '-q'], { cwd: root });
   execFileSync('git', ['config', 'user.email', 'flow@test.local'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Flow Test'], { cwd: root });
@@ -173,6 +178,7 @@ test('task commit rejects undeclared staged files and trace requires canonical t
 
 test('migration preserves legacy work-items and creates valid outlined shells', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-legacy-'));
+  temporaryRoots.add(root);
   const flow = path.join(root, '.flow');
   fs.mkdirSync(path.join(flow, 'work-items', 'W001-reference-item'), { recursive: true });
   fs.writeFileSync(flow + '/config.yaml', 'schema_version: 2\nruntimes: []\nengineering: {}\n');

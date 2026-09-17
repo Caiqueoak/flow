@@ -96,7 +96,7 @@ function createCanonicalShell(base, item) {
   );
   fs.writeFileSync(path.join(base, 'review.yaml'), `schema_version: 1\nwork_item: ${item.id}\nstatus: pending\n`);
 }
-function migrateStaged(root) {
+function migrateStaged(root, targetVersion) {
   const flow = path.join(root, '_flow');
   const oldConfig = readConfig(root);
   const oldFile = path.join(flow, fs.existsSync(path.join(flow, 'BACKLOG.yaml')) ? 'BACKLOG.yaml' : 'backlog.yaml');
@@ -168,7 +168,7 @@ function migrateStaged(root) {
   fs.writeFileSync(path.join(flow, 'state.yaml'), stringifyState(state));
   if (!fs.existsSync(path.join(flow, 'gates.yaml')))
     fs.writeFileSync(path.join(flow, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
-  const config = defaultConfig();
+  const config = defaultConfig(targetVersion);
   config.runtimes = oldConfig?.runtimes ?? [];
   config.engineering.existing_code_policy = 'improve';
   writeConfig(root, config);
@@ -264,19 +264,18 @@ export function migrationPlan(root, targetVersion = '0.6.0') {
     }
   }
   const source = config?.flow_version ?? 'legacy';
-  const knownSource = source === 'legacy' || source === targetVersion || /^0\.[45]\./.test(source);
   return {
     from_version: source,
     to_version: targetVersion,
     changes,
     files_affected: [...legacy, 'config.yaml', 'backlog.yaml', 'state.yaml', 'gates.yaml'],
-    incompatibilities: knownSource ? [] : [`Unknown source version '${source}'.`],
+    incompatibilities: [],
     invalidated_plans: invalidatedPlans,
     affected_approvals: invalidatedPlans,
     human_decisions: changes.length
       ? ['Reconcile preserved product, engineering, spec and traceability semantics before implementation.']
       : [],
-    can_apply: knownSource
+    can_apply: true
   };
 }
 
@@ -332,7 +331,7 @@ export function migrateProject(root, { targetVersion = '0.6.0' } = {}) {
   let preserveStaging = false;
   try {
     fs.cpSync(sourceFlow, staged, { recursive: true });
-    if (usesLegacyDirectory || hasLegacyBacklog(staged)) migrateStaged(staging);
+    if (usesLegacyDirectory || hasLegacyBacklog(staged)) migrateStaged(staging, targetVersion);
     else upgradeCanonicalStaged(staging, targetVersion);
     syncProject(staging);
     const findings = validateProject(staging);
