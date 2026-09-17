@@ -1,6 +1,6 @@
-import { requiredOption } from '../../../cli/command-input/arguments.js';
-import { fail } from '../../../cli/terminal/output.js';
-import type { LoadedWorkItem } from '../../../contracts/work-item.js';
+import { requiredOption } from '../../../presentation/cli/command-input/arguments.js';
+import { fail } from '../../../presentation/cli/terminal/output.js';
+import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import { editSpecMetadata } from '../work-item-context.js';
 
 export function resolveWorkItemBlocker(item: LoadedWorkItem, args: readonly string[]): void {
