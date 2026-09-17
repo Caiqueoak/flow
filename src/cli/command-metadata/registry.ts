@@ -1,17 +1,17 @@
-import { definition as approval } from '../../commands/approval/definition.js';
-import { definition as diagnostics } from '../../commands/doctor/definition.js';
-import { definition as gates } from '../../commands/gates/definition.js';
-import { definition as initialization } from '../../commands/init/definition.js';
-import { definition as migration } from '../../commands/migrate/definition.js';
-import { definition as projections } from '../../commands/sync/definition.js';
-import { definition as routing } from '../../commands/route/definition.js';
-import { definition as schemaGeneration } from '../../commands/schemas/definition.js';
-import { definition as scope } from '../../commands/scope/definition.js';
-import { definition as status } from '../../commands/status/definition.js';
-import { definition as tasks } from '../../commands/task/definition.js';
-import { definition as traceability } from '../../commands/trace/definition.js';
-import { definition as validation } from '../../commands/validate/definition.js';
-import { definition as workItems } from '../../commands/work-item/definition.js';
+import { definition as approval } from '../../application/approval/definition.js';
+import { definition as diagnostics } from '../../application/doctor/definition.js';
+import { definition as gates } from '../../application/gates/definition.js';
+import { definition as initialization } from '../../application/init/definition.js';
+import { definition as migration } from '../../application/migrate/definition.js';
+import { definition as projections } from '../../application/sync/definition.js';
+import { definition as routing } from '../../application/route/definition.js';
+import { definition as schemaGeneration } from '../../application/schemas/definition.js';
+import { definition as scope } from '../../application/scope/definition.js';
+import { definition as status } from '../../application/status/definition.js';
+import { definition as tasks } from '../../application/task/definition.js';
+import { definition as traceability } from '../../application/trace/definition.js';
+import { definition as validation } from '../../application/validate/definition.js';
+import { definition as workItems } from '../../application/work-item/definition.js';
 import type { CommandDefinition } from './definition.js';
 
 export const commands: readonly CommandDefinition[] = [
