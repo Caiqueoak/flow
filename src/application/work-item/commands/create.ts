@@ -1,8 +1,6 @@
 import path from 'node:path';
 import { stringify } from 'yaml';
 import {
-  DEFAULT_WORK_ITEM_KIND,
-  DEFAULT_WORK_ITEM_PRIORITY,
   FLOW_DIRECTORY,
   ID_PADDING,
   IMPLEMENTATION_PLAN_FILE,
@@ -10,14 +8,23 @@ import {
   REVIEW_FILE,
   SPEC_FILE,
   TASKS_FILE,
-  WORK_ITEM_ID_PREFIX,
   WORK_ITEM_SPEC_TITLE,
   WORK_ITEMS_DIRECTORY
-} from '../../../contracts/constants.js';
-import type { WorkItemId, WorkItemKind } from '../../../contracts/work-item.js';
-import { commaSeparatedValues, optionValue, requiredOption } from '../../../cli/command-input/arguments.js';
-import { ensureDirectory, writeText, writeYaml } from '../../../environment/filesystem.js';
-import { fail, writeOutput } from '../../../cli/terminal/output.js';
+} from '../../../domain/project/project.js';
+import {
+  DEFAULT_WORK_ITEM_KIND,
+  DEFAULT_WORK_ITEM_PRIORITY,
+  WORK_ITEM_ID_PREFIX,
+  type WorkItemId,
+  type WorkItemKind
+} from '../../../domain/work-item/work-item.js';
+import {
+  commaSeparatedValues,
+  optionValue,
+  requiredOption
+} from '../../../presentation/cli/command-input/arguments.js';
+import { fail, writeOutput } from '../../../presentation/cli/terminal/output.js';
+import { ensureDirectory, writeText, writeYaml } from '../../../infrastructure/filesystem/index.js';
 import { loadProjectWorkItems } from '../work-item-context.js';
 
 interface CreateWorkItemInput {
