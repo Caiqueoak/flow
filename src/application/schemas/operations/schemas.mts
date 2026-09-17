@@ -1,16 +1,22 @@
-// @ts-nocheck
 import fs from 'node:fs';
 import path from 'node:path';
-import { JSON_SCHEMAS } from '../../../contracts/contracts.js';
-import { writeOutput as info } from '../../../cli/terminal/output.js';
+import { JSON_SCHEMAS } from '../../../domain/project/schemas.js';
+import { writeOutput } from '../../../presentation/cli/terminal/output.js';
 
-export function writeSchemas(target) {
-  fs.mkdirSync(target, { recursive: true });
-  for (const [name, schema] of Object.entries(JSON_SCHEMAS))
-    fs.writeFileSync(path.join(target, `${name}.schema.json`), `${JSON.stringify(schema, null, 2)}\n`);
+interface SchemasCommandContext {
+  packageRoot: string;
 }
 
-export function runSchemas({ packageRoot }) {
+export function writeSchemas(target: string): void {
+  fs.mkdirSync(target, { recursive: true });
+
+  for (const [name, schema] of Object.entries(JSON_SCHEMAS)) {
+    const schemaFile = path.join(target, `${name}.schema.json`);
+    fs.writeFileSync(schemaFile, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+}
+
+export function runSchemas({ packageRoot }: SchemasCommandContext): void {
   writeSchemas(path.join(packageRoot, 'schemas'));
-  info('Generated Flow JSON Schemas.');
+  writeOutput('Generated Flow JSON Schemas.');
 }
