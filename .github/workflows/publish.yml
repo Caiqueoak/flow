@@ -93,17 +93,3 @@ jobs:
         env:
           HUSKY: 0
         run: npm exec --yes --package=semantic-release@25.0.9 -- semantic-release
-      - name: Synchronize package version from release workspace
-        shell: bash
-        run: |
-          released_version="$(node -p 'require("./package.json").version')"
-
-          if git diff --quiet -- package.json package-lock.json; then
-            exit 0
-          fi
-
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package.json package-lock.json
-          git commit --message "chore(release): sync package version to ${released_version} [skip ci]"
-          HUSKY=0 git push origin "HEAD:${GITHUB_REF_NAME}"
