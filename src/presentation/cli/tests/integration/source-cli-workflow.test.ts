@@ -125,11 +125,24 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
     const engineering = 'engineering\n';
     fs.mkdirSync(path.join(root, '_flow', 'docs'), { recursive: true });
     fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), engineering);
+    assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
+      action: 'continue',
+      phase: 'planning',
+      instruction: 'planning/step-02-prepare-plan.md',
+      work_item: 'W101'
+    });
     const hash = (text: string) => createHash('sha256').update(text).digest('hex');
     fs.writeFileSync(
       path.join(base, 'implementation-plan.md'),
       `---\nschema_version: 2\nwork_item: W101\nengineering_revision: ${hash(engineering)}\nspec_revision: ${hash(fs.readFileSync(path.join(base, 'spec.md'), 'utf8'))}\ntasks_revision: ${hash(fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8'))}\n---\n\n# Implementation Plan\n\n## Preflight\n\n## Strategy\n\n## Execution\n\n## Validation\n`
     );
+    assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
+      action: 'continue',
+      phase: 'implementation',
+      instruction: 'build/step-01-execute-task.md',
+      work_item: 'W101',
+      task: 'W101-T001'
+    });
     assert.equal(await flow(root, ['task', 'start', 'W101-T001']), 'W101-T001 started.');
     await flow(root, ['sync']);
     fs.writeFileSync(path.join(root, 'implementation.txt'), 'done\n');
