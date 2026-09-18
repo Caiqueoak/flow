@@ -2,7 +2,7 @@
 
 ## Canonical work-items
 
-Each `_flow/work-items/W###-*/` directory is the sole source of truth. Creating a work-item writes versionable shells for `spec.md`, `tasks.yaml`, `implementation-plan.md`, and `review.yaml`. A spec may remain `outlined`; tasks require a ready, human-approved spec. The implementation plan is a derived execution brief, never an approval artifact.
+Each `_flow/work-items/W###-*/` directory is the sole source of truth. Creating a work-item writes versionable shells for `spec.md`, `tasks.yaml`, `implementation-plan.md`, and `review.yaml`. A spec may remain `outlined`; tasks require a ready, human-authorized spec. When the user has already explicitly authorized proceeding with the finalized work item, approval can be recorded during specification instead of adding a second confirmation step. The implementation plan is a derived execution brief, never an approval artifact.
 
 Run `flow sync` to materialize `_flow/generated/backlog.yaml` and `_flow/generated/graph.md`. Sync only reads canonical work-items and only writes `_flow/generated/`; it never alters a canonical source. Generated files are disposable and ignored by Git.
 
@@ -22,7 +22,7 @@ The project records the Flow package version that initialized or explicitly upda
 
 ## Workflow
 
-`doctor quick → discovery → PRD → engineering → outlined backlog → selected eligible item → ready spec → spec approval → tasks and brief → implementation → gates → implementation commit → evidence persistence → review`
+`doctor quick → discovery → PRD → engineering → outlined backlog → selected eligible item → ready authorized spec → tasks → current brief → implementation → gates → implementation commit → evidence persistence → review`
 
 The backlog contains every known work-item and its DAG, but deep specs are created on demand. `spec_maturity: outlined|ready` is independent of `state: pending|in_progress|completed`. Eligibility is derived from completed dependencies plus resolved external/decision blockers; then routing uses lower priority number and lower numeric ID.
 

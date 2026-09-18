@@ -4,7 +4,7 @@
 2. One mutating work item and task at a time across the project. Read-only research/review may be parallel; Flow does not orchestrate concurrent mutating worktrees.
 3. PRD approval precedes engineering approval; both precede complete backlog creation.
 4. Keep the full outlined backlog, but create a work-item spec on demand; create tasks.yaml and implementation-plan.md only once its spec is ready and approved.
-5. The human approves the exact ready SPEC revision; implementation-plan.md is a derived execution brief and is never approved.
+5. The human authorizes the exact ready SPEC revision. Capture that approval during specification when the current instruction explicitly authorizes proceeding; otherwise use the approval route. implementation-plan.md is a derived execution brief and is never approved.
 6. Briefs bind to exact SHA256 engineering, SPEC and tasks text; stale briefs must be regenerated before implementation.
 7. Read the full engineering.md before planning, implementation and review. Missing/unapproved engineering blocks code.
 8. SRP, semantic naming, cohesion, low coupling, locality and justified complexity guide qualitative review; do not fake mechanical proof with Markdown regex.
