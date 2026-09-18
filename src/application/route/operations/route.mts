@@ -4,6 +4,7 @@ import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mj
 import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 import { parseState } from '../../../domain/workflow/execution-state.mjs';
 import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
+import { isWorkItemSpecApproved } from '../../../domain/work-item/specification.mjs';
 
 interface RouteResult {
   action: 'continue' | 'stop';
@@ -56,6 +57,14 @@ export function routeProject(root: string): RouteResult {
   const state = lifecycle(candidate, by).status;
   if (state === 'outlined')
     return step('specification', 'specification/step-01-deepen-spec.md', { work_item: candidate.id });
+  if (!isWorkItemSpecApproved(readText(path.join(candidate.base, 'spec.md')), { expectedWorkItem: candidate.id }))
+    return {
+      action: 'stop',
+      reason: 'consequential_decision',
+      phase: 'specification',
+      instruction: 'specification/step-02-await-approval.md',
+      work_item: candidate.id
+    };
   if (state === 'review') return step('review', 'review/step-01-review-work-item.md', { work_item: candidate.id });
   if (!candidate.tasks.tasks.length)
     return step('planning', 'planning/step-01-create-tasks.md', { work_item: candidate.id });

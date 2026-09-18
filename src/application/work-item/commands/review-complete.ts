@@ -1,10 +1,9 @@
 import path from 'node:path';
 import { parseReview } from '../../../domain/work-item/review.mjs';
-import { isImplementationPlanApproved } from '../../../domain/project/implementation-plan.js';
 import { validateProject } from '../../project-validation.mjs';
 import { evaluateGates } from '../../../infrastructure/process/gate-evaluation.mjs';
 import { fail, recordOutput as writeOutput, requiredOption } from '../../command-runtime.js';
-import { IMPLEMENTATION_PLAN_FILE, REVIEW_FILE, SPEC_FILE } from '../../../domain/project/project.js';
+import { REVIEW_FILE, SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem, WorkItemReview } from '../../../domain/work-item/work-item.js';
 import { projectRelativePath, readText, writeYaml } from '../../../infrastructure/filesystem/index.js';
 import {
@@ -43,7 +42,6 @@ export function completeWorkItemReview(root: string, item: LoadedWorkItem, args:
   const domain = requiredOption(args, '--domain');
 
   ensureReviewCanComplete(item);
-  ensureApprovedImplementationPlan(item);
   ensureReviewValidationPasses(root, item.id);
   ensureReviewGatesPass(root, item.id);
 
@@ -97,14 +95,6 @@ function ensureReviewCanComplete(item: LoadedWorkItem): void {
 
   if (item.maturity !== 'ready' || !hasTasks || !allTasksCompleted) {
     fail(`${item.id} is not ready for review completion.`);
-  }
-}
-
-function ensureApprovedImplementationPlan(item: LoadedWorkItem): void {
-  const planFile = path.join(item.base, IMPLEMENTATION_PLAN_FILE);
-
-  if (!isImplementationPlanApproved(readText(planFile))) {
-    fail(`${item.id} requires an approved implementation plan.`);
   }
 }
 

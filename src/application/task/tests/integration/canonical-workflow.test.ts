@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 import { parse } from 'yaml';
 
 const cli = path.resolve('dist/entry.js');
@@ -34,6 +35,8 @@ function project() {
   execFileSync('git', ['config', 'user.email', 'flow@test.local'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Flow Test'], { cwd: root });
   assert.equal(run(root, ['init', '--runtime', 'codex', '--existing-code', 'improve']).status, 0);
+  fs.mkdirSync(path.join(root, '_flow', 'docs'), { recursive: true });
+  fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), 'engineering\n');
   return root;
 }
 function ready(root: string, id = 'W101') {
@@ -43,13 +46,11 @@ function ready(root: string, id = 'W101') {
   const original = fs.readFileSync(spec, 'utf8');
   fs.writeFileSync(spec, `${original}\n${headings.map((heading) => `${heading}\nText.`).join('\n\n')}\n`);
   assert.equal(run(root, ['work-item', 'promote', id]).status, 0);
+  assert.equal(run(root, ['approval', 'record', path.relative(root, spec)]).status, 0);
+  const hash = (text: string) => createHash('sha256').update(text).digest('hex');
   fs.writeFileSync(
     path.join(base, 'implementation-plan.md'),
-    `---\nschema_version: 1\nwork_item: ${id}\nstatus: approved\n---\n\n# Implementation Plan\n`
-  );
-  assert.equal(
-    run(root, ['approval', 'record', path.relative(root, path.join(base, 'implementation-plan.md'))]).status,
-    0
+    `---\nschema_version: 2\nwork_item: ${id}\nengineering_revision: ${hash('engineering\n')}\nspec_revision: ${hash(fs.readFileSync(spec, 'utf8'))}\ntasks_revision: ${hash(fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8'))}\n---\n\n# Implementation Plan\n\n## Preflight\n\n## Strategy\n\n## Execution\n\n## Validation\n`
   );
   return base;
 }
@@ -72,14 +73,14 @@ test('compiled CLI creates canonical shells and sync never mutates them', () => 
   assert.equal(run(root, ['validate', '--json']).status, 0);
 });
 
-test('changing an approved plan invalidates its approval', () => {
+test('changing a brief requires regeneration', () => {
   const root = project();
   const base = ready(root);
-  fs.appendFileSync(path.join(base, 'implementation-plan.md'), '\nChanged after approval.\n');
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
+  fs.appendFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), 'changed\n');
   const start = run(root, ['task', 'start', 'W101-T001']);
   assert.notEqual(start.status, 0);
-  assert.match(start.stderr, /requires an approved implementation plan/);
+  assert.match(start.stderr, /requires a current implementation plan/);
 });
 
 test('task and review use canonical subjects and release dependent work', () => {
