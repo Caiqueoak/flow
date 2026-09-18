@@ -187,18 +187,24 @@ test('specialized documents accept complete content and reject stale plan revisi
     ).errors,
     []
   );
-  const plan = document(
-    PLAN_HEADINGS,
-    `work_item: W101\nengineering_revision: ${documentRevision(engineering)}\nspec_revision: ${documentRevision('spec')}\n`
-  );
+  const tasks = 'schema_version: 3\nwork_item: W101\ntasks: []\n';
+  const plan = `---\nschema_version: 2\nwork_item: W101\nengineering_revision: ${documentRevision(engineering)}\nspec_revision: ${documentRevision('spec')}\ntasks_revision: ${documentRevision(tasks)}\n---\n\n${PLAN_HEADINGS.join('\n\n')}\n`;
   assert.deepEqual(
-    validateImplementationPlan(plan, { workItem: 'W101', engineeringText: engineering, specText: 'spec' }).errors,
+    validateImplementationPlan(plan, {
+      workItem: 'W101',
+      engineeringText: engineering,
+      specText: 'spec',
+      tasksText: tasks
+    }).errors,
     []
   );
   assert.match(
-    validateImplementationPlan(plan, { workItem: 'W102', engineeringText: 'changed', specText: 'spec' }).errors.join(
-      ' '
-    ),
+    validateImplementationPlan(plan, {
+      workItem: 'W102',
+      engineeringText: 'changed',
+      specText: 'spec',
+      tasksText: tasks
+    }).errors.join(' '),
     /different work item.*stale/
   );
 });

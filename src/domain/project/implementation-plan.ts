@@ -1,11 +1,11 @@
-import { createHash } from 'node:crypto';
 import { parse, stringify } from 'yaml';
 
 export interface ImplementationPlanMetadata {
   schema_version?: number;
   work_item?: string;
-  status?: string;
-  approval?: { at: string; revision: string };
+  engineering_revision?: string;
+  spec_revision?: string;
+  tasks_revision?: string;
   [key: string]: unknown;
 }
 
@@ -22,19 +22,4 @@ export function parseImplementationPlan(text: string): ParsedImplementationPlan 
 
 export function serializeImplementationPlan(metadata: ImplementationPlanMetadata, body: string): string {
   return `---\n${stringify(metadata).trimEnd()}\n---${body}`;
-}
-
-export function implementationPlanRevision(metadata: ImplementationPlanMetadata, body: string): string {
-  const stableMetadata = { ...metadata };
-  delete stableMetadata.approval;
-  return createHash('sha256').update(serializeImplementationPlan(stableMetadata, body)).digest('hex');
-}
-
-export function isImplementationPlanApproved(text: string): boolean {
-  const plan = parseImplementationPlan(text);
-  return Boolean(
-    plan &&
-    plan.metadata.status === 'approved' &&
-    plan.metadata.approval?.revision === implementationPlanRevision(plan.metadata, plan.body)
-  );
 }

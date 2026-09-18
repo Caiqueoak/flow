@@ -13,7 +13,8 @@ export const SPEC_HEADINGS = Object.freeze([
   '## Gates'
 ]);
 
-import { parseDocument } from 'yaml';
+import { createHash } from 'node:crypto';
+import { parseDocument, stringify } from 'yaml';
 import { ArtifactValidationError } from './backlog.mjs';
 import {
   WORK_ITEM_ID,
@@ -27,6 +28,25 @@ import {
 export interface ParsedWorkItemSpecification {
   metadata: WorkItemSpecMetadata;
   body: string;
+}
+
+export function serializeWorkItemSpec(metadata: WorkItemSpecMetadata, body: string): string {
+  return `---\n${stringify(metadata).trimEnd()}\n---\n${body}`;
+}
+
+export function specificationRevision(metadata: WorkItemSpecMetadata, body: string): string {
+  const stable = { ...metadata };
+  delete stable.approval;
+  return createHash('sha256').update(serializeWorkItemSpec(stable, body)).digest('hex');
+}
+
+export function isWorkItemSpecApproved(text: string, options: { expectedWorkItem?: string | null } = {}): boolean {
+  try {
+    const spec = parseWorkItemSpec(text, options);
+    return spec.metadata.approval?.revision === specificationRevision(spec.metadata, spec.body);
+  } catch {
+    return false;
+  }
 }
 
 export function parseWorkItemSpec(
@@ -73,10 +93,21 @@ export function parseWorkItemSpec(
       priority: m.priority as number,
       depends_on: m.depends_on as WorkItemId[],
       blockers: m.blockers as Blocker[],
-      maturity: m.maturity as SpecMaturity
+      maturity: m.maturity as SpecMaturity,
+      ...(isApproval(m.approval) ? { approval: m.approval } : {})
     },
     body: match[2] ?? ''
   };
+}
+
+function isApproval(value: unknown): value is { at: string; revision: string } {
+  return (
+    isRecord(value) &&
+    typeof value.at === 'string' &&
+    !Number.isNaN(Date.parse(value.at)) &&
+    typeof value.revision === 'string' &&
+    /^[a-f0-9]{64}$/.test(value.revision)
+  );
 }
 export function validateSpec(text: string, options: { expectedWorkItem?: string | null | undefined } = {}) {
   const parsed = parseWorkItemSpec(text, options);

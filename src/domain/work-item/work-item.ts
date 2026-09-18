@@ -43,6 +43,7 @@ export interface WorkItemSpecMetadata {
   depends_on: WorkItemId[];
   blockers: Blocker[];
   maturity: SpecMaturity;
+  approval?: { at: string; revision: string };
 }
 
 export interface WorkItemReview {

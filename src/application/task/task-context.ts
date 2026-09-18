@@ -6,6 +6,7 @@ import { ID_PADDING, TASKS_FILE } from '../../domain/project/project.js';
 import { TASK_ID_PREFIX, type Task, type TaskCollection, type TaskId } from '../../domain/task/task.js';
 import type { LoadedWorkItem } from '../../domain/work-item/work-item.js';
 import { readText } from '../../infrastructure/filesystem/index.js';
+import { isWorkItemSpecApproved } from '../../domain/work-item/specification.mjs';
 
 const parseTasksBoundary = parseTasks as unknown as (
   text: string,
@@ -57,5 +58,8 @@ function workItemIdFromTaskTarget(target: string | undefined): string {
 function ensureWorkItemReady(item: LoadedWorkItem): void {
   if (item.maturity !== 'ready') {
     fail(`${item.id} is outlined; promote its complete spec first.`);
+  }
+  if (!isWorkItemSpecApproved(readText(path.join(item.base, 'spec.md')), { expectedWorkItem: item.id })) {
+    fail(`${item.id} requires an approved specification.`);
   }
 }

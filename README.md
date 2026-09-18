@@ -2,7 +2,7 @@
 
 ## Canonical work-items
 
-Each `_flow/work-items/W###-*/` directory is the sole source of truth. Creating a work-item writes versionable shells for `spec.md`, `tasks.yaml`, `implementation-plan.md`, and `review.yaml`. A spec may remain `outlined`; tasks require a `ready` spec and implementation requires an approved plan.
+Each `_flow/work-items/W###-*/` directory is the sole source of truth. Creating a work-item writes versionable shells for `spec.md`, `tasks.yaml`, `implementation-plan.md`, and `review.yaml`. A spec may remain `outlined`; tasks require a ready, human-approved spec. The implementation plan is a derived execution brief, never an approval artifact.
 
 Run `flow sync` to materialize `_flow/generated/backlog.yaml` and `_flow/generated/graph.md`. Sync only reads canonical work-items and only writes `_flow/generated/`; it never alters a canonical source. Generated files are disposable and ignored by Git.
 
@@ -22,7 +22,7 @@ The project records the Flow package version that initialized or explicitly upda
 
 ## Workflow
 
-`doctor quick → discovery → PRD → engineering → outlined backlog → selected eligible item → ready spec → tasks and plan → approval → implementation → gates → implementation commit → evidence persistence → review`
+`doctor quick → discovery → PRD → engineering → outlined backlog → selected eligible item → ready spec → spec approval → tasks and brief → implementation → gates → implementation commit → evidence persistence → review`
 
 The backlog contains every known work-item and its DAG, but deep specs are created on demand. `spec_maturity: outlined|ready` is independent of `state: pending|in_progress|completed`. Eligibility is derived from completed dependencies plus resolved external/decision blockers; then routing uses lower priority number and lower numeric ID.
 
@@ -55,7 +55,7 @@ flow task create W015 --title "Add query contract"
 flow task start W015-T001
 flow scope validate W015-T001 --files src/query.js,test/query.test.js
 flow task commit W015-T001 --message "feat(search): add customer query [W015-T001]" --files src/query.js,test/query.test.js
-flow approval record _flow/work-items/W015-customer-search/implementation-plan.md
+flow approval record _flow/work-items/W015-customer-search/spec.md
 ```
 
 ## Git traceability

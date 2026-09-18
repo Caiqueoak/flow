@@ -74,7 +74,7 @@ function writeWorkItemShells(directory: string, input: CreateWorkItemInput): voi
   });
   writeText(
     path.join(directory, IMPLEMENTATION_PLAN_FILE),
-    `---\nschema_version: 1\nwork_item: ${input.id}\nstatus: draft\n---\n\n${IMPLEMENTATION_PLAN_TITLE}\n`
+    `---\nschema_version: 2\nwork_item: ${input.id}\nengineering_revision: \nspec_revision: \ntasks_revision: \n---\n\n${IMPLEMENTATION_PLAN_TITLE}\n\n## Preflight\n\n## Strategy\n\n## Execution\n\n## Validation\n`
   );
   writeYaml(path.join(directory, REVIEW_FILE), {
     schema_version: 1,

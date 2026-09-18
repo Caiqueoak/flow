@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -115,22 +116,20 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
   });
 
   await t.test('approves, executes and commits one task with exact evidence', async () => {
-    fs.writeFileSync(
-      path.join(base, 'implementation-plan.md'),
-      '---\nschema_version: 1\nwork_item: W101\nstatus: approved\n---\n\n# Implementation Plan\n'
-    );
     assert.match(
-      await flow(root, [
-        'approval',
-        'record',
-        '_flow/work-items/W101-source-workflow/implementation-plan.md',
-        '--at',
-        '2026-01-01'
-      ]),
-      /implementation plan approved/
+      await flow(root, ['approval', 'record', '_flow/work-items/W101-source-workflow/spec.md', '--at', '2026-01-01']),
+      /specification approved/
     );
     await flow(root, ['task', 'create', 'W101', '--title', 'Implement source workflow']);
     await flow(root, ['task', 'set', 'W101-T001', '--title', 'Implement updated source workflow']);
+    const engineering = 'engineering\n';
+    fs.mkdirSync(path.join(root, '_flow', 'docs'), { recursive: true });
+    fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), engineering);
+    const hash = (text: string) => createHash('sha256').update(text).digest('hex');
+    fs.writeFileSync(
+      path.join(base, 'implementation-plan.md'),
+      `---\nschema_version: 2\nwork_item: W101\nengineering_revision: ${hash(engineering)}\nspec_revision: ${hash(fs.readFileSync(path.join(base, 'spec.md'), 'utf8'))}\ntasks_revision: ${hash(fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8'))}\n---\n\n# Implementation Plan\n\n## Preflight\n\n## Strategy\n\n## Execution\n\n## Validation\n`
+    );
     assert.equal(await flow(root, ['task', 'start', 'W101-T001']), 'W101-T001 started.');
     await flow(root, ['sync']);
     fs.writeFileSync(path.join(root, 'implementation.txt'), 'done\n');
