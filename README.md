@@ -28,6 +28,8 @@ The backlog contains every known work-item and its DAG, but deep specs are creat
 
 Generated `backlog.yaml` and `graph.md` are disposable projections under `_flow/generated/`. Product truth lives in `docs/prd.md`, technical truth in `docs/engineering.md`, and work-item maturity/DAG in canonical work-item specs.
 
+When all mapped work is complete, `flow route` returns `finished`. A plain `/flow continue` therefore stops cleanly. If the current `/flow` invocation contains a substantive new feature/change request, the skill performs bounded discovery for only that new scope, reuses approved product/engineering contracts when they still apply, revises only materially affected contract sections when needed, and creates new work-items without reopening completed history.
+
 ## CLI
 
 Run `flow --help` or `flow <command> --help`. Help and parsing share one declarative command registry, so unknown flags and invalid combinations are rejected before writes.
