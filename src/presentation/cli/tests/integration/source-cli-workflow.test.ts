@@ -9,6 +9,16 @@ import { runCli } from '../../dispatch-command.js';
 import { migrateProject } from '../../../../application/migrate/operations/apply.mjs';
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
 
+const PRD_HEADINGS = [
+  '# Product Requirements',
+  '## Purpose',
+  '## Users',
+  '## Scope',
+  '## Requirements',
+  '## Constraints',
+  '## Non-goals'
+];
+
 const headings = [
   '## Problem',
   '## Scope',
@@ -44,9 +54,21 @@ function project(t: test.TestContext) {
   return root;
 }
 
+function prdDocument(status: 'draft' | 'approved') {
+  const approvedAt = status === 'approved' ? 'approved_at: 2026-01-01T00:00:00.000Z\n' : '';
+  return `---\nschema_version: 1\nstatus: ${status}\n${approvedAt}---\n\n${PRD_HEADINGS.map((heading) => `${heading}\nText.`).join('\n\n')}\n`;
+}
+
 function engineeringDocument(status: 'draft' | 'approved', policy: string) {
   const approvedAt = status === 'approved' ? 'approved_at: 2026-01-01T00:00:00.000Z\n' : '';
   return `---\nschema_version: 1\nstatus: ${status}\n${approvedAt}baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: ${policy}\n---\n\n${ENGINEERING_HEADINGS.map((heading) => `${heading}\nText.`).join('\n\n')}\n`;
+}
+
+function writeApprovedProjectBaseline(root: string, policy = 'not_applicable') {
+  const docs = path.join(root, '_flow', 'docs');
+  fs.mkdirSync(docs, { recursive: true });
+  fs.writeFileSync(path.join(docs, 'prd.md'), prdDocument('approved'));
+  fs.writeFileSync(path.join(docs, 'engineering.md'), engineeringDocument('approved', policy));
 }
 
 function setRecordedFlowVersion(root: string, version: string) {
@@ -86,48 +108,89 @@ test('global help lists the stable public command surface', async () => {
   }
 });
 
-test('init defers brownfield adoption but leaves greenfield not applicable', async (t) => {
-  const greenfield = project(t);
-  await flow(greenfield, ['init', '--runtime', 'codex']);
+test('greenfield bootstrap routes discovery, approvals, engineering, then backlog generation', async (t) => {
+  const root = project(t);
+  await flow(root, ['init', '--runtime', 'codex']);
+
   assert.equal(
-    parse(fs.readFileSync(path.join(greenfield, '_flow', 'config.yaml'), 'utf8')).engineering.existing_code_policy,
+    parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).engineering.existing_code_policy,
     'not_applicable'
   );
+  assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
+    action: 'continue',
+    phase: 'discovery',
+    instruction: 'discovery/step-01-project.md'
+  });
 
-  const brownfield = project(t);
-  fs.mkdirSync(path.join(brownfield, 'src'));
-  fs.writeFileSync(path.join(brownfield, 'src', 'index.ts'), 'export {};\n');
-  assert.match(await flow(brownfield, ['init', '--runtime', 'codex']), /Flow is ready/);
-  assert.equal(
-    parse(fs.readFileSync(path.join(brownfield, '_flow', 'config.yaml'), 'utf8')).engineering.existing_code_policy,
-    'undecided'
-  );
-  assert.deepEqual(JSON.parse(await flow(brownfield, ['route', '--json'])), {
+  const docs = path.join(root, '_flow', 'docs');
+  fs.mkdirSync(docs, { recursive: true });
+  fs.writeFileSync(path.join(docs, 'prd.md'), prdDocument('draft'));
+  assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
+    action: 'stop',
+    reason: 'consequential_decision',
+    phase: 'discovery',
+    instruction: 'discovery/step-02-await-approval.md'
+  });
+
+  fs.writeFileSync(path.join(docs, 'prd.md'), prdDocument('approved'));
+  assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
     action: 'continue',
     phase: 'engineering',
     instruction: 'engineering/step-02-synthesize.md'
   });
 
-  fs.mkdirSync(path.join(brownfield, '_flow', 'docs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(brownfield, '_flow', 'docs', 'engineering.md'),
-    engineeringDocument('draft', 'incremental')
-  );
-  assert.deepEqual(JSON.parse(await flow(brownfield, ['route', '--json'])), {
+  fs.writeFileSync(path.join(docs, 'engineering.md'), engineeringDocument('draft', 'not_applicable'));
+  assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
     action: 'stop',
     reason: 'consequential_decision',
     phase: 'engineering',
     instruction: 'engineering/step-05-present.md'
   });
 
-  fs.writeFileSync(
-    path.join(brownfield, '_flow', 'docs', 'engineering.md'),
-    engineeringDocument('approved', 'incremental')
-  );
-  assert.deepEqual(JSON.parse(await flow(brownfield, ['route', '--json'])), {
-    action: 'stop',
-    reason: 'external_action'
+  fs.writeFileSync(path.join(docs, 'engineering.md'), engineeringDocument('approved', 'not_applicable'));
+  assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
+    action: 'continue',
+    phase: 'planning',
+    instruction: 'planning/step-01-plan-work-item.md'
   });
+});
+
+test('brownfield bootstrap discovers product before engineering adoption and trusts approved engineering', async (t) => {
+  const root = project(t);
+  fs.mkdirSync(path.join(root, 'src'));
+  fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'export {};\n');
+  await flow(root, ['init', '--runtime', 'codex']);
+
+  assert.equal(
+    parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).engineering.existing_code_policy,
+    'undecided'
+  );
+  assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
+    action: 'continue',
+    phase: 'discovery',
+    instruction: 'discovery/step-01-project.md'
+  });
+
+  const docs = path.join(root, '_flow', 'docs');
+  fs.mkdirSync(docs, { recursive: true });
+  fs.writeFileSync(path.join(docs, 'prd.md'), prdDocument('approved'));
+  assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
+    action: 'continue',
+    phase: 'engineering',
+    instruction: 'engineering/step-02-synthesize.md'
+  });
+
+  fs.writeFileSync(path.join(docs, 'engineering.md'), engineeringDocument('approved', 'incremental'));
+  assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
+    action: 'continue',
+    phase: 'planning',
+    instruction: 'planning/step-01-plan-work-item.md'
+  });
+
+  assert.equal(
+    parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).engineering.existing_code_policy,
+    'undecided'
+  );
 });
 
 test('explicit brownfield adoption is preserved by init', async (t) => {
@@ -153,6 +216,7 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
     assert.equal(diagnosis.healthy, true);
     assert.equal(diagnosis.mode, 'quick');
     assert.equal(fs.existsSync(path.join(root, '_flow', 'config.yaml')), true);
+    writeApprovedProjectBaseline(root, 'incremental');
   });
 
   await t.test('creates, updates and promotes canonical work-item metadata', async () => {
