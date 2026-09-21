@@ -64,8 +64,7 @@ export const BROWNFIELD_POLICIES: Record<string, BrownfieldPolicy | undefined> =
   },
   incremental: {
     label: 'Incremental alignment — Recommended',
-    description:
-      'Preserve unrelated code while new or touched areas move toward the approved engineering direction.'
+    description: 'Preserve unrelated code while new or touched areas move toward the approved engineering direction.'
   },
   refactor: {
     label: 'Refactor first',
