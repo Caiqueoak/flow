@@ -54,10 +54,6 @@ export const ENGINEERING_PROFILES: Record<string, EngineeringProfile | undefined
 export { ENGINEERING_PROFILE_IDS };
 
 export const BROWNFIELD_POLICIES: Record<string, BrownfieldPolicy | undefined> = {
-  improve: {
-    label: 'Incremental alignment (legacy alias)',
-    description: 'Compatibility alias for incremental alignment.'
-  },
   preserve: {
     label: 'Preserve existing structure',
     description: 'Adopt Flow without restructuring coherent existing architecture or conventions.'
