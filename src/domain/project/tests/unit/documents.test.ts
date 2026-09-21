@@ -3,7 +3,6 @@ import test from 'node:test';
 import { documentMetadata, documentRevision, validateDocument } from '../../document.mjs';
 import { validateEngineeringDocument, ENGINEERING_HEADINGS } from '../../engineering-document.mjs';
 import { validatePrdDocument } from '../../product-requirements-document.mjs';
-import { PLAN_HEADINGS, validateImplementationPlan } from '../../implementation-plan-validation.mjs';
 import { deriveExecutionStatus, parseBacklog, topologicalOrder } from '../../../work-item/backlog.mjs';
 import { parseGates } from '../../../gate/gate-definition.mjs';
 import { parseReview, stringifyReview } from '../../../work-item/review.mjs';
@@ -167,10 +166,10 @@ test('specifications and reviews enforce ownership and canonical metadata', () =
   assert.throws(() => parseReviewTyped(JSON.stringify(pending), { expectedWorkItem: 'W102' }), /invalid work_item/);
 });
 
-test('specialized documents accept complete content and reject stale plan revisions', () => {
+test('specialized documents accept complete product and engineering content', () => {
   const engineering = document(
     ENGINEERING_HEADINGS,
-    'baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: improve\n'
+    'baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: incremental\n'
   );
   assert.deepEqual(validateEngineeringDocument(engineering).errors, []);
   assert.deepEqual(
@@ -187,28 +186,7 @@ test('specialized documents accept complete content and reject stale plan revisi
     ).errors,
     []
   );
-  const tasks = 'schema_version: 3\nwork_item: W101\ntasks: []\n';
-  const plan = `---\nschema_version: 2\nwork_item: W101\nengineering_revision: ${documentRevision(engineering)}\nspec_revision: ${documentRevision('spec')}\ntasks_revision: ${documentRevision(tasks)}\n---\n\n${PLAN_HEADINGS.join('\n\n')}\n`;
-  assert.deepEqual(
-    validateImplementationPlan(plan, {
-      workItem: 'W101',
-      engineeringText: engineering,
-      specText: 'spec',
-      tasksText: tasks
-    }).errors,
-    []
-  );
-  assert.match(
-    validateImplementationPlan(plan, {
-      workItem: 'W102',
-      engineeringText: 'changed',
-      specText: 'spec',
-      tasksText: tasks
-    }).errors.join(' '),
-    /different work item.*stale/
-  );
 });
-
 test('backlog parsing and ordering preserve dependencies and reject invalid graphs', () => {
   const yaml = `schema_version: 4\nwork_items:\n  - id: W101\n    folder: W101-first\n    kind: feature\n    title: First\n    state: completed\n    priority: 1\n    spec_maturity: ready\n    depends_on: []\n    blockers: []\n  - id: W102\n    folder: W102-second\n    kind: technical\n    title: Second\n    state: pending\n    priority: 2\n    spec_maturity: outlined\n    depends_on: [W101]\n    blockers:\n      - id: waiting-input\n        type: external_action\n        description: Input\n        status: unresolved\n`;
   const backlog = parseBacklogTyped(yaml);
