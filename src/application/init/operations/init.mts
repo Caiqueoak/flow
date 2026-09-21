@@ -90,7 +90,8 @@ async function selectEngineering(
   const hasProjectFiles = directoryEntryNames(root).some(
     (name) => ['src', 'app', 'lib', 'packages'].includes(name) || /\.(m?[jt]sx?|py|java|go|rs|cs)$/.test(name)
   );
-  if (brownfieldFlag) config.engineering.existing_code_policy = brownfieldFlag;
+  if (brownfieldFlag)
+    config.engineering.existing_code_policy = brownfieldFlag === 'improve' ? 'incremental' : brownfieldFlag;
   else if (!existed && hasProjectFiles)
     config.engineering.existing_code_policy = await promptSelect({
       title: 'How should Flow adopt this existing repository?',
