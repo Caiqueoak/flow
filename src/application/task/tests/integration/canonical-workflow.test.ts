@@ -27,6 +27,47 @@ const headings = [
   '## Decisions',
   '## Gates'
 ];
+const prdHeadings = [
+  '# Product Requirements',
+  '## Purpose',
+  '## Users',
+  '## Scope',
+  '## Requirements',
+  '## Constraints',
+  '## Non-goals'
+];
+
+const engineeringHeadings = [
+  '# Engineering',
+  '## Observed system',
+  '## Adoption strategy',
+  '## System shape',
+  '## Modules and ownership',
+  '## Dependency direction and boundaries',
+  '## Vertical slices and code organization',
+  '## Naming and readability conventions',
+  '## Data ownership and persistence',
+  '## Error handling',
+  '## Testing and verification',
+  '## Dependencies and external services',
+  '## Security and operations',
+  '## Deterministic gates',
+  '## Deferred complexity',
+  '## Exceptions'
+];
+
+function approvedDocument(headings: readonly string[], baseline = '') {
+  return `---
+schema_version: 1
+status: approved
+approved_at: 2026-01-01T00:00:00.000Z
+${baseline}---
+
+${headings.map((heading) => `${heading}
+Text.`).join('\n\n')}
+`;
+}
+
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-canonical-'));
   temporaryRoots.add(root);
@@ -34,8 +75,16 @@ function project() {
   execFileSync('git', ['config', 'user.email', 'flow@test.local'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Flow Test'], { cwd: root });
   assert.equal(run(root, ['init', '--runtime', 'codex', '--existing-code', 'incremental']).status, 0);
-  fs.mkdirSync(path.join(root, '_flow', 'docs'), { recursive: true });
-  fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), 'engineering\n');
+  const docs = path.join(root, '_flow', 'docs');
+  fs.mkdirSync(docs, { recursive: true });
+  fs.writeFileSync(path.join(docs, 'prd.md'), approvedDocument(prdHeadings));
+  fs.writeFileSync(
+    path.join(docs, 'engineering.md'),
+    approvedDocument(
+      engineeringHeadings,
+      'baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: incremental\n'
+    )
+  );
   return root;
 }
 function ready(root: string, id = 'W101') {
