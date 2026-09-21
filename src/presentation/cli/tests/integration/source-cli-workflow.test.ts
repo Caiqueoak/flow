@@ -7,6 +7,7 @@ import test from 'node:test';
 import { parse, stringify } from 'yaml';
 import { runCli } from '../../dispatch-command.js';
 import { migrateProject } from '../../../../application/migrate/operations/apply.mjs';
+import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
 
 const headings = [
   '## Problem',
@@ -41,6 +42,11 @@ function project(t: test.TestContext) {
   execFileSync('git', ['config', 'user.email', 'flow@test.local'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Flow Test'], { cwd: root });
   return root;
+}
+
+function engineeringDocument(status: 'draft' | 'approved', policy: string) {
+  const approvedAt = status === 'approved' ? 'approved_at: 2026-01-01T00:00:00.000Z\n' : '';
+  return `---\nschema_version: 1\nstatus: ${status}\n${approvedAt}baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: ${policy}\n---\n\n${ENGINEERING_HEADINGS.map((heading) => `${heading}\nText.`).join('\n\n')}\n`;
 }
 
 function setRecordedFlowVersion(root: string, version: string) {
@@ -80,6 +86,63 @@ test('global help lists the stable public command surface', async () => {
   }
 });
 
+test('init defers brownfield adoption but leaves greenfield not applicable', async (t) => {
+  const greenfield = project(t);
+  await flow(greenfield, ['init', '--runtime', 'codex']);
+  assert.equal(
+    parse(fs.readFileSync(path.join(greenfield, '_flow', 'config.yaml'), 'utf8')).engineering.existing_code_policy,
+    'not_applicable'
+  );
+
+  const brownfield = project(t);
+  fs.mkdirSync(path.join(brownfield, 'src'));
+  fs.writeFileSync(path.join(brownfield, 'src', 'index.ts'), 'export {};\n');
+  assert.match(await flow(brownfield, ['init', '--runtime', 'codex']), /Flow is ready/);
+  assert.equal(
+    parse(fs.readFileSync(path.join(brownfield, '_flow', 'config.yaml'), 'utf8')).engineering.existing_code_policy,
+    'undecided'
+  );
+  assert.deepEqual(JSON.parse(await flow(brownfield, ['route', '--json'])), {
+    action: 'continue',
+    phase: 'engineering',
+    instruction: 'engineering/step-02-synthesize.md'
+  });
+
+  fs.mkdirSync(path.join(brownfield, '_flow', 'docs'), { recursive: true });
+  fs.writeFileSync(
+    path.join(brownfield, '_flow', 'docs', 'engineering.md'),
+    engineeringDocument('draft', 'incremental')
+  );
+  assert.deepEqual(JSON.parse(await flow(brownfield, ['route', '--json'])), {
+    action: 'stop',
+    reason: 'consequential_decision',
+    phase: 'engineering',
+    instruction: 'engineering/step-05-present.md'
+  });
+
+  fs.writeFileSync(
+    path.join(brownfield, '_flow', 'docs', 'engineering.md'),
+    engineeringDocument('approved', 'incremental')
+  );
+  assert.deepEqual(JSON.parse(await flow(brownfield, ['route', '--json'])), {
+    action: 'stop',
+    reason: 'external_action'
+  });
+});
+
+test('explicit brownfield adoption is preserved by init', async (t) => {
+  const root = project(t);
+  fs.mkdirSync(path.join(root, 'src'));
+  fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'export {};\n');
+
+  await flow(root, ['init', '--runtime', 'codex', '--existing-code', 'incremental']);
+
+  assert.equal(
+    parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).engineering.existing_code_policy,
+    'incremental'
+  );
+});
+
 test('source CLI lifecycle has observable, deterministic transitions', async (t) => {
   const root = project(t);
   const base = path.join(root, '_flow', 'work-items', 'W101-source-workflow');
@@ -93,7 +156,15 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
   });
 
   await t.test('creates, updates and promotes canonical work-item metadata', async () => {
-    assert.equal(await flow(root, ['work-item', 'create', 'W101', '--title', 'Source workflow']), 'W101 created.');
+    assert.equal(await flow(root, [
+        'work-item',
+        'create',
+        'W101',
+        '--title',
+        'Source workflow',
+        '--outcome',
+        'User can complete the source workflow.'
+      ]), 'W101 created.');
     await flow(root, ['work-item', 'priority', 'W101', '--priority', '2']);
     await flow(root, [
       'work-item',
