@@ -63,8 +63,10 @@ status: approved
 approved_at: 2026-01-01T00:00:00.000Z
 ${baseline}---
 
-${headings.map((heading) => `${heading}
-Text.`).join('\n\n')}
+${headings
+  .map((heading) => `${heading}
+Text.`)
+  .join('\n\n')}
 `;
 }
 
