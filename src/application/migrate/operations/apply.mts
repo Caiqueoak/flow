@@ -422,6 +422,19 @@ function upgradeCanonicalStaged(root: string, targetVersion: string): void {
   }
 }
 
+function recoverExistingCodePolicy(sourceFlow: string): string {
+  try {
+    const raw = asRecord(parse(readMigrationText(path.join(sourceFlow, 'config.yaml'))));
+    const engineering = asRecord(raw.engineering);
+    const policy = engineering.existing_code_policy;
+    if (policy === 'improve') return 'incremental';
+    if (policy === 'preserve' || policy === 'incremental' || policy === 'refactor') return policy;
+  } catch {
+    // Reconciliation will establish the qualitative adoption decision.
+  }
+  return 'undecided';
+}
+
 function recoverRuntimeConfigurations(sourceFlow: string): RuntimeConfiguration[] {
   try {
     const raw = asRecord(parse(readMigrationText(path.join(sourceFlow, 'config.yaml'))));
@@ -456,7 +469,7 @@ function rebuildStagedForReconciliation(staging: string, sourceFlow: string, tar
 
   const config = defaultConfig(targetVersion);
   config.runtimes = recoverRuntimeConfigurations(sourceFlow);
-  config.engineering.existing_code_policy = 'undecided';
+  config.engineering.existing_code_policy = recoverExistingCodePolicy(sourceFlow);
   writeConfig(staging, config);
   writeMigrationText(path.join(staged, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
 
