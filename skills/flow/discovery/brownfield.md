@@ -1,6 +1,6 @@
 # Brownfield adoption
 
-A repository with existing application code and no Flow metadata is a first-class Flow project.
+A repository with existing application code and no Flow metadata is a first-class Flow project. `flow init` only records that adoption is undecided unless the user explicitly supplied a strategy; qualitative selection happens here after inspection.
 
 Inspect the repository before recommending an adoption strategy. Identify the observed architecture, topology, ownership, naming, testing, tooling, persistence, integrations, CI/deployment and meaningful inconsistencies. Compare that observed state with the selected engineering profile, but never treat profile mismatch as authorization to refactor.
 
