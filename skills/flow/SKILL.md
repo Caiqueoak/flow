@@ -24,10 +24,15 @@ For brownfield repositories without Flow, inspect the repository first and read 
 Work-items are implementation outcomes. Read `backlog/work-items.md` when creating or revising the MVP graph. Planning, preparation, evidence, readiness, validation and review normally belong inside the owning work-item as tasks or gates.
 
 Canonical delivery truth is:
+
 - product contract in `_flow/docs/prd.md`;
+
 - engineering contract in `_flow/docs/engineering.md`;
+
 - work-item scope/acceptance in `spec.md`;
+
 - decomposition in `tasks.yaml`;
+
 - actual implementation in Git commits identified by W###-T### and Flow trailers.
 
 Do not treat a derived plan as an approval or traceability artifact. Important approach/architecture decisions belong in the spec or engineering contract; ordinary implementation reasoning stays local to execution.
