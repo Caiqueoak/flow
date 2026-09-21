@@ -27,7 +27,6 @@ test('readability-first v2 keeps the agent-facing architecture rules explicit', 
   assert.match(v2Profile, /behavior-preserving structural refactors/);
 });
 
-
 test('legacy improve policy normalizes to incremental when config is read', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-legacy-policy-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
