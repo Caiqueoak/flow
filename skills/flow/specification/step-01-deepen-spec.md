@@ -1,9 +1,22 @@
 # Specification — deepen one eligible work-item
 
-Read the PRD, full engineering contract and selected backlog outline. Do not deepen other work-items.
+Read the product contract, engineering contract and selected outlined work-item. Deepen only this work-item.
 
-Create `spec.md` with `# Work Item Specification` and sections Problem, Scope, Non-goals, Requirements, observable Acceptance criteria, Contracts, Data and APIs, Edge cases, Risks, Decisions, and Gates. Resolve ambiguity that would make planning unsafe. Keep `spec_maturity` exclusively in backlog.
+The SPEC defines the bounded implementation outcome. Include:
+- Problem
+- Scope
+- Non-goals
+- Requirements
+- observable Acceptance criteria
+- Contracts
+- Data and APIs when relevant
+- realistic Edge cases that could violate acceptance, integrity, security, idempotency or user expectations
+- Risks
+- Decisions
+- Gates
 
-Validate, then run `flow work-item promote W###`. If the user's current instruction explicitly authorizes proceeding with this work-item and the finalized SPEC introduces no unresolved consequential choice, record approval for this exact SPEC revision in the same step with `flow approval record <spec.md>`. Participation in discovery/specification alone is not consent. Otherwise route to the approval step. Never create tasks before the exact ready SPEC is approved.
+Resolve ordinary implementation details autonomously from engineering. If a consequential unresolved product/engineering choice remains, use `../core/decisions.md`.
 
-Contract, dependency or spec changes invalidate unexecuted briefs; never rewrite completed history.
+Validate and promote the SPEC. If the user's current instruction already authorizes proceeding and no new consequential choice was introduced, record authorization for that exact SPEC revision in the same step. Otherwise route to the focused approval decision.
+
+After authorization, route directly to task decomposition and implementation. No implementation-plan artifact or plan approval is required. Never rewrite completed history.
