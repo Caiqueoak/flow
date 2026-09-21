@@ -156,7 +156,8 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
   });
 
   await t.test('creates, updates and promotes canonical work-item metadata', async () => {
-    assert.equal(await flow(root, [
+    assert.equal(
+      await flow(root, [
         'work-item',
         'create',
         'W101',
@@ -164,7 +165,9 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
         'Source workflow',
         '--outcome',
         'User can complete the source workflow.'
-      ]), 'W101 created.');
+      ]),
+      'W101 created.'
+    );
     await flow(root, ['work-item', 'priority', 'W101', '--priority', '2']);
     await flow(root, [
       'work-item',
