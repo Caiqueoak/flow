@@ -80,7 +80,7 @@ async function selectEngineering(
   const brownfieldFlag = valueAfter(args, '--existing-code');
   if (args.includes('--brownfield'))
     fail(
-      'Use --existing-code improve|preserve: improve recommends clearer structure; preserve keeps consistent conventions.'
+      'Use --existing-code preserve|incremental|refactor to choose the brownfield adoption strategy.'
     );
   if (existed && (profileFlag || brownfieldFlag))
     fail('Change engineering through /flow and human approval, not init.');
@@ -93,7 +93,7 @@ async function selectEngineering(
   if (brownfieldFlag) config.engineering.existing_code_policy = brownfieldFlag;
   else if (!existed && hasProjectFiles)
     config.engineering.existing_code_policy = await promptSelect({
-      title: 'How should Flow treat existing code conventions?',
+      title: 'How should Flow adopt this existing repository?',
       options: Object.entries(BROWNFIELD_POLICIES).flatMap(([value, policy]) =>
         policy
           ? [
