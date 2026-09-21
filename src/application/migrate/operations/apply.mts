@@ -39,13 +39,12 @@ interface LegacyWorkItem {
   folder?: string;
   title: string;
   outcome?: string;
+  objective?: string;
   kind: string;
   state?: string;
   status?: string;
   priority?: number;
   spec_maturity?: string;
-  outcome?: string;
-  objective?: string;
   depends_on?: LegacyIdentifier[];
 }
 
@@ -58,6 +57,7 @@ interface MigratedWorkItem {
   id: string;
   folder: string;
   title: string;
+  outcome?: string;
   kind: string;
   state: LifecycleState;
   priority: number;
@@ -117,11 +117,7 @@ function createCanonicalShell(base: string, item: MigratedWorkItem): void {
       schema_version: 1,
       work_item: item.id,
       title: item.title,
-      ...(typeof item.outcome === 'string' && item.outcome.trim()
-        ? { outcome: item.outcome.trim() }
-        : typeof item.objective === 'string' && item.objective.trim()
-          ? { outcome: item.objective.trim() }
-          : {}),
+      ...(item.outcome ? { outcome: item.outcome } : {}),
       kind: item.kind,
       priority: item.priority,
       depends_on: item.depends_on,
@@ -166,6 +162,11 @@ function migrateStaged(root: string, targetVersion: string): void {
       id,
       folder,
       title: item.title,
+      ...(typeof item.outcome === 'string' && item.outcome.trim()
+        ? { outcome: item.outcome.trim() }
+        : typeof item.objective === 'string' && item.objective.trim()
+          ? { outcome: item.objective.trim() }
+          : {}),
       kind: item.kind,
       state: lifecycle(item.state ?? item.status ?? 'pending'),
       priority: item.priority ?? 1,
