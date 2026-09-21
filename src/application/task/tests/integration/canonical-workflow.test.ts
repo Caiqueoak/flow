@@ -212,6 +212,65 @@ test('task and review use canonical subjects and release dependent work', () => 
   assert.equal(JSON.parse(run(root, ['route', '--json']).stdout).work_item, 'W102');
 });
 
+test('finished projects stay finished until new scope creates new immutable work', () => {
+  const root = project();
+  const completedBase = ready(root, 'W101');
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement completed outcome']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  fs.writeFileSync(path.join(root, 'completed.txt'), 'done\n');
+  execFileSync('git', ['add', 'completed.txt'], { cwd: root });
+  assert.equal(run(root, ['sync']).status, 0);
+  assert.equal(
+    run(root, [
+      'task',
+      'commit',
+      'W101-T001',
+      '--message',
+      'feat(flow): complete original outcome [W101-T001]',
+      '--files',
+      'completed.txt'
+    ]).status,
+    0
+  );
+  assert.equal(run(root, ['sync']).status, 0);
+  assert.equal(run(root, ['work-item', 'review-complete', 'W101', '--domain', 'flow']).status, 0);
+
+  assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), { action: 'stop', reason: 'finished' });
+
+  const completedHistory = Object.fromEntries(
+    ['spec.md', 'tasks.yaml', 'review.yaml'].map((file) => [
+      file,
+      fs.readFileSync(path.join(completedBase, file), 'utf8')
+    ])
+  );
+
+  assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), { action: 'stop', reason: 'finished' });
+
+  assert.equal(
+    run(root, [
+      'work-item',
+      'create',
+      'W102',
+      '--title',
+      'Deliver new feature',
+      '--outcome',
+      'User can use the newly requested feature.'
+    ]).status,
+    0
+  );
+
+  assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), {
+    action: 'continue',
+    phase: 'specification',
+    instruction: 'specification/step-01-deepen-spec.md',
+    work_item: 'W102'
+  });
+
+  for (const [file, before] of Object.entries(completedHistory)) {
+    assert.equal(fs.readFileSync(path.join(completedBase, file), 'utf8'), before);
+  }
+});
+
 test('validate identifies missing, stale and malformed projections', () => {
   const root = project();
   ready(root);
@@ -367,6 +426,14 @@ test('packaged workflow instructions use the canonical task and review commands'
   const review = fs.readFileSync('skills/flow/review/step-01-review-work-item.md', 'utf8');
   const invariants = fs.readFileSync('skills/flow/invariants.md', 'utf8');
   const readme = fs.readFileSync('README.md', 'utf8');
+  const flowSkill = fs.readFileSync('skills/flow/SKILL.md', 'utf8');
+  const newScope = fs.readFileSync('skills/flow/discovery/new-scope.md', 'utf8');
+
+  assert.match(flowSkill, /route returns \`finished\`[\s\S]*substantive new feature\/change request/);
+  assert.match(newScope, /Do not rediscover unrelated parts of the project/);
+  assert.match(newScope, /reuse it unchanged/);
+  assert.match(newScope, /new outcome work-items with new W### identities/);
+  assert.match(newScope, /Never reopen, renumber, rewrite or append tasks to completed work-items/);
 
   for (const instructions of [planning, build, invariants]) {
     assert.doesNotMatch(instructions, /`traceability:/);
