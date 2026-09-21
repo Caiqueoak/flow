@@ -232,7 +232,7 @@ test('migration preserves legacy work-items and creates valid outlined shells', 
     false
   );
   const migratedConfig = parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8'));
-  assert.equal(migratedConfig.engineering.existing_code_policy, 'incremental');
+  assert.equal(migratedConfig.engineering.existing_code_policy, 'undecided');
   const diagnosis = JSON.parse(run(root, ['doctor', '--quick', '--json']).stdout);
   assert.equal(diagnosis.checks.find((check: { id: string }) => check.id === 'migration-state').status, 'pass');
   assert.equal(run(root, ['validate', '--json']).status, 0);
