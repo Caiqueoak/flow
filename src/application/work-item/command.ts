@@ -43,6 +43,7 @@ export const command: CommandDefinition = {
   flags: [
     projectPathOption,
     { name: '--title', value: '<text>' },
+    { name: '--outcome', value: '<text>' },
     { name: '--kind', value: '<kind>', values: ['feature', 'technical', 'maintenance'] },
     { name: '--priority', value: '<integer>' },
     { name: '--depends-on', value: '<W###,...>' },
