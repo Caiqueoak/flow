@@ -82,6 +82,8 @@ export function parseWorkItemSpec(
     !['outlined', 'ready'].includes(m.maturity)
   )
     throw new ArtifactValidationError('spec.md has invalid canonical metadata.');
+  if (m.outcome !== undefined && (typeof m.outcome !== 'string' || !m.outcome.trim()))
+    throw new ArtifactValidationError('spec.md outcome must be a non-empty string when present.');
   for (const key of ['depends_on', 'blockers'])
     if (!Array.isArray(m[key])) throw new ArtifactValidationError(`spec.md ${key} must be a list.`);
   return {
@@ -89,6 +91,7 @@ export function parseWorkItemSpec(
       schema_version: 1,
       work_item: m.work_item as WorkItemId,
       title: m.title,
+      ...(typeof m.outcome === 'string' && m.outcome.trim() ? { outcome: m.outcome.trim() } : {}),
       kind: m.kind as WorkItemKind,
       priority: m.priority as number,
       depends_on: m.depends_on as WorkItemId[],
