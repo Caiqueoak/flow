@@ -17,12 +17,12 @@ Better decomposition:
   - UI
   - validation/tests
 
-Before persisting the MVP graph, check:
-- every work-item is an independently meaningful outcome;
-- the graph covers the known MVP without inventing future scope;
-- small phase-like items are merged into tasks;
-- oversized items with independent outcomes are split;
-- every dependency is necessary and has a clear reason;
-- every work-item has an implementation objective, not only analysis or ceremony.
+Create the complete set of known MVP work-item shells so the graph is useful, but deeply specify only the next eligible item. Give every outlined shell a concise `## Outcome` statement describing what will observably exist when it is done.
 
-Create the complete set of known MVP work-item shells so the graph is useful, but deeply specify only the next eligible item.
+Before persisting a work-item, ask:
+- Is this an observable implementation outcome?
+- Could it be a task of another outcome?
+- Is it only planning, validation, readiness or evidence?
+- Can completion be objectively verified?
+
+Then verify the overall graph covers the known MVP without inventing future scope, splits genuinely independent outcomes, and includes only necessary dependencies.
