@@ -4,10 +4,12 @@ import { editSpecMetadata } from '../work-item-context.js';
 
 export function updateWorkItemIdentity(item: LoadedWorkItem, args: readonly string[]): void {
   const title = optionValue(args, '--title');
+  const outcome = optionValue(args, '--outcome');
   const kind = optionValue(args, '--kind') as WorkItemKind | undefined;
 
   editSpecMetadata(item, (metadata) => {
     if (title) metadata.title = title;
+    if (outcome) metadata.outcome = outcome;
     if (kind) metadata.kind = kind;
   });
 }
