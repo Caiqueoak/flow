@@ -7,8 +7,6 @@ export const GENERATED_DIRECTORY = 'generated';
 
 export const SPEC_FILE = 'spec.md';
 export const TASKS_FILE = 'tasks.yaml';
-export const IMPLEMENTATION_PLAN_FILE = 'implementation-plan.md';
 export const REVIEW_FILE = 'review.yaml';
 
-export const IMPLEMENTATION_PLAN_TITLE = '# Implementation Plan';
 export const WORK_ITEM_SPEC_TITLE = '# Work Item Specification';
