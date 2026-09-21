@@ -403,7 +403,6 @@ function upgradeCanonicalStaged(root: string, targetVersion: string): void {
     }
   const config = readConfig(root) ?? defaultConfig(targetVersion);
   config.flow_version = targetVersion;
-  if (config.engineering.existing_code_policy === 'improve') config.engineering.existing_code_policy = 'incremental';
   writeConfig(root, config);
   const gatesFile = path.join(flow, 'gates.yaml');
   if (!migrationPathExists(gatesFile))
