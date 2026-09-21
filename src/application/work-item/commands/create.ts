@@ -70,7 +70,7 @@ function writeWorkItemShells(directory: string, input: CreateWorkItemInput): voi
 
   writeText(
     path.join(directory, SPEC_FILE),
-    `---\n${stringify(metadata).trimEnd()}\n---\n\n${WORK_ITEM_SPEC_TITLE}\n\n## Outcome\n\n${input.title}\n`
+    `---\n${stringify(metadata).trimEnd()}\n---\n\n${WORK_ITEM_SPEC_TITLE}\n\n## Outcome\n\n${input.outcome}\n`
   );
   writeYaml(path.join(directory, TASKS_FILE), {
     schema_version: 3,
