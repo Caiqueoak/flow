@@ -50,6 +50,7 @@ export const JSON_SCHEMAS = Object.freeze({
             folder: { type: 'string', pattern: '^W\\d{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$' },
             kind: { enum: WORK_ITEM_KINDS },
             title: { type: 'string', minLength: 1 },
+            outcome: { type: 'string', minLength: 1 },
             state: { enum: DERIVED_WORK_ITEM_STATES },
             priority: { type: 'integer', minimum: 1 },
             spec_maturity: { enum: SPEC_MATURITIES },
