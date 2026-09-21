@@ -9,11 +9,6 @@ export interface EngineeringProfile {
   [key: string]: unknown;
 }
 
-export interface BrownfieldPolicy {
-  label: string;
-  description: string;
-}
-
 function readProfile(file: string): EngineeringProfile {
   return parseProfileFrontmatter(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
 }
@@ -52,19 +47,3 @@ export const ENGINEERING_PROFILES: Record<string, EngineeringProfile | undefined
 };
 
 export { ENGINEERING_PROFILE_IDS };
-
-export const BROWNFIELD_POLICIES: Record<string, BrownfieldPolicy | undefined> = {
-  preserve: {
-    label: 'Preserve existing structure',
-    description: 'Adopt Flow without restructuring coherent existing architecture or conventions.'
-  },
-  incremental: {
-    label: 'Incremental alignment — Recommended',
-    description: 'Preserve unrelated code while new or touched areas move toward the approved engineering direction.'
-  },
-  refactor: {
-    label: 'Refactor first',
-    description:
-      'Align existing architecture/topology before feature delivery. This expands scope and requires explicit user choice.'
-  }
-};
