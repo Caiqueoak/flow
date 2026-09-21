@@ -46,7 +46,7 @@ flow gates list|run [--id ID|--task W015-T003|--work-item W015|--stage task|work
 Structured writes:
 
 ```bash
-flow work-item create --title "Customer search" --priority 2
+flow work-item create --title "Customer search" --outcome "User can find customers matching a query." --priority 2
 flow work-item dependencies W015 --depends-on W003,W009
 flow work-item blocker-add W015 --id vendor-approval --type external_action --description "Vendor approval"
 flow work-item blocker-resolve W015 --id vendor-approval
@@ -60,7 +60,7 @@ flow approval record _flow/work-items/W015-customer-search/spec.md
 
 ### Brownfield adoption
 
-For an existing repository without Flow, inspect the codebase before choosing an engineering direction. Flow supports `--existing-code preserve|incremental|refactor`: preserve coherent existing structure, incrementally align only new/touched areas, or explicitly refactor first. The engineering profile supplies recommendations and never implicitly authorizes refactoring.
+For an existing repository without Flow, `flow init` detects brownfield code but does not force an architectural choice. Unless `--existing-code preserve|incremental|refactor` is explicitly supplied, config records the strategy as undecided and `/flow` inspects the repository before presenting those three options with a project-specific recommendation. The approved engineering contract records the final choice. The engineering profile supplies recommendations and never implicitly authorizes refactoring.
 
 Implementation plans are not canonical artifacts. The durable chain is SPEC (intended outcome) → tasks (decomposition) → Git commits (what actually changed).
 
