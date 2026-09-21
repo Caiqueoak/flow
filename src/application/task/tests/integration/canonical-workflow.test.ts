@@ -88,6 +88,7 @@ test('quick doctor validates canonical work-items', () => {
   const diagnosis = JSON.parse(broken.stdout);
   assert.equal(diagnosis.checks.find((check: { id: string }) => check.id === 'work-items').status, 'fail');
 });
+
 test('task and review use canonical subjects and release dependent work', () => {
   const root = project();
   ready(root, 'W101');
@@ -204,7 +205,10 @@ test('migration preserves legacy work-items and creates valid outlined shells', 
     fs.readFileSync(path.join(root, '_flow', 'work-items', 'W001-reference-item', 'tasks.yaml'), 'utf8')
   );
   assert.deepEqual(tasks.tasks, []);
-  assert.equal(fs.existsSync(path.join(root, '_flow', 'work-items', 'W001-reference-item', 'implementation-plan.md')), false);
+  assert.equal(
+    fs.existsSync(path.join(root, '_flow', 'work-items', 'W001-reference-item', 'implementation-plan.md')),
+    false
+  );
   const migratedConfig = parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8'));
   assert.equal(migratedConfig.engineering.existing_code_policy, 'incremental');
   const diagnosis = JSON.parse(run(root, ['doctor', '--quick', '--json']).stdout);
