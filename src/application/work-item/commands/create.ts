@@ -24,6 +24,7 @@ import { loadProjectWorkItems } from '../work-item-context.js';
 interface CreateWorkItemInput {
   id: WorkItemId;
   title: string;
+  outcome: string;
   kind: WorkItemKind;
   priority: number;
   dependsOn: WorkItemId[];
@@ -32,6 +33,7 @@ interface CreateWorkItemInput {
 export function createWorkItem(root: string, requestedId: string | undefined, args: readonly string[]): void {
   const items = loadProjectWorkItems(root);
   const title = requiredOption(args, '--title');
+  const outcome = requiredOption(args, '--outcome');
   const id = (requestedId as WorkItemId | undefined) ?? nextWorkItemId(items.map((item) => item.id));
 
   if (items.some((item) => item.id === id)) {
@@ -44,6 +46,7 @@ export function createWorkItem(root: string, requestedId: string | undefined, ar
   writeWorkItemShells(directory, {
     id,
     title,
+    outcome,
     kind: (optionValue(args, '--kind') ?? DEFAULT_WORK_ITEM_KIND) as WorkItemKind,
     priority: Number(optionValue(args, '--priority') ?? DEFAULT_WORK_ITEM_PRIORITY),
     dependsOn: commaSeparatedValues(optionValue(args, '--depends-on')) as WorkItemId[]
@@ -57,6 +60,7 @@ function writeWorkItemShells(directory: string, input: CreateWorkItemInput): voi
     schema_version: 1,
     work_item: input.id,
     title: input.title,
+    outcome: input.outcome,
     kind: input.kind,
     priority: input.priority,
     depends_on: input.dependsOn,
