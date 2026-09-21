@@ -4,9 +4,10 @@ import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mj
 import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 import { parseState } from '../../../domain/workflow/execution-state.mjs';
 import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
+import { validateEngineeringDocument } from '../../../domain/project/engineering-document.mjs';
+import { validatePrdDocument } from '../../../domain/project/product-requirements-document.mjs';
 import { isWorkItemSpecApproved } from '../../../domain/work-item/specification.mjs';
-import { validateImplementationPlan } from '../../../domain/project/implementation-plan-validation.mjs';
-import { IMPLEMENTATION_PLAN_FILE, SPEC_FILE, TASKS_FILE } from '../../../domain/project/project.js';
+import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 
 interface RouteResult {
@@ -34,27 +35,72 @@ function migrationRoute(root: string): RouteResult | null {
     : null;
 }
 
-function hasCurrentImplementationBrief(root: string, item: LoadedWorkItem): boolean {
-  const planFile = path.join(item.base, IMPLEMENTATION_PLAN_FILE);
-  const engineeringFile = path.join(root, '_flow', 'docs', 'engineering.md');
-  if (!fileExists(planFile) || !fileExists(engineeringFile)) return false;
+function projectDocumentRoute(
+  root: string,
+  {
+    fileName,
+    phase,
+    draftInstruction,
+    approvalInstruction,
+    validate
+  }: {
+    fileName: string;
+    phase: 'discovery' | 'engineering';
+    draftInstruction: string;
+    approvalInstruction: string;
+    validate: (text: string) => { errors: string[]; status?: string };
+  }
+): RouteResult | null {
+  const file = path.join(root, '_flow', 'docs', fileName);
+  if (!fileExists(file)) return step(phase, draftInstruction);
 
-  const result = validateImplementationPlan(readText(planFile), {
-    workItem: item.id,
-    engineeringText: readText(engineeringFile),
-    specText: readText(path.join(item.base, SPEC_FILE)),
-    tasksText: readText(path.join(item.base, TASKS_FILE))
+  const document = validate(readText(file));
+  if (document.errors.length) return step(phase, draftInstruction);
+  if (document.status !== 'approved')
+    return {
+      action: 'stop',
+      reason: 'consequential_decision',
+      phase,
+      instruction: approvalInstruction
+    };
+
+  return null;
+}
+
+function productBootstrapRoute(root: string): RouteResult | null {
+  return projectDocumentRoute(root, {
+    fileName: 'prd.md',
+    phase: 'discovery',
+    draftInstruction: 'discovery/step-01-project.md',
+    approvalInstruction: 'discovery/step-02-await-approval.md',
+    validate: validatePrdDocument
   });
+}
 
-  return result.errors.length === 0;
+function engineeringBootstrapRoute(root: string): RouteResult | null {
+  return projectDocumentRoute(root, {
+    fileName: 'engineering.md',
+    phase: 'engineering',
+    draftInstruction: 'engineering/step-02-synthesize.md',
+    approvalInstruction: 'engineering/step-05-present.md',
+    validate: validateEngineeringDocument
+  });
 }
 
 export function routeProject(root: string): RouteResult {
   const migration = migrationRoute(root);
   if (migration) return migration;
 
-  const items = loadWorkItems(root),
-    by = new Map(items.map((i) => [i.id, i]));
+  const product = productBootstrapRoute(root);
+  if (product) return product;
+
+  const engineering = engineeringBootstrapRoute(root);
+  if (engineering) return engineering;
+
+  const items = loadWorkItems(root);
+  if (!items.length) return step('planning', 'planning/step-01-plan-work-item.md');
+
+  const by = new Map(items.map((i) => [i.id, i]));
   const active = items.find((i) => lifecycle(i, by).status === 'in_progress');
   if (active) {
     const task = active.tasks.tasks.find((t) => t.state === 'in_progress');
@@ -86,8 +132,6 @@ export function routeProject(root: string): RouteResult {
   if (state === 'review') return step('review', 'review/step-01-review-work-item.md', { work_item: candidate.id });
   if (!candidate.tasks.tasks.length)
     return step('planning', 'planning/step-01-create-tasks.md', { work_item: candidate.id });
-  if (!hasCurrentImplementationBrief(root, candidate))
-    return step('planning', 'planning/step-02-prepare-plan.md', { work_item: candidate.id });
   const task = candidate.tasks.tasks.find(
     (t) =>
       t.state === 'pending' &&

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+import fs, { readFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { parseProfileFrontmatter } from '../../engineering-profiles.js';
-import { defaultConfig } from '../../../persistence/configuration.mjs';
+import { defaultConfig, readConfig } from '../../../persistence/configuration.mjs';
 
 const v1Profile = readFileSync('skills/flow/engineering/profiles/readability-first.md', 'utf8');
 const v2Profile = readFileSync('skills/flow/engineering/profiles/readability-first-v2.md', 'utf8');
@@ -23,4 +25,16 @@ test('readability-first v2 keeps the agent-facing architecture rules explicit', 
   assert.match(v2Profile, /magic numbers/);
   assert.match(v2Profile, /system boundaries/);
   assert.match(v2Profile, /behavior-preserving structural refactors/);
+});
+
+test('legacy improve policy normalizes to incremental when config is read', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-legacy-policy-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, '_flow'));
+  fs.writeFileSync(
+    path.join(root, '_flow', 'config.yaml'),
+    'schema_version: 4\nflow_version: 0.8.0\nruntimes: []\nengineering:\n  profile: flow/readability-first@2\n  existing_code_policy: improve\n'
+  );
+
+  assert.equal(readConfig(root)?.engineering.existing_code_policy, 'incremental');
 });

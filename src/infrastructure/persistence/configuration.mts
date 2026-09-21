@@ -38,6 +38,7 @@ export function readConfig(root: string): FlowConfiguration | null {
   config.flow_version = typeof raw.flow_version === 'string' ? raw.flow_version : null;
   config.runtimes = Array.isArray(raw.runtimes) ? (raw.runtimes as RuntimeConfiguration[]) : [];
   config.engineering = { ...config.engineering, ...asRecord(raw.engineering) } as FlowConfiguration['engineering'];
+  config.engineering.existing_code_policy = normalizeExistingCodePolicy(config.engineering.existing_code_policy);
   return config;
 }
 
@@ -48,11 +49,15 @@ export function writeConfig(root: string, config: FlowConfiguration): void {
     runtimes: config.runtimes ?? [],
     engineering: {
       profile: config.engineering?.profile ?? defaultConfig().engineering.profile,
-      existing_code_policy: config.engineering?.existing_code_policy ?? 'not_applicable'
+      existing_code_policy: normalizeExistingCodePolicy(config.engineering?.existing_code_policy)
     }
   };
   fs.mkdirSync(path.join(root, '_flow'), { recursive: true });
   fs.writeFileSync(configPath(root), stringify(normalized, { lineWidth: 0 }), 'utf8');
+}
+
+function normalizeExistingCodePolicy(value: string | undefined): string {
+  return value === 'improve' ? 'incremental' : (value ?? 'not_applicable');
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

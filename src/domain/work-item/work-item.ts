@@ -38,6 +38,7 @@ export interface WorkItemSpecMetadata {
   schema_version: number;
   work_item: WorkItemId;
   title: string;
+  outcome?: string;
   kind: WorkItemKind;
   priority: number;
   depends_on: WorkItemId[];

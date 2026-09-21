@@ -3,7 +3,6 @@ import {
   fail,
   optionValue as valueAfter,
   promptMultiSelect,
-  promptSelect,
   promptText,
   recordOutput as info,
   type PromptOption
@@ -17,7 +16,7 @@ import {
 } from '../../../infrastructure/persistence/configuration.mjs';
 import { projectRoot } from '../../command-runtime.js';
 import { installRuntimeSkill } from '../../../infrastructure/runtime/runtime-skills.js';
-import { BROWNFIELD_POLICIES, ENGINEERING_PROFILES } from '../../../infrastructure/runtime/engineering-profiles.js';
+import { ENGINEERING_PROFILES } from '../../../infrastructure/runtime/engineering-profiles.js';
 import { FLOW_SCHEMA_VERSION } from '../../../domain/project/project.js';
 import { GATES_SCHEMA_VERSION } from '../../../domain/gate/gate.js';
 import {
@@ -79,33 +78,18 @@ async function selectEngineering(
   const profileFlag = valueAfter(args, '--profile');
   const brownfieldFlag = valueAfter(args, '--existing-code');
   if (args.includes('--brownfield'))
-    fail(
-      'Use --existing-code improve|preserve: improve recommends clearer structure; preserve keeps consistent conventions.'
-    );
+    fail('Use --existing-code preserve|incremental|refactor to choose the brownfield adoption strategy.');
   if (existed && (profileFlag || brownfieldFlag))
     fail('Change engineering through /flow and human approval, not init.');
   if (profileFlag && !ENGINEERING_PROFILES[profileFlag]) fail(`unknown engineering profile '${profileFlag}'.`);
-  if (brownfieldFlag && !BROWNFIELD_POLICIES[brownfieldFlag]) fail(`unknown brownfield policy '${brownfieldFlag}'.`);
+  if (brownfieldFlag && !['preserve', 'incremental', 'refactor'].includes(brownfieldFlag))
+    fail(`unknown brownfield policy '${brownfieldFlag}'.`);
   if (profileFlag) config.engineering.profile = ENGINEERING_PROFILES[profileFlag]!.id;
   const hasProjectFiles = directoryEntryNames(root).some(
     (name) => ['src', 'app', 'lib', 'packages'].includes(name) || /\.(m?[jt]sx?|py|java|go|rs|cs)$/.test(name)
   );
   if (brownfieldFlag) config.engineering.existing_code_policy = brownfieldFlag;
-  else if (!existed && hasProjectFiles)
-    config.engineering.existing_code_policy = await promptSelect({
-      title: 'How should Flow treat existing code conventions?',
-      options: Object.entries(BROWNFIELD_POLICIES).flatMap(([value, policy]) =>
-        policy
-          ? [
-              {
-                value,
-                label: policy.label,
-                description: policy.description
-              }
-            ]
-          : []
-      )
-    });
+  else if (!existed && hasProjectFiles) config.engineering.existing_code_policy = 'undecided';
 }
 
 export async function runInit({

@@ -3,8 +3,6 @@ import { stringify } from 'yaml';
 import {
   FLOW_DIRECTORY,
   ID_PADDING,
-  IMPLEMENTATION_PLAN_FILE,
-  IMPLEMENTATION_PLAN_TITLE,
   REVIEW_FILE,
   SPEC_FILE,
   TASKS_FILE,
@@ -26,6 +24,7 @@ import { loadProjectWorkItems } from '../work-item-context.js';
 interface CreateWorkItemInput {
   id: WorkItemId;
   title: string;
+  outcome: string;
   kind: WorkItemKind;
   priority: number;
   dependsOn: WorkItemId[];
@@ -34,6 +33,7 @@ interface CreateWorkItemInput {
 export function createWorkItem(root: string, requestedId: string | undefined, args: readonly string[]): void {
   const items = loadProjectWorkItems(root);
   const title = requiredOption(args, '--title');
+  const outcome = requiredOption(args, '--outcome');
   const id = (requestedId as WorkItemId | undefined) ?? nextWorkItemId(items.map((item) => item.id));
 
   if (items.some((item) => item.id === id)) {
@@ -46,6 +46,7 @@ export function createWorkItem(root: string, requestedId: string | undefined, ar
   writeWorkItemShells(directory, {
     id,
     title,
+    outcome,
     kind: (optionValue(args, '--kind') ?? DEFAULT_WORK_ITEM_KIND) as WorkItemKind,
     priority: Number(optionValue(args, '--priority') ?? DEFAULT_WORK_ITEM_PRIORITY),
     dependsOn: commaSeparatedValues(optionValue(args, '--depends-on')) as WorkItemId[]
@@ -59,6 +60,7 @@ function writeWorkItemShells(directory: string, input: CreateWorkItemInput): voi
     schema_version: 1,
     work_item: input.id,
     title: input.title,
+    outcome: input.outcome,
     kind: input.kind,
     priority: input.priority,
     depends_on: input.dependsOn,
@@ -66,16 +68,15 @@ function writeWorkItemShells(directory: string, input: CreateWorkItemInput): voi
     maturity: 'outlined'
   };
 
-  writeText(path.join(directory, SPEC_FILE), `---\n${stringify(metadata).trimEnd()}\n---\n\n${WORK_ITEM_SPEC_TITLE}\n`);
+  writeText(
+    path.join(directory, SPEC_FILE),
+    `---\n${stringify(metadata).trimEnd()}\n---\n\n${WORK_ITEM_SPEC_TITLE}\n\n## Outcome\n\n${input.outcome}\n`
+  );
   writeYaml(path.join(directory, TASKS_FILE), {
     schema_version: 3,
     work_item: input.id,
     tasks: []
   });
-  writeText(
-    path.join(directory, IMPLEMENTATION_PLAN_FILE),
-    `---\nschema_version: 2\nwork_item: ${input.id}\nengineering_revision: \nspec_revision: \ntasks_revision: \n---\n\n${IMPLEMENTATION_PLAN_TITLE}\n\n## Preflight\n\n## Strategy\n\n## Execution\n\n## Validation\n`
-  );
   writeYaml(path.join(directory, REVIEW_FILE), {
     schema_version: 1,
     work_item: input.id,

@@ -237,7 +237,7 @@ test('preserves safe runtime registrations when canonical artifacts require resc
   assert.equal(result.rescued, true);
   assert.deepEqual(config.runtimes, [{ type: 'codex', skills_path: '.codex/skills' }]);
   assert.equal(config.engineering.profile, 'flow/readability-first@2');
-  assert.equal(config.engineering.existing_code_policy, 'improve');
+  assert.equal(config.engineering.existing_code_policy, 'incremental');
 });
 
 test('does not turn operational write failures into format rescue', (t) => {

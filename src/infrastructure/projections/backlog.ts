@@ -8,6 +8,7 @@ export interface DerivedBacklog {
     id: WorkItemId;
     folder: string;
     title: string;
+    outcome?: string;
     kind: LoadedWorkItem['kind'];
     priority: number;
     spec_maturity: LoadedWorkItem['maturity'];
@@ -25,6 +26,7 @@ export function derivedBacklog(items: readonly LoadedWorkItem[]): DerivedBacklog
       id: item.id,
       folder: item.folder,
       title: item.title,
+      ...(item.outcome ? { outcome: item.outcome } : {}),
       kind: item.kind,
       priority: item.priority,
       spec_maturity: item.maturity,

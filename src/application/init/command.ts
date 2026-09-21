@@ -9,7 +9,7 @@ export const command: CommandDefinition = {
     projectPathOption,
     { name: '--runtime', value: '<list>' },
     { name: '--profile', value: '<id>', default: 'readability-first' },
-    { name: '--existing-code', value: '<policy>', values: ['improve', 'preserve'] }
+    { name: '--existing-code', value: '<policy>', values: ['preserve', 'incremental', 'refactor'] }
   ],
   effects: 'Writes config and runtime skills.',
   when: 'Once per project and after an explicit package update.',

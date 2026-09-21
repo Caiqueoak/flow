@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { createHash } from 'node:crypto';
 import { parse } from 'yaml';
 
 const cli = path.resolve('dist/entry.js');
@@ -28,39 +27,103 @@ const headings = [
   '## Decisions',
   '## Gates'
 ];
+const prdHeadings = [
+  '# Product Requirements',
+  '## Purpose',
+  '## Users',
+  '## Scope',
+  '## Requirements',
+  '## Constraints',
+  '## Non-goals'
+];
+
+const engineeringHeadings = [
+  '# Engineering',
+  '## Observed system',
+  '## Adoption strategy',
+  '## System shape',
+  '## Modules and ownership',
+  '## Dependency direction and boundaries',
+  '## Vertical slices and code organization',
+  '## Naming and readability conventions',
+  '## Data ownership and persistence',
+  '## Error handling',
+  '## Testing and verification',
+  '## Dependencies and external services',
+  '## Security and operations',
+  '## Deterministic gates',
+  '## Deferred complexity',
+  '## Exceptions'
+];
+
+function approvedDocument(headings: readonly string[], baseline = '') {
+  const body = headings.map((heading) => `${heading}\nText.`).join('\n\n');
+  return `---\nschema_version: 1\nstatus: approved\napproved_at: 2026-01-01T00:00:00.000Z\n${baseline}---\n\n${body}\n`;
+}
+
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-canonical-'));
   temporaryRoots.add(root);
   execFileSync('git', ['init', '-q'], { cwd: root });
   execFileSync('git', ['config', 'user.email', 'flow@test.local'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Flow Test'], { cwd: root });
-  assert.equal(run(root, ['init', '--runtime', 'codex', '--existing-code', 'improve']).status, 0);
-  fs.mkdirSync(path.join(root, '_flow', 'docs'), { recursive: true });
-  fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), 'engineering\n');
+  assert.equal(run(root, ['init', '--runtime', 'codex', '--existing-code', 'incremental']).status, 0);
+  const docs = path.join(root, '_flow', 'docs');
+  fs.mkdirSync(docs, { recursive: true });
+  fs.writeFileSync(path.join(docs, 'prd.md'), approvedDocument(prdHeadings));
+  fs.writeFileSync(
+    path.join(docs, 'engineering.md'),
+    approvedDocument(
+      engineeringHeadings,
+      'baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: incremental\n'
+    )
+  );
   return root;
 }
 function ready(root: string, id = 'W101') {
-  assert.equal(run(root, ['work-item', 'create', id, '--title', 'Canonical item']).status, 0);
+  assert.equal(
+    run(root, [
+      'work-item',
+      'create',
+      id,
+      '--title',
+      'Canonical item',
+      '--outcome',
+      'User can complete the canonical item.'
+    ]).status,
+    0
+  );
   const base = path.join(root, '_flow', 'work-items', `${id}-canonical-item`);
   const spec = path.join(base, 'spec.md');
   const original = fs.readFileSync(spec, 'utf8');
   fs.writeFileSync(spec, `${original}\n${headings.map((heading) => `${heading}\nText.`).join('\n\n')}\n`);
   assert.equal(run(root, ['work-item', 'promote', id]).status, 0);
   assert.equal(run(root, ['approval', 'record', path.relative(root, spec)]).status, 0);
-  const hash = (text: string) => createHash('sha256').update(text).digest('hex');
-  fs.writeFileSync(
-    path.join(base, 'implementation-plan.md'),
-    `---\nschema_version: 2\nwork_item: ${id}\nengineering_revision: ${hash('engineering\n')}\nspec_revision: ${hash(fs.readFileSync(spec, 'utf8'))}\ntasks_revision: ${hash(fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8'))}\n---\n\n# Implementation Plan\n\n## Preflight\n\n## Strategy\n\n## Execution\n\n## Validation\n`
-  );
   return base;
 }
 
 test('compiled CLI creates canonical shells and sync never mutates them', () => {
   const root = project();
-  assert.equal(run(root, ['work-item', 'create', 'W101', '--title', 'Canonical item']).status, 0);
+  assert.equal(
+    run(root, [
+      'work-item',
+      'create',
+      'W101',
+      '--title',
+      'Canonical item',
+      '--outcome',
+      'User can complete the canonical item.'
+    ]).status,
+    0
+  );
   const base = path.join(root, '_flow', 'work-items', 'W101-canonical-item');
-  for (const file of ['spec.md', 'tasks.yaml', 'implementation-plan.md', 'review.yaml'])
-    assert.ok(fs.existsSync(path.join(base, file)));
+  for (const file of ['spec.md', 'tasks.yaml', 'review.yaml']) assert.ok(fs.existsSync(path.join(base, file)));
+  assert.equal(fs.existsSync(path.join(base, 'implementation-plan.md')), false);
+  assert.match(fs.readFileSync(path.join(base, 'spec.md'), 'utf8'), /outcome: User can complete the canonical item\./);
+  assert.match(
+    fs.readFileSync(path.join(base, 'spec.md'), 'utf8'),
+    /## Outcome\n\nUser can complete the canonical item\./
+  );
   assert.deepEqual(parse(fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8')).tasks, []);
   const before = fs.readFileSync(path.join(base, 'spec.md'), 'utf8');
   assert.equal(run(root, ['sync']).status, 0);
@@ -68,19 +131,35 @@ test('compiled CLI creates canonical shells and sync never mutates them', () => 
   const generated = parse(fs.readFileSync(path.join(root, '_flow', 'generated', 'backlog.yaml'), 'utf8'));
   const schema = JSON.parse(fs.readFileSync('schemas/backlog.schema.json', 'utf8'));
   assert.equal(generated.work_items[0].spec_maturity, 'outlined');
+  assert.equal(generated.work_items[0].outcome, 'User can complete the canonical item.');
+  assert.match(
+    fs.readFileSync(path.join(root, '_flow', 'generated', 'graph.md'), 'utf8'),
+    /W101 Canonical item.*User can complete the canonical item\./
+  );
   assert.ok(schema.properties.work_items.items.required.includes('spec_maturity'));
   assert.ok(schema.properties.work_items.items.properties.state.enum.includes(generated.work_items[0].state));
   assert.equal(run(root, ['validate', '--json']).status, 0);
 });
 
-test('changing a brief requires regeneration', () => {
+test('approved spec routes directly through task creation and start without a plan artifact', () => {
   const root = project();
   const base = ready(root);
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
+  assert.equal(fs.existsSync(path.join(base, 'implementation-plan.md')), false);
   fs.appendFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), 'changed\n');
-  const start = run(root, ['task', 'start', 'W101-T001']);
-  assert.notEqual(start.status, 0);
-  assert.match(start.stderr, /requires a current implementation plan/);
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+});
+
+test('quick doctor validates canonical work-items', () => {
+  const root = project();
+  const base = ready(root);
+  assert.equal(run(root, ['doctor', '--quick', '--json']).status, 0);
+
+  fs.rmSync(path.join(base, 'review.yaml'));
+  const broken = run(root, ['doctor', '--quick', '--json']);
+  assert.notEqual(broken.status, 0);
+  const diagnosis = JSON.parse(broken.stdout);
+  assert.equal(diagnosis.checks.find((check: { id: string }) => check.id === 'work-items').status, 'fail');
 });
 
 test('task and review use canonical subjects and release dependent work', () => {
@@ -131,6 +210,65 @@ test('task and review use canonical subjects and release dependent work', () => 
     /notes\.md/
   );
   assert.equal(JSON.parse(run(root, ['route', '--json']).stdout).work_item, 'W102');
+});
+
+test('finished projects stay finished until new scope creates new immutable work', () => {
+  const root = project();
+  const completedBase = ready(root, 'W101');
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement completed outcome']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  fs.writeFileSync(path.join(root, 'completed.txt'), 'done\n');
+  execFileSync('git', ['add', 'completed.txt'], { cwd: root });
+  assert.equal(run(root, ['sync']).status, 0);
+  assert.equal(
+    run(root, [
+      'task',
+      'commit',
+      'W101-T001',
+      '--message',
+      'feat(flow): complete original outcome [W101-T001]',
+      '--files',
+      'completed.txt'
+    ]).status,
+    0
+  );
+  assert.equal(run(root, ['sync']).status, 0);
+  assert.equal(run(root, ['work-item', 'review-complete', 'W101', '--domain', 'flow']).status, 0);
+
+  assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), { action: 'stop', reason: 'finished' });
+
+  const completedHistory = Object.fromEntries(
+    ['spec.md', 'tasks.yaml', 'review.yaml'].map((file) => [
+      file,
+      fs.readFileSync(path.join(completedBase, file), 'utf8')
+    ])
+  );
+
+  assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), { action: 'stop', reason: 'finished' });
+
+  assert.equal(
+    run(root, [
+      'work-item',
+      'create',
+      'W102',
+      '--title',
+      'Deliver new feature',
+      '--outcome',
+      'User can use the newly requested feature.'
+    ]).status,
+    0
+  );
+
+  assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), {
+    action: 'continue',
+    phase: 'specification',
+    instruction: 'specification/step-01-deepen-spec.md',
+    work_item: 'W102'
+  });
+
+  for (const [file, before] of Object.entries(completedHistory)) {
+    assert.equal(fs.readFileSync(path.join(completedBase, file), 'utf8'), before);
+  }
 });
 
 test('validate identifies missing, stale and malformed projections', () => {
@@ -199,6 +337,14 @@ test('migration preserves legacy work-items and creates valid outlined shells', 
     fs.readFileSync(path.join(root, '_flow', 'work-items', 'W001-reference-item', 'tasks.yaml'), 'utf8')
   );
   assert.deepEqual(tasks.tasks, []);
+  assert.equal(
+    fs.existsSync(path.join(root, '_flow', 'work-items', 'W001-reference-item', 'implementation-plan.md')),
+    false
+  );
+  const migratedConfig = parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8'));
+  assert.equal(migratedConfig.engineering.existing_code_policy, 'undecided');
+  const diagnosis = JSON.parse(run(root, ['doctor', '--quick', '--json']).stdout);
+  assert.equal(diagnosis.checks.find((check: { id: string }) => check.id === 'migration-state').status, 'pass');
   assert.equal(run(root, ['validate', '--json']).status, 0);
 });
 
@@ -280,6 +426,14 @@ test('packaged workflow instructions use the canonical task and review commands'
   const review = fs.readFileSync('skills/flow/review/step-01-review-work-item.md', 'utf8');
   const invariants = fs.readFileSync('skills/flow/invariants.md', 'utf8');
   const readme = fs.readFileSync('README.md', 'utf8');
+  const flowSkill = fs.readFileSync('skills/flow/SKILL.md', 'utf8');
+  const newScope = fs.readFileSync('skills/flow/discovery/new-scope.md', 'utf8');
+
+  assert.match(flowSkill, /route returns \`finished\`[\s\S]*substantive new feature\/change request/);
+  assert.match(newScope, /Do not rediscover unrelated parts of the project/);
+  assert.match(newScope, /reuse it unchanged/);
+  assert.match(newScope, /new outcome work-items with new W### identities/);
+  assert.match(newScope, /Never reopen, renumber, rewrite or append tasks to completed work-items/);
 
   for (const instructions of [planning, build, invariants]) {
     assert.doesNotMatch(instructions, /`traceability:/);

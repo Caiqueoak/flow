@@ -22,7 +22,7 @@ export function loadWorkItems(root: string): LoadedWorkItem[] {
       if (!match) throw new ArtifactValidationError(`Invalid work-item folder '${entry.name}'.`);
       const base = path.join(dir, entry.name);
       const id = match[1] as WorkItemId;
-      for (const name of ['spec.md', 'tasks.yaml', 'implementation-plan.md', 'review.yaml'])
+      for (const name of ['spec.md', 'tasks.yaml', 'review.yaml'])
         if (!fs.existsSync(path.join(base, name))) throw new ArtifactValidationError(`${id} is missing ${name}.`);
       const spec = parseWorkItemSpec(read(path.join(base, 'spec.md')), { expectedWorkItem: id });
       const tasks = parseTasks(read(path.join(base, 'tasks.yaml')), { expectedWorkItem: id });

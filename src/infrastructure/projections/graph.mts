@@ -11,6 +11,7 @@ export { ArtifactValidationError as GraphValidationError };
 interface GraphItem {
   id: string;
   title: string;
+  outcome?: string;
   state: string;
   depends_on: string[];
 }
@@ -54,6 +55,10 @@ export function generateGraphMarkdown(backlogText: string | Backlog | DerivedBac
     '- Ã°Å¸Å¸Â¦ **In Progress** Ã¢â‚¬â€ currently executing.',
     '- Ã°Å¸Å¸Â¨ **Eligible** Ã¢â‚¬â€ pending work with dependencies and blockers satisfied.',
     '- Ã°Å¸Å¸Â¥ **Blocked** Ã¢â‚¬â€ pending work with an incomplete dependency or unresolved blocker.',
+    '',
+    '## Outcomes',
+    '',
+    ...ordered.map((item) => `- **${item.id} ${item.title}** — ${item.outcome ?? 'Outcome not recorded.'}`),
     '',
     '```mermaid',
     "%%{init: {'flowchart': {'curve': 'linear', 'nodeSpacing': 32, 'rankSpacing': 54}} }%%",

@@ -20,6 +20,7 @@ export interface BacklogItem {
   spec_maturity: SpecMaturity;
   depends_on: WorkItemId[];
   blockers: Blocker[];
+  outcome?: string;
   objective?: string;
   boundaries: unknown[];
   requirements: unknown[];
@@ -126,6 +127,7 @@ export function parseBacklog(text: string, { source = 'backlog.yaml' }: { source
       priority: item.priority as number,
       spec_maturity: specMaturity as SpecMaturity,
       depends_on: dependencies,
+      ...(item.outcome ? { outcome: requireString(item.outcome, `${label}.outcome`) } : {}),
       blockers: rawBlockers.map((rawBlocker: unknown): Blocker => {
         const blocker = requireObject(rawBlocker, `${id} blocker`);
         if (typeof blocker.id !== 'string' || !/^[a-z][a-z0-9-]*$/.test(blocker.id))

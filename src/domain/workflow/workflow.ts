@@ -6,7 +6,7 @@ export const WORKFLOW = Object.freeze({
   engineering: ['draft', 'await_approval'],
   backlog: ['outline', 'route'],
   specification: ['deepen', 'validate', 'promote'],
-  planning: ['create_tasks', 'prepare_plan'],
+  planning: ['create_tasks'],
   implementation: ['start_task', 'execute_task', 'verify_task', 'persist_evidence'],
   review: ['review_work_item'],
   reconcile: ['resolve_conflicts'],

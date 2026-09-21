@@ -9,11 +9,6 @@ export interface EngineeringProfile {
   [key: string]: unknown;
 }
 
-export interface BrownfieldPolicy {
-  label: string;
-  description: string;
-}
-
 function readProfile(file: string): EngineeringProfile {
   return parseProfileFrontmatter(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
 }
@@ -52,15 +47,3 @@ export const ENGINEERING_PROFILES: Record<string, EngineeringProfile | undefined
 };
 
 export { ENGINEERING_PROFILE_IDS };
-
-export const BROWNFIELD_POLICIES: Record<string, BrownfieldPolicy | undefined> = {
-  improve: {
-    label: 'Improve existing structure — Recommended',
-    description:
-      'Preserve behavior and external contracts; recommend clearer structure where justified. Does not authorize refactoring.'
-  },
-  preserve: {
-    label: 'Keep existing structure',
-    description: 'Retain consistent conventions unless a concrete problem warrants an approved change.'
-  }
-};
