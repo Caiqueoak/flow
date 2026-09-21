@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -86,7 +85,7 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
   const base = path.join(root, '_flow', 'work-items', 'W101-source-workflow');
 
   await t.test('initializes and diagnoses the project', async () => {
-    assert.match(await flow(root, ['init', '--runtime', 'codex', '--existing-code', 'improve']), /Flow is ready/);
+    assert.match(await flow(root, ['init', '--runtime', 'codex', '--existing-code', 'incremental']), /Flow is ready/);
     const diagnosis = JSON.parse(await flow(root, ['doctor', '--quick', '--json']));
     assert.equal(diagnosis.healthy, true);
     assert.equal(diagnosis.mode, 'quick');
@@ -125,17 +124,6 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
     const engineering = 'engineering\n';
     fs.mkdirSync(path.join(root, '_flow', 'docs'), { recursive: true });
     fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), engineering);
-    assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
-      action: 'continue',
-      phase: 'planning',
-      instruction: 'planning/step-02-prepare-plan.md',
-      work_item: 'W101'
-    });
-    const hash = (text: string) => createHash('sha256').update(text).digest('hex');
-    fs.writeFileSync(
-      path.join(base, 'implementation-plan.md'),
-      `---\nschema_version: 2\nwork_item: W101\nengineering_revision: ${hash(engineering)}\nspec_revision: ${hash(fs.readFileSync(path.join(base, 'spec.md'), 'utf8'))}\ntasks_revision: ${hash(fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8'))}\n---\n\n# Implementation Plan\n\n## Preflight\n\n## Strategy\n\n## Execution\n\n## Validation\n`
-    );
     assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
       action: 'continue',
       phase: 'implementation',
