@@ -3,6 +3,8 @@ import { ENGINEERING_PROFILE_IDS } from './engineering-profile.js';
 
 export const ENGINEERING_HEADINGS = [
   '# Engineering',
+  '## Observed system',
+  '## Adoption strategy',
   '## System shape',
   '## Modules and ownership',
   '## Dependency direction and boundaries',
