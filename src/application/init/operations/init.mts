@@ -79,9 +79,7 @@ async function selectEngineering(
   const profileFlag = valueAfter(args, '--profile');
   const brownfieldFlag = valueAfter(args, '--existing-code');
   if (args.includes('--brownfield'))
-    fail(
-      'Use --existing-code preserve|incremental|refactor to choose the brownfield adoption strategy.'
-    );
+    fail('Use --existing-code preserve|incremental|refactor to choose the brownfield adoption strategy.');
   if (existed && (profileFlag || brownfieldFlag))
     fail('Change engineering through /flow and human approval, not init.');
   if (profileFlag && !ENGINEERING_PROFILES[profileFlag]) fail(`unknown engineering profile '${profileFlag}'.`);
@@ -91,8 +89,7 @@ async function selectEngineering(
     (name) => ['src', 'app', 'lib', 'packages'].includes(name) || /\.(m?[jt]sx?|py|java|go|rs|cs)$/.test(name)
   );
   if (brownfieldFlag)
-    config.engineering.existing_code_policy =
-      brownfieldFlag === 'improve' ? 'incremental' : brownfieldFlag;
+    config.engineering.existing_code_policy = brownfieldFlag === 'improve' ? 'incremental' : brownfieldFlag;
   else if (!existed && hasProjectFiles)
     config.engineering.existing_code_policy = await promptSelect({
       title: 'How should Flow adopt this existing repository?',
