@@ -5,7 +5,7 @@ Read the approved PRD, config, repository evidence, technology-defaults.md and t
 - `flow/readability-first@2` -> `profiles/readability-first-v2.md`
 - `flow/readability-first@1` -> `profiles/readability-first.md`
 
-Use the selected profile as defaults and recommendation criteria, not as text to copy mechanically. For brownfield, inspect the actual repository first and distinguish observed state from desired state. The adoption strategy is `preserve`, `incremental`, or `refactor`; none is inferred from profile mismatch and refactoring requires the user's explicit choice.
+Use the selected profile as defaults and recommendation criteria, not as text to copy mechanically. For brownfield, inspect the actual repository first and distinguish observed state from desired state. If config records `undecided`, present `preserve`, `incremental`, and `refactor`, recommend one with project-specific justification, and ask one focused consequential question. Do not finalize the engineering contract until the user chooses. None is inferred from profile mismatch and refactoring requires the user's explicit choice.
 
 Recommend a complete but proportional technical contract. Keep global product behavior in the PRD and bounded delivery behavior in work-item specs; engineering records only the technical/code/infra constraints that realize them.
 
@@ -14,7 +14,7 @@ Frontmatter:
 - `schema_version: 1`
 - `status: draft`
 - `baseline.profile`: exact versioned profile id selected in config
-- `baseline.existing_code_policy: preserve|incremental|refactor|not_applicable`
+- `baseline.existing_code_policy: preserve|incremental|refactor|not_applicable` — never persist `undecided` in the engineering contract
 
 Include exact headings:
 
