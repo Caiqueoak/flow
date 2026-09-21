@@ -2,6 +2,8 @@ import path from 'node:path';
 import { parse } from 'yaml';
 import { projectRoot, recordOutput as info, setExitCode } from '../../command-runtime.js';
 import { readConfig } from '../../../infrastructure/persistence/configuration.mjs';
+import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
+import { parseState } from '../../../domain/workflow/execution-state.mjs';
 import { validateProject } from '../../project-validation.mjs';
 import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
 
@@ -41,6 +43,8 @@ interface DoctorCommandContext {
   packageRoot: string;
 }
 
+type AddCheck = (id: string, ok: boolean, message: string, recovery?: string) => void;
+
 const readConfigBoundary = readConfig as (root: string) => ProjectConfiguration;
 const validateProjectBoundary = validateProject as (root: string, options: { skipTrace: boolean }) => unknown[];
 
@@ -49,7 +53,7 @@ export function diagnoseProject(
   { quick = false, version, packageRoot = root }: DiagnoseOptions = {}
 ): DoctorResult {
   const checks: DoctorCheck[] = [];
-  const add = (id: string, ok: boolean, message: string, recovery?: string): void => {
+  const add: AddCheck = (id, ok, message, recovery) => {
     checks.push({ id, status: ok ? 'pass' : 'fail', message, ...(recovery ? { recovery } : {}) });
   };
 
@@ -128,7 +132,7 @@ export function diagnoseProject(
   }
 
   if (quick) {
-    checkQuickYaml(flow, add);
+    checkQuickStructure(root, flow, add);
   } else {
     const findings = validateProjectBoundary(root, { skipTrace: false });
     add(
@@ -168,10 +172,39 @@ export function runDoctor({ args, version, packageRoot }: DoctorCommandContext):
   }
 }
 
-function checkQuickYaml(
-  flow: string,
-  add: (id: string, ok: boolean, message: string, recovery?: string) => void
-): void {
+function checkQuickStructure(root: string, flow: string, add: AddCheck): void {
+  checkQuickYaml(flow, add);
+
+  try {
+    const items = loadWorkItems(root);
+    add(
+      'work-items',
+      true,
+      `${items.length} canonical work-item(s) load with valid spec, tasks, review and dependency DAG.`
+    );
+  } catch (error) {
+    add('work-items', false, errorMessage(error), 'Repair the canonical work-item artifacts or run migration.');
+  }
+
+  const stateFile = path.join(flow, 'state.yaml');
+  if (!fileExists(stateFile)) {
+    add('migration-state', true, 'No migration reconciliation state is present.');
+    return;
+  }
+
+  try {
+    const state = parseState(readText(stateFile));
+    const message =
+      state.migration.status === 'pending_reconciliation'
+        ? 'Pending migration reconciliation is recognized.'
+        : `Migration state is ${state.migration.status}.`;
+    add('migration-state', true, message);
+  } catch (error) {
+    add('migration-state', false, errorMessage(error), 'Repair state.yaml or rerun migration recovery.');
+  }
+}
+
+function checkQuickYaml(flow: string, add: AddCheck): void {
   const file = 'gates.yaml';
   const target = path.join(flow, file);
 
