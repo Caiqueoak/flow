@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { createHash } from 'node:crypto';
 import { parse } from 'yaml';
 
 const cli = path.resolve('dist/entry.js');
@@ -34,7 +33,7 @@ function project() {
   execFileSync('git', ['init', '-q'], { cwd: root });
   execFileSync('git', ['config', 'user.email', 'flow@test.local'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Flow Test'], { cwd: root });
-  assert.equal(run(root, ['init', '--runtime', 'codex', '--existing-code', 'improve']).status, 0);
+  assert.equal(run(root, ['init', '--runtime', 'codex', '--existing-code', 'incremental']).status, 0);
   fs.mkdirSync(path.join(root, '_flow', 'docs'), { recursive: true });
   fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), 'engineering\n');
   return root;
@@ -47,11 +46,6 @@ function ready(root: string, id = 'W101') {
   fs.writeFileSync(spec, `${original}\n${headings.map((heading) => `${heading}\nText.`).join('\n\n')}\n`);
   assert.equal(run(root, ['work-item', 'promote', id]).status, 0);
   assert.equal(run(root, ['approval', 'record', path.relative(root, spec)]).status, 0);
-  const hash = (text: string) => createHash('sha256').update(text).digest('hex');
-  fs.writeFileSync(
-    path.join(base, 'implementation-plan.md'),
-    `---\nschema_version: 2\nwork_item: ${id}\nengineering_revision: ${hash('engineering\n')}\nspec_revision: ${hash(fs.readFileSync(spec, 'utf8'))}\ntasks_revision: ${hash(fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8'))}\n---\n\n# Implementation Plan\n\n## Preflight\n\n## Strategy\n\n## Execution\n\n## Validation\n`
-  );
   return base;
 }
 
@@ -59,8 +53,9 @@ test('compiled CLI creates canonical shells and sync never mutates them', () => 
   const root = project();
   assert.equal(run(root, ['work-item', 'create', 'W101', '--title', 'Canonical item']).status, 0);
   const base = path.join(root, '_flow', 'work-items', 'W101-canonical-item');
-  for (const file of ['spec.md', 'tasks.yaml', 'implementation-plan.md', 'review.yaml'])
-    assert.ok(fs.existsSync(path.join(base, file)));
+  for (const file of ['spec.md', 'tasks.yaml', 'review.yaml']) assert.ok(fs.existsSync(path.join(base, file)));
+  assert.equal(fs.existsSync(path.join(base, 'implementation-plan.md')), false);
+  assert.match(fs.readFileSync(path.join(base, 'spec.md'), 'utf8'), /## Outcome\n\nCanonical item/);
   assert.deepEqual(parse(fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8')).tasks, []);
   const before = fs.readFileSync(path.join(base, 'spec.md'), 'utf8');
   assert.equal(run(root, ['sync']).status, 0);
@@ -73,16 +68,26 @@ test('compiled CLI creates canonical shells and sync never mutates them', () => 
   assert.equal(run(root, ['validate', '--json']).status, 0);
 });
 
-test('changing a brief requires regeneration', () => {
+test('approved spec routes directly through task creation and start without a plan artifact', () => {
   const root = project();
   const base = ready(root);
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
+  assert.equal(fs.existsSync(path.join(base, 'implementation-plan.md')), false);
   fs.appendFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), 'changed\n');
-  const start = run(root, ['task', 'start', 'W101-T001']);
-  assert.notEqual(start.status, 0);
-  assert.match(start.stderr, /requires a current implementation plan/);
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
 });
 
+test('quick doctor validates canonical work-items', () => {
+  const root = project();
+  const base = ready(root);
+  assert.equal(run(root, ['doctor', '--quick', '--json']).status, 0);
+
+  fs.rmSync(path.join(base, 'review.yaml'));
+  const broken = run(root, ['doctor', '--quick', '--json']);
+  assert.notEqual(broken.status, 0);
+  const diagnosis = JSON.parse(broken.stdout);
+  assert.equal(diagnosis.checks.find((check: { id: string }) => check.id === 'work-items').status, 'fail');
+});
 test('task and review use canonical subjects and release dependent work', () => {
   const root = project();
   ready(root, 'W101');
@@ -199,6 +204,11 @@ test('migration preserves legacy work-items and creates valid outlined shells', 
     fs.readFileSync(path.join(root, '_flow', 'work-items', 'W001-reference-item', 'tasks.yaml'), 'utf8')
   );
   assert.deepEqual(tasks.tasks, []);
+  assert.equal(fs.existsSync(path.join(root, '_flow', 'work-items', 'W001-reference-item', 'implementation-plan.md')), false);
+  const migratedConfig = parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8'));
+  assert.equal(migratedConfig.engineering.existing_code_policy, 'incremental');
+  const diagnosis = JSON.parse(run(root, ['doctor', '--quick', '--json']).stdout);
+  assert.equal(diagnosis.checks.find((check: { id: string }) => check.id === 'migration-state').status, 'pass');
   assert.equal(run(root, ['validate', '--json']).status, 0);
 });
 
