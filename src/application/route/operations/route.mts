@@ -4,6 +4,8 @@ import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mj
 import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 import { parseState } from '../../../domain/workflow/execution-state.mjs';
 import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
+import { readConfig } from '../../../infrastructure/persistence/configuration.mjs';
+import { validateEngineeringDocument } from '../../../domain/project/engineering-document.mjs';
 import { isWorkItemSpecApproved } from '../../../domain/work-item/specification.mjs';
 import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
@@ -33,9 +35,32 @@ function migrationRoute(root: string): RouteResult | null {
     : null;
 }
 
+function deferredEngineeringRoute(root: string): RouteResult | null {
+  const config = readConfig(root);
+  if (config?.engineering.existing_code_policy !== 'undecided') return null;
+
+  const file = path.join(root, '_flow', 'docs', 'engineering.md');
+  if (!fileExists(file)) return step('engineering', 'engineering/step-02-synthesize.md');
+
+  const engineering = validateEngineeringDocument(readText(file));
+  if (engineering.errors.length) return step('engineering', 'engineering/step-02-synthesize.md');
+  if (engineering.status !== 'approved')
+    return {
+      action: 'stop',
+      reason: 'consequential_decision',
+      phase: 'engineering',
+      instruction: 'engineering/step-05-present.md'
+    };
+
+  return null;
+}
+
 export function routeProject(root: string): RouteResult {
   const migration = migrationRoute(root);
   if (migration) return migration;
+
+  const engineering = deferredEngineeringRoute(root);
+  if (engineering) return engineering;
 
   const items = loadWorkItems(root),
     by = new Map(items.map((i) => [i.id, i]));
