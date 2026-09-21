@@ -95,7 +95,7 @@ async function selectEngineering(
     config.engineering.existing_code_policy = await promptSelect({
       title: 'How should Flow adopt this existing repository?',
       options: Object.entries(BROWNFIELD_POLICIES).flatMap(([value, policy]) =>
-        policy
+        value !== 'improve' && policy
           ? [
               {
                 value,
