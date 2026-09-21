@@ -6,6 +6,7 @@ import { parseState } from '../../../domain/workflow/execution-state.mjs';
 import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
 import { readConfig } from '../../../infrastructure/persistence/configuration.mjs';
 import { validateEngineeringDocument } from '../../../domain/project/engineering-document.mjs';
+import { validatePrdDocument } from '../../../domain/project/product-requirements-document.mjs';
 import { isWorkItemSpecApproved } from '../../../domain/work-item/specification.mjs';
 import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
@@ -35,35 +36,73 @@ function migrationRoute(root: string): RouteResult | null {
     : null;
 }
 
-function deferredEngineeringRoute(root: string): RouteResult | null {
-  const config = readConfig(root);
-  if (config?.engineering.existing_code_policy !== 'undecided') return null;
+function projectDocumentRoute(
+  root: string,
+  {
+    fileName,
+    phase,
+    draftInstruction,
+    approvalInstruction,
+    validate
+  }: {
+    fileName: string;
+    phase: 'discovery' | 'engineering';
+    draftInstruction: string;
+    approvalInstruction: string;
+    validate: (text: string) => { errors: string[]; status?: string };
+  }
+): RouteResult | null {
+  const file = path.join(root, '_flow', 'docs', fileName);
+  if (!fileExists(file)) return step(phase, draftInstruction);
 
-  const file = path.join(root, '_flow', 'docs', 'engineering.md');
-  if (!fileExists(file)) return step('engineering', 'engineering/step-02-synthesize.md');
-
-  const engineering = validateEngineeringDocument(readText(file));
-  if (engineering.errors.length) return step('engineering', 'engineering/step-02-synthesize.md');
-  if (engineering.status !== 'approved')
+  const document = validate(readText(file));
+  if (document.errors.length) return step(phase, draftInstruction);
+  if (document.status !== 'approved')
     return {
       action: 'stop',
       reason: 'consequential_decision',
-      phase: 'engineering',
-      instruction: 'engineering/step-05-present.md'
+      phase,
+      instruction: approvalInstruction
     };
 
   return null;
 }
 
+function productBootstrapRoute(root: string): RouteResult | null {
+  return projectDocumentRoute(root, {
+    fileName: 'prd.md',
+    phase: 'discovery',
+    draftInstruction: 'discovery/step-01-project.md',
+    approvalInstruction: 'discovery/step-02-await-approval.md',
+    validate: validatePrdDocument
+  });
+}
+
+function engineeringBootstrapRoute(root: string): RouteResult | null {
+  return projectDocumentRoute(root, {
+    fileName: 'engineering.md',
+    phase: 'engineering',
+    draftInstruction: 'engineering/step-02-synthesize.md',
+    approvalInstruction: 'engineering/step-05-present.md',
+    validate: validateEngineeringDocument
+  });
+}
+
+
 export function routeProject(root: string): RouteResult {
   const migration = migrationRoute(root);
   if (migration) return migration;
 
-  const engineering = deferredEngineeringRoute(root);
+  const product = productBootstrapRoute(root);
+  if (product) return product;
+
+  const engineering = engineeringBootstrapRoute(root);
   if (engineering) return engineering;
 
-  const items = loadWorkItems(root),
-    by = new Map(items.map((i) => [i.id, i]));
+  const items = loadWorkItems(root);
+  if (!items.length) return step('planning', 'planning/step-01-plan-work-item.md');
+
+  const by = new Map(items.map((i) => [i.id, i]));
   const active = items.find((i) => lifecycle(i, by).status === 'in_progress');
   if (active) {
     const task = active.tasks.tasks.find((t) => t.state === 'in_progress');
