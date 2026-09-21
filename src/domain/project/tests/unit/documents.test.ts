@@ -172,6 +172,14 @@ test('specialized documents accept complete product and engineering content', ()
     'baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: incremental\n'
   );
   assert.deepEqual(validateEngineeringDocument(engineering).errors, []);
+  assert.match(
+    validateEngineeringDocument(engineering.replace('## Observed system\nText.\n\n', '')).errors.join(' '),
+    /Missing ## Observed system/
+  );
+  assert.match(
+    validateEngineeringDocument(engineering.replace('## Adoption strategy\nText.\n\n', '')).errors.join(' '),
+    /Missing ## Adoption strategy/
+  );
   assert.deepEqual(
     validatePrdDocument(
       document([
