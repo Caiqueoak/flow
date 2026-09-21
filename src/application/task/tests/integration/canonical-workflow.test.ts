@@ -39,7 +39,8 @@ function project() {
   return root;
 }
 function ready(root: string, id = 'W101') {
-  assert.equal(run(root, [
+  assert.equal(
+    run(root, [
       'work-item',
       'create',
       id,
@@ -47,7 +48,9 @@ function ready(root: string, id = 'W101') {
       'Canonical item',
       '--outcome',
       'User can complete the canonical item.'
-    ]).status, 0);
+    ]).status,
+    0
+  );
   const base = path.join(root, '_flow', 'work-items', `${id}-canonical-item`);
   const spec = path.join(base, 'spec.md');
   const original = fs.readFileSync(spec, 'utf8');
@@ -59,7 +62,8 @@ function ready(root: string, id = 'W101') {
 
 test('compiled CLI creates canonical shells and sync never mutates them', () => {
   const root = project();
-  assert.equal(run(root, [
+  assert.equal(
+    run(root, [
       'work-item',
       'create',
       'W101',
@@ -67,12 +71,17 @@ test('compiled CLI creates canonical shells and sync never mutates them', () => 
       'Canonical item',
       '--outcome',
       'User can complete the canonical item.'
-    ]).status, 0);
+    ]).status,
+    0
+  );
   const base = path.join(root, '_flow', 'work-items', 'W101-canonical-item');
   for (const file of ['spec.md', 'tasks.yaml', 'review.yaml']) assert.ok(fs.existsSync(path.join(base, file)));
   assert.equal(fs.existsSync(path.join(base, 'implementation-plan.md')), false);
   assert.match(fs.readFileSync(path.join(base, 'spec.md'), 'utf8'), /outcome: User can complete the canonical item\./);
-  assert.match(fs.readFileSync(path.join(base, 'spec.md'), 'utf8'), /## Outcome\n\nUser can complete the canonical item\./);
+  assert.match(
+    fs.readFileSync(path.join(base, 'spec.md'), 'utf8'),
+    /## Outcome\n\nUser can complete the canonical item\./
+  );
   assert.deepEqual(parse(fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8')).tasks, []);
   const before = fs.readFileSync(path.join(base, 'spec.md'), 'utf8');
   assert.equal(run(root, ['sync']).status, 0);
