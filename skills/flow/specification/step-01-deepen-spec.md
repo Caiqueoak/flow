@@ -3,16 +3,27 @@
 Read the product contract, engineering contract and selected outlined work-item. Deepen only this work-item.
 
 The SPEC defines the bounded implementation outcome. Include:
+
 - Problem
+
 - Scope
+
 - Non-goals
+
 - Requirements
+
 - observable Acceptance criteria
+
 - Contracts
+
 - Data and APIs when relevant
+
 - realistic Edge cases that could violate acceptance, integrity, security, idempotency or user expectations
+
 - Risks
+
 - Decisions
+
 - Gates
 
 Resolve ordinary implementation details autonomously from engineering. If a consequential unresolved product/engineering choice remains, use `../core/decisions.md`.
