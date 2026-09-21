@@ -54,13 +54,18 @@ export const ENGINEERING_PROFILES: Record<string, EngineeringProfile | undefined
 export { ENGINEERING_PROFILE_IDS };
 
 export const BROWNFIELD_POLICIES: Record<string, BrownfieldPolicy | undefined> = {
-  improve: {
-    label: 'Improve existing structure — Recommended',
-    description:
-      'Preserve behavior and external contracts; recommend clearer structure where justified. Does not authorize refactoring.'
-  },
   preserve: {
-    label: 'Keep existing structure',
-    description: 'Retain consistent conventions unless a concrete problem warrants an approved change.'
+    label: 'Preserve existing structure',
+    description: 'Adopt Flow without restructuring coherent existing architecture or conventions.'
+  },
+  incremental: {
+    label: 'Incremental alignment — Recommended',
+    description:
+      'Preserve unrelated code while new or touched areas move toward the approved engineering direction.'
+  },
+  refactor: {
+    label: 'Refactor first',
+    description:
+      'Align existing architecture/topology before feature delivery. This expands scope and requires explicit user choice.'
   }
 };
