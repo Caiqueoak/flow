@@ -4,7 +4,6 @@ import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mj
 import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 import { parseState } from '../../../domain/workflow/execution-state.mjs';
 import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
-import { readConfig } from '../../../infrastructure/persistence/configuration.mjs';
 import { validateEngineeringDocument } from '../../../domain/project/engineering-document.mjs';
 import { validatePrdDocument } from '../../../domain/project/product-requirements-document.mjs';
 import { isWorkItemSpecApproved } from '../../../domain/work-item/specification.mjs';
@@ -87,7 +86,6 @@ function engineeringBootstrapRoute(root: string): RouteResult | null {
     validate: validateEngineeringDocument
   });
 }
-
 
 export function routeProject(root: string): RouteResult {
   const migration = migrationRoute(root);
