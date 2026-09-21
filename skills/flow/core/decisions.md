@@ -11,4 +11,9 @@ When asking, provide:
 
 Do not ask the user to decide ordinary implementation details such as private naming, file placement within an approved topology, local refactors, implementation order, routine error handling, test organization, or library usage already covered by engineering.
 
+Before stopping for a decision, ask:
+- Does this materially change product, scope, contracts, architecture or risk?
+- Is the answer already derivable from approved contracts?
+- Can this safely be decided autonomously as a local implementation detail?
+
 If existing contracts make one option safe and consistent, choose it and continue.
