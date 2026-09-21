@@ -12,7 +12,7 @@ On every invocation:
 1. Run `npx --no-install flow doctor --quick --json` first. Always do this even when the user only says to continue: migrations, manual edits or partial Flow directories may have changed repository state.
 2. If doctor reports a version/migration/reconciliation problem, follow its safe recovery path before normal delivery.
 3. Run `npx --no-install flow sync`, `npx --no-install flow validate --json`, then `npx --no-install flow route --json`. Routing derives bootstrap progress from canonical artifacts: approved PRD -> approved engineering -> at least one MVP work-item -> normal delivery.
-4. Read the routed instruction and only the modular guidance relevant to that action. Use `core/decisions.md`, `core/continuation.md` and `core/recovery.md` when applicable.
+4. Read the routed instruction and only the modular guidance relevant to that action. Use `core/decisions.md`, `core/continuation.md` and `core/recovery.md` when applicable. If route returns `finished`, compare that result with the current user intent: plain continuation means completion; a substantive new feature/change request means read `discovery/new-scope.md` and re-enter bounded discovery for only the new scope.
 5. Execute the routed action, persist it, validate the minimum necessary state, route again and continue until completion or a legitimate human stop.
 
 The user experience is: understand -> decide when necessary -> deliver -> verify -> continue. Workflow phases are internal routing, not user checkpoints.
@@ -37,4 +37,4 @@ Canonical delivery truth is:
 
 Do not treat a derived plan as an approval or traceability artifact. Important approach/architecture decisions belong in the spec or engineering contract; ordinary implementation reasoning stays local to execution.
 
-Preserve completed history. While work is active, corrections become tasks; after completion, corrections become maintenance work-items. See `maintenance/corrections.md`.
+Preserve completed history. Never reopen or rewrite completed work-items when new scope arrives. While work is active, corrections become tasks; after completion, corrections become maintenance work-items. See `maintenance/corrections.md`.
