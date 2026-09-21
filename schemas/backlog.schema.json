@@ -77,6 +77,10 @@
           },
           "blockers": {
             "type": "array"
+          },
+          "outcome": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
