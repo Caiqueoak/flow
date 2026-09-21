@@ -14,7 +14,7 @@ Frontmatter:
 - `schema_version: 1`
 - `status: draft`
 - `baseline.profile`: exact versioned profile id selected in config
-- `baseline.existing_code_policy: improve|preserve|not_applicable`
+- `baseline.existing_code_policy: preserve|incremental|refactor|not_applicable`
 
 Include exact headings:
 
