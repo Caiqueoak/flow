@@ -3,8 +3,6 @@ import { stringify } from 'yaml';
 import {
   FLOW_DIRECTORY,
   ID_PADDING,
-  IMPLEMENTATION_PLAN_FILE,
-  IMPLEMENTATION_PLAN_TITLE,
   REVIEW_FILE,
   SPEC_FILE,
   TASKS_FILE,
@@ -72,10 +70,6 @@ function writeWorkItemShells(directory: string, input: CreateWorkItemInput): voi
     work_item: input.id,
     tasks: []
   });
-  writeText(
-    path.join(directory, IMPLEMENTATION_PLAN_FILE),
-    `---\nschema_version: 2\nwork_item: ${input.id}\nengineering_revision: \nspec_revision: \ntasks_revision: \n---\n\n${IMPLEMENTATION_PLAN_TITLE}\n\n## Preflight\n\n## Strategy\n\n## Execution\n\n## Validation\n`
-  );
   writeYaml(path.join(directory, REVIEW_FILE), {
     schema_version: 1,
     work_item: input.id,
