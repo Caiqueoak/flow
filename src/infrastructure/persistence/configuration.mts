@@ -38,6 +38,7 @@ export function readConfig(root: string): FlowConfiguration | null {
   config.flow_version = typeof raw.flow_version === 'string' ? raw.flow_version : null;
   config.runtimes = Array.isArray(raw.runtimes) ? (raw.runtimes as RuntimeConfiguration[]) : [];
   config.engineering = { ...config.engineering, ...asRecord(raw.engineering) } as FlowConfiguration['engineering'];
+  config.engineering.existing_code_policy = normalizeExistingCodePolicy(config.engineering.existing_code_policy);
   return config;
 }
 
