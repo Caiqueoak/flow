@@ -22,7 +22,7 @@ Better decomposition:
   - UI
   - validation/tests
 
-Create the complete set of known MVP work-item shells so the graph is useful, but deeply specify only the next eligible item. Give every outlined shell a concise `## Outcome` statement describing what will observably exist when it is done.
+Create the complete set of known MVP work-item shells so the graph is useful, but deeply specify only the next eligible item. Create each shell with `--outcome` containing one concise observable implementation outcome. The title names the work; the outcome states what the system/user can observably do when it is complete.
 
 Before persisting a work-item, ask:
 
