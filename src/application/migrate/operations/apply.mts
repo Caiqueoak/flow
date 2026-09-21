@@ -75,8 +75,6 @@ export interface MigrationPlan {
   changes: string[];
   files_affected: string[];
   incompatibilities: string[];
-  invalidated_plans: string[];
-  affected_approvals: string[];
   human_decisions: string[];
   can_apply: boolean;
 }
@@ -126,10 +124,6 @@ function createCanonicalShell(base: string, item: MigratedWorkItem): void {
   writeMigrationText(
     path.join(base, 'tasks.yaml'),
     stringify({ schema_version: TASKS_SCHEMA_VERSION, work_item: item.id, tasks: [] }, { lineWidth: 0 })
-  );
-  writeMigrationText(
-    path.join(base, 'implementation-plan.md'),
-    `---\nschema_version: 1\nwork_item: ${item.id}\nstatus: draft\n---\n\n# Implementation Plan\n`
   );
   writeMigrationText(path.join(base, 'review.yaml'), `schema_version: 1\nwork_item: ${item.id}\nstatus: pending\n`);
 }
@@ -210,7 +204,7 @@ function migrateStaged(root: string, targetVersion: string): void {
     writeMigrationText(path.join(flow, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
   const config = defaultConfig(targetVersion);
   config.runtimes = oldConfig?.runtimes ?? [];
-  config.engineering.existing_code_policy = 'improve';
+  config.engineering.existing_code_policy = 'incremental';
   writeConfig(root, config);
 }
 function hasLegacyBacklog(flow: string): boolean {
@@ -298,8 +292,6 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
       changes: [],
       files_affected: [],
       incompatibilities: ['Both .flow and _flow exist; reconcile the authoritative directory first.'],
-      invalidated_plans: [],
-      affected_approvals: [],
       human_decisions: ['Choose the authoritative Flow directory.'],
       can_apply: false
     };
@@ -339,7 +331,6 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
     ['BACKLOG.yaml', 'PRD.md', 'ENGINEERING.md', 'STATE.md', 'DECISIONS.md', 'SUMMARY.md', 'GRAPH.md'].includes(name)
   );
   const changes: string[] = [];
-  const invalidatedPlans: string[] = [];
   if (usesLegacyDirectory) changes.push('rename the canonical project directory from .flow to _flow');
   if (!config?.flow_version || config.flow_version !== targetVersion)
     changes.push('record executed Flow package version');
@@ -353,11 +344,6 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
       backlog.schema_version = BACKLOG_SCHEMA_VERSION;
       if ((backlog.work_items ?? []).some((item) => !item.spec_maturity))
         changes.push('derive initial spec_maturity from existing artifacts');
-      for (const item of backlog.work_items ?? []) {
-        const planFile = path.join(flow, 'work-items', item.folder ?? '', 'implementation-plan.md');
-        if ((item.state ?? item.status) !== 'completed' && migrationPathExists(planFile))
-          invalidatedPlans.push(`${item.id}: work-items/${item.folder}/implementation-plan.md`);
-      }
     } catch {
       changes.push('archive unconvertible Flow artifacts for assisted reconciliation');
     }
@@ -370,8 +356,6 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
     changes,
     files_affected: [...legacy, 'config.yaml', 'backlog.yaml', 'state.yaml', 'gates.yaml'],
     incompatibilities,
-    invalidated_plans: invalidatedPlans,
-    affected_approvals: invalidatedPlans,
     human_decisions: changes.length
       ? ['Reconcile preserved product, engineering, spec and traceability semantics before implementation.']
       : [],
@@ -405,6 +389,7 @@ function upgradeCanonicalStaged(root: string, targetVersion: string): void {
     }
   const config = readConfig(root) ?? defaultConfig(targetVersion);
   config.flow_version = targetVersion;
+  if (config.engineering.existing_code_policy === 'improve') config.engineering.existing_code_policy = 'incremental';
   writeConfig(root, config);
   const gatesFile = path.join(flow, 'gates.yaml');
   if (!migrationPathExists(gatesFile))
@@ -458,7 +443,7 @@ function rebuildStagedForReconciliation(staging: string, sourceFlow: string, tar
 
   const config = defaultConfig(targetVersion);
   config.runtimes = recoverRuntimeConfigurations(sourceFlow);
-  config.engineering.existing_code_policy = 'improve';
+  config.engineering.existing_code_policy = 'incremental';
   writeConfig(staging, config);
   writeMigrationText(path.join(staged, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
 
