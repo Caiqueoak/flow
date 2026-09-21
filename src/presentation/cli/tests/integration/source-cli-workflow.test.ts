@@ -275,9 +275,6 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
     );
     await flow(root, ['task', 'create', 'W101', '--title', 'Implement source workflow']);
     await flow(root, ['task', 'set', 'W101-T001', '--title', 'Implement updated source workflow']);
-    const engineering = 'engineering\n';
-    fs.mkdirSync(path.join(root, '_flow', 'docs'), { recursive: true });
-    fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), engineering);
     assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
       action: 'continue',
       phase: 'implementation',
