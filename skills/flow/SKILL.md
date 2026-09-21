@@ -11,7 +11,7 @@ On every invocation:
 
 1. Run `npx --no-install flow doctor --quick --json` first. Always do this even when the user only says to continue: migrations, manual edits or partial Flow directories may have changed repository state.
 2. If doctor reports a version/migration/reconciliation problem, follow its safe recovery path before normal delivery.
-3. Run `npx --no-install flow sync`, `npx --no-install flow validate --json`, then `npx --no-install flow route --json`.
+3. Run `npx --no-install flow sync`, `npx --no-install flow validate --json`, then `npx --no-install flow route --json`. Routing derives bootstrap progress from canonical artifacts: approved PRD -> approved engineering -> at least one MVP work-item -> normal delivery.
 4. Read the routed instruction and only the modular guidance relevant to that action. Use `core/decisions.md`, `core/continuation.md` and `core/recovery.md` when applicable.
 5. Execute the routed action, persist it, validate the minimum necessary state, route again and continue until completion or a legitimate human stop.
 
@@ -19,7 +19,7 @@ The user experience is: understand -> decide when necessary -> deliver -> verify
 
 Human stops are limited to consequential product/engineering decisions, external actions only the user can perform, genuine ambiguity with materially different outcomes, irreversible operations, or unrecoverable blockers. Give options, a recommendation and justification when asking.
 
-For brownfield repositories without Flow, inspect the repository first and read `discovery/brownfield.md`. The engineering profile is a recommendation baseline, never permission to refactor existing code.
+For brownfield repositories without Flow, product discovery comes before engineering adoption. Inspect the repository, understand the requested product change and read `discovery/brownfield.md`; only after the PRD is approved should engineering compare observed structure with the selected profile. The profile is a recommendation baseline, never permission to refactor existing code.
 
 Work-items are implementation outcomes. Read `backlog/work-items.md` when creating or revising the MVP graph. Planning, preparation, evidence, readiness, validation and review normally belong inside the owning work-item as tasks or gates.
 
