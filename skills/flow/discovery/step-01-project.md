@@ -22,6 +22,6 @@ Cover, proportionally:
 
 Technical discovery is allowed here when it affects product decisions. Implementation-level architecture is synthesized in engineering after product intent is sufficiently clear.
 
-For existing repositories without Flow, inspect the repository and read `brownfield.md` before proposing engineering direction.
+For existing repositories without Flow, inspect the repository and read `brownfield.md`. Understand both the existing product behavior and the user's requested product change here; produce/approve the PRD before engineering evaluates preserve, incremental or refactor adoption.
 
 Persist durable decisions, rejected alternatives, assumptions and unresolved consequential questions so discovery resumes without repetition. Do not turn discovery into a questionnaire; use the selected profile and repository evidence to make defaults and recommendations.
