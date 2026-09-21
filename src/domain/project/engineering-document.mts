@@ -24,7 +24,7 @@ export function validateEngineeringDocument(text: string) {
 
   if (!ENGINEERING_PROFILE_IDS.includes(baseline.profile as (typeof ENGINEERING_PROFILE_IDS)[number]))
     result.errors.push(`baseline.profile must be one of: ${ENGINEERING_PROFILE_IDS.join(', ')}.`);
-  if (!['improve', 'preserve', 'not_applicable'].includes(String(baseline.existing_code_policy)))
+  if (!['preserve', 'incremental', 'refactor', 'not_applicable'].includes(String(baseline.existing_code_policy)))
     result.errors.push('baseline.existing_code_policy is invalid.');
 
   return result;
