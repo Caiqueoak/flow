@@ -38,11 +38,14 @@ interface LegacyWorkItem {
   id: LegacyIdentifier;
   folder?: string;
   title: string;
+  outcome?: string;
   kind: string;
   state?: string;
   status?: string;
   priority?: number;
   spec_maturity?: string;
+  outcome?: string;
+  objective?: string;
   depends_on?: LegacyIdentifier[];
 }
 
@@ -114,6 +117,11 @@ function createCanonicalShell(base: string, item: MigratedWorkItem): void {
       schema_version: 1,
       work_item: item.id,
       title: item.title,
+      ...(typeof item.outcome === 'string' && item.outcome.trim()
+        ? { outcome: item.outcome.trim() }
+        : typeof item.objective === 'string' && item.objective.trim()
+          ? { outcome: item.objective.trim() }
+          : {}),
       kind: item.kind,
       priority: item.priority,
       depends_on: item.depends_on,
@@ -204,7 +212,12 @@ function migrateStaged(root: string, targetVersion: string): void {
     writeMigrationText(path.join(flow, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
   const config = defaultConfig(targetVersion);
   config.runtimes = oldConfig?.runtimes ?? [];
-  config.engineering.existing_code_policy = 'incremental';
+  config.engineering.existing_code_policy =
+    oldConfig?.engineering.existing_code_policy === 'preserve' ||
+    oldConfig?.engineering.existing_code_policy === 'incremental' ||
+    oldConfig?.engineering.existing_code_policy === 'refactor'
+      ? oldConfig.engineering.existing_code_policy
+      : 'undecided';
   writeConfig(root, config);
 }
 function hasLegacyBacklog(flow: string): boolean {
@@ -443,7 +456,7 @@ function rebuildStagedForReconciliation(staging: string, sourceFlow: string, tar
 
   const config = defaultConfig(targetVersion);
   config.runtimes = recoverRuntimeConfigurations(sourceFlow);
-  config.engineering.existing_code_policy = 'incremental';
+  config.engineering.existing_code_policy = 'undecided';
   writeConfig(staging, config);
   writeMigrationText(path.join(staged, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
 
