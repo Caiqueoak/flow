@@ -57,17 +57,8 @@ const engineeringHeadings = [
 ];
 
 function approvedDocument(headings: readonly string[], baseline = '') {
-  return `---
-schema_version: 1
-status: approved
-approved_at: 2026-01-01T00:00:00.000Z
-${baseline}---
-
-${headings
-  .map((heading) => `${heading}
-Text.`)
-  .join('\n\n')}
-`;
+  const body = headings.map((heading) => `${heading}\nText.`).join('\n\n');
+  return `---\nschema_version: 1\nstatus: approved\napproved_at: 2026-01-01T00:00:00.000Z\n${baseline}---\n\n${body}\n`;
 }
 
 function project() {
