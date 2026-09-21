@@ -1,11 +1,11 @@
 # Engineering — recommend a contract
 
-Read the approved PRD, config, full existing engineering evidence, repository tooling/contracts and technology-defaults.md. Resolve the exact engineering profile selected by config before drafting:
+Read the approved PRD, config, repository evidence, technology-defaults.md and the exact engineering profile selected by config before drafting:
 
 - `flow/readability-first@2` -> `profiles/readability-first-v2.md`
 - `flow/readability-first@1` -> `profiles/readability-first.md`
 
-Use the selected profile as defaults, not as text to copy mechanically. Materialize stack-idiomatic paths, boundaries, naming, contracts and verification rules for this project. `improve` may critique accidental structure while preserving behavior; `preserve` gives consistent existing conventions stronger weight. Neither policy authorizes refactoring by itself.
+Use the selected profile as defaults and recommendation criteria, not as text to copy mechanically. For brownfield, inspect the actual repository first and distinguish observed state from desired state. The adoption strategy is `preserve`, `incremental`, or `refactor`; none is inferred from profile mismatch and refactoring requires the user's explicit choice.
 
 Recommend a complete but proportional technical contract. Keep global product behavior in the PRD and bounded delivery behavior in work-item specs; engineering records only the technical/code/infra constraints that realize them.
 
@@ -19,6 +19,14 @@ Frontmatter:
 Include exact headings:
 
 # Engineering
+
+## Observed system
+
+For greenfield write `not applicable`. For brownfield summarize the architecture, topology, conventions, tests/tooling and relevant inconsistencies that actually exist.
+
+## Adoption strategy
+
+Record `not_applicable|preserve|incremental|refactor` with the reason for the chosen strategy.
 
 ## System shape
 
