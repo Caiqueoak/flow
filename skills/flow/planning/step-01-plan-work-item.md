@@ -1,9 +1,11 @@
-# Planning — materialize the complete backlog
+# Backlog — map the known MVP outcomes
 
-Reread the FULL approved engineering.md and PRD. Decompose all known approved scope into bounded work items and dependencies; do not invent future scope. Create backlog.yaml schema_version: 3 with outlined work items using id W###, folder W###-kebab-case, kind feature|technical|maintenance, title, state pending, priority positive integer, spec_maturity, depends_on and blockers.
+Read the approved product and engineering contracts, then read `../backlog/work-items.md`.
 
-Do not eagerly create folders, specs, tasks or plans for outlined work. When a selected item is ready, create its spec, then tasks.yaml schema_version: 2 with local T### IDs, title, state pending, depends_on and traceability commit|none. Preserve completed history and legacy_commit provenance; never use the retired implementation task field.
+Create the complete set of known MVP work-item shells so `graph.md` represents the path to the MVP. Keep shells intentionally shallow: enough objective, boundaries, dependencies and provided/consumed capability to understand the graph, but do not prematurely deepen every spec.
 
-Structured blockers: id stable-kebab-case, type external_action|consequential_decision, description, status unresolved|resolved. Do not encode dependencies as external blockers.
+Decompose by independently meaningful implementation outcomes, never by workflow phases. Planning, preparation, evidence collection, readiness, validation and review are normally tasks or gates inside the outcome they support.
 
-Create/maintain gates.yaml and state.yaml; regenerate graph with npx --no-install flow graph. Run npx --no-install flow validate. Route again; no application code in this step.
+Before persisting, run the qualitative backlog check in `backlog/work-items.md`: merge phase-like items, split oversized independent outcomes, verify each dependency is necessary, and ensure every work-item has a concrete implementation objective.
+
+Use CLI work-item commands for deterministic IDs, dependencies, priorities and blockers. Regenerate projections with `npx --no-install flow sync`, validate, route again and continue. Do not create application code in this step.
