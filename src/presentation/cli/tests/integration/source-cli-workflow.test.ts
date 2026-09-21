@@ -153,6 +153,22 @@ test('greenfield bootstrap routes discovery, approvals, engineering, then backlo
     phase: 'planning',
     instruction: 'planning/step-01-plan-work-item.md'
   });
+
+  await flow(root, [
+    'work-item',
+    'create',
+    'W001',
+    '--title',
+    'First MVP outcome',
+    '--outcome',
+    'User can complete the first MVP outcome.'
+  ]);
+  assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
+    action: 'continue',
+    phase: 'specification',
+    instruction: 'specification/step-01-deepen-spec.md',
+    work_item: 'W001'
+  });
 });
 
 test('brownfield bootstrap discovers product before engineering adoption and trusts approved engineering', async (t) => {
