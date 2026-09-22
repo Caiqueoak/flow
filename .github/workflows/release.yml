@@ -1,0 +1,136 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner backend
+        required: true
+        default: self-hosted
+        type: choice
+        options:
+          - self-hosted
+          - github-hosted
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flow-npm-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish npm release
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'))
+    runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["ubuntu-latest"]' || '["self-hosted","linux","x64","flow-release"]') }}
+    timeout-minutes: 15
+    environment: npm-publish
+    steps:
+      - name: Check out validated revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Skip a superseded release
+        id: freshness
+        shell: bash
+        env:
+          VALIDATED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          latest_sha="$(git rev-parse origin/main)"
+
+          if [ "$VALIDATED_SHA" = "$latest_sha" ]; then
+            stale=false
+          elif ! git merge-base --is-ancestor "$VALIDATED_SHA" "$latest_sha"; then
+            stale=true
+          elif git diff --quiet "$VALIDATED_SHA" "$latest_sha" -- \
+            .github/workflows/ci.yml .github/workflows/release.yml .husky \
+            src scripts skills schemas .nvmrc .npmrc .releaserc.json \
+            eslint.config.js prettier.config.mjs 'tsconfig*.json' \
+            package.json package-lock.json README.md LICENSE; then
+            stale=false
+            git checkout --detach "$latest_sha"
+          else
+            stale=true
+          fi
+
+          echo "stale=$stale" >> "$GITHUB_OUTPUT"
+          if [ "$stale" = "true" ]; then
+            echo "A newer validated package revision supersedes $VALIDATED_SHA; nothing will be published." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Set up Node.js
+        if: steps.freshness.outputs.stale != 'true'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install dependencies
+        if: steps.freshness.outputs.stale != 'true'
+        run: npm ci --no-audit --no-fund
+
+      - name: Install npm with publishing support
+        if: steps.freshness.outputs.stale != 'true'
+        run: npm install --global npm@latest
+
+      - name: Require npm publish token
+        if: steps.freshness.outputs.stale != 'true'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::NPM_TOKEN is not configured. Add a granular npm automation token to the npm-publish environment before releasing."
+            exit 1
+          fi
+
+      - name: Recheck main before publishing
+        if: steps.freshness.outputs.stale != 'true'
+        id: final_freshness
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_sha="$(git rev-parse HEAD)"
+          git fetch --no-tags origin main
+          latest_sha="$(git rev-parse origin/main)"
+
+          if [ "$release_sha" = "$latest_sha" ]; then
+            stale=false
+          elif ! git merge-base --is-ancestor "$release_sha" "$latest_sha"; then
+            stale=true
+          elif git diff --quiet "$release_sha" "$latest_sha" -- \
+            .github/workflows/ci.yml .github/workflows/release.yml .husky \
+            src scripts skills schemas .nvmrc .npmrc .releaserc.json \
+            eslint.config.js prettier.config.mjs 'tsconfig*.json' \
+            package.json package-lock.json README.md LICENSE; then
+            stale=false
+            git checkout --detach "$latest_sha"
+          else
+            stale=true
+          fi
+
+          echo "stale=$stale" >> "$GITHUB_OUTPUT"
+          if [ "$stale" = "true" ]; then
+            echo "Main advanced during release preparation; the newer CI run will release instead." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Determine version and publish
+        if: steps.freshness.outputs.stale != 'true' && steps.final_freshness.outputs.stale != 'true'
+        env:
+          HUSKY: 0
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm exec --yes --package=semantic-release@25.0.9 -- semantic-release
