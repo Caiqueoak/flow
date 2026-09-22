@@ -109,9 +109,17 @@ jobs:
         if: steps.scope.outputs.full == 'true'
         run: npm run verify
 
+      - name: Check package-content formatting
+        if: steps.scope.outputs.package == 'true' && steps.scope.outputs.full != 'true'
+        run: npm run format:check
+
       - name: Build package-only changes
         if: steps.scope.outputs.package == 'true' && steps.scope.outputs.full != 'true'
         run: npm run build
+
+      - name: Check generated package content
+        if: steps.scope.outputs.package == 'true' && steps.scope.outputs.full != 'true'
+        run: git diff --exit-code -- schemas
 
       - name: Pack the validated candidate
         if: steps.scope.outputs.package == 'true'
