@@ -65,7 +65,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+        shell: cmd
       - run: npm run verify
+        shell: cmd
 
   publish:
     name: release npm
