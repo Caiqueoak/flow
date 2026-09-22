@@ -1,0 +1,203 @@
+name: CI
+
+on:
+  pull_request:
+    paths-ignore:
+      - '.github/CODEOWNERS'
+      - '.github/dependabot.yml'
+      - '.gitignore'
+      - 'AGENTS.md'
+      - 'docs/**'
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/CODEOWNERS'
+      - '.github/dependabot.yml'
+      - '.gitignore'
+      - 'AGENTS.md'
+      - 'docs/**'
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner backend
+        required: true
+        default: self-hosted
+        type: choice
+        options:
+          - self-hosted
+          - github-hosted
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flow-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate changed scope
+    runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["ubuntu-latest"]' || '["self-hosted","linux","x64","flow-ci"]') }}
+    timeout-minutes: 15
+    outputs:
+      windows: ${{ steps.scope.outputs.windows }}
+    steps:
+      - name: Check out revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Detect changed scope
+        id: scope
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            printf '%s\n' 'full=true' 'package=true' 'windows=true' 'workflows=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt"
+          cat "$RUNNER_TEMP/changed-files.txt"
+
+          match() {
+            if grep -Eq "$1" "$RUNNER_TEMP/changed-files.txt"; then
+              printf 'true'
+            else
+              printf 'false'
+            fi
+          }
+
+          full="$(match '^(src/|scripts/|\.husky/|\.nvmrc$|\.npmrc$|eslint\.config\.js$|prettier\.config\.mjs$|tsconfig[^/]*\.json$|package(-lock)?\.json$)')"
+          package="$(match '^(src/|scripts/|skills/|schemas/|\.husky/|\.nvmrc$|\.npmrc$|\.releaserc\.json$|eslint\.config\.js$|prettier\.config\.mjs$|tsconfig[^/]*\.json$|package(-lock)?\.json$|README\.md$|LICENSE$)')"
+          workflows="$(match '^\.github/workflows/')"
+
+          if grep -Evq '^(\.github/workflows/|\.github/CODEOWNERS$|\.github/dependabot\.yml$|\.husky/|docs/|src/|scripts/|skills/|schemas/|\.gitignore$|\.nvmrc$|\.npmrc$|\.releaserc\.json$|AGENTS\.md$|eslint\.config\.js$|prettier\.config\.mjs$|tsconfig[^/]*\.json$|package(-lock)?\.json$|README\.md$|LICENSE$)' "$RUNNER_TEMP/changed-files.txt"; then
+            full=true
+            package=true
+          fi
+
+          printf '%s\n' \
+            "full=$full" \
+            "package=$package" \
+            "windows=$full" \
+            "workflows=$workflows" >> "$GITHUB_OUTPUT"
+
+      - name: Validate workflow YAML
+        if: steps.scope.outputs.workflows == 'true'
+        run: >-
+          ruby -e 'require "yaml"; ARGV.each { |path| YAML.safe_load(File.read(path), aliases: true) }'
+          .github/workflows/*.yml
+
+      - name: Set up Node.js 24
+        if: steps.scope.outputs.package == 'true'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.scope.outputs.package == 'true'
+        run: npm ci --no-audit --no-fund
+
+      - name: Run complete validation
+        if: steps.scope.outputs.full == 'true'
+        run: npm run verify
+
+      - name: Check package-content formatting
+        if: steps.scope.outputs.package == 'true' && steps.scope.outputs.full != 'true'
+        run: npm run format:check
+
+      - name: Snapshot package schemas
+        if: steps.scope.outputs.package == 'true' && steps.scope.outputs.full != 'true'
+        run: cp --recursive schemas "$RUNNER_TEMP/schemas-before-build"
+
+      - name: Build package-only changes
+        if: steps.scope.outputs.package == 'true' && steps.scope.outputs.full != 'true'
+        run: npm run build
+
+      - name: Check generated package content
+        if: steps.scope.outputs.package == 'true' && steps.scope.outputs.full != 'true'
+        env:
+          SCHEMAS_BEFORE_BUILD: ${{ runner.temp }}/schemas-before-build
+        run: |
+          node --input-type=module <<'NODE'
+            import { readdirSync, readFileSync } from "node:fs";
+            import { join, relative } from "node:path";
+
+            const current = "schemas";
+            const before = process.env.SCHEMAS_BEFORE_BUILD;
+            const jsonFiles = (root) =>
+              readdirSync(root, { recursive: true, withFileTypes: true })
+                .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+                .map((entry) => join(entry.parentPath, entry.name))
+                .map((path) => relative(root, path))
+                .sort();
+            const normalize = (value) =>
+              Array.isArray(value)
+                ? value.map(normalize)
+                : value && typeof value === "object"
+                  ? Object.fromEntries(
+                      Object.keys(value)
+                        .sort()
+                        .map((key) => [key, normalize(value[key])]),
+                    )
+                  : value;
+            const snapshot = (root) =>
+              Object.fromEntries(
+                jsonFiles(root).map((path) => [
+                  path,
+                  normalize(JSON.parse(readFileSync(join(root, path), "utf8"))),
+                ]),
+              );
+
+            if (JSON.stringify(snapshot(before)) !== JSON.stringify(snapshot(current))) {
+              throw new Error("Committed schemas do not match the package schemas generated by the build.");
+            }
+          NODE
+
+      - name: Pack the validated candidate
+        if: steps.scope.outputs.package == 'true'
+        run: |
+          mkdir --parents package
+          npm pack --json --ignore-scripts --pack-destination package
+
+      - name: Set up minimum supported Node.js
+        if: steps.scope.outputs.package == 'true'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 20.19.0
+          package-manager-cache: false
+
+      - name: Verify consumer compatibility
+        if: steps.scope.outputs.package == 'true'
+        run: node scripts/test-package.mjs package/*.tgz
+
+  windows:
+    name: Windows integration compatibility
+    needs: validate
+    if: needs.validate.outputs.windows == 'true'
+    runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["windows-latest"]' || '["self-hosted","windows","x64","flow-windows-main"]') }}
+    timeout-minutes: 15
+    steps:
+      - name: Check out revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+        shell: cmd
+
+      - name: Verify native Windows integration and package behavior
+        run: npm run check:runtime && npm run test:integration && npm run test:package
+        shell: cmd
