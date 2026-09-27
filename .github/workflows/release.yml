@@ -5,15 +5,6 @@ on:
     workflows: [CI]
     types: [completed]
   workflow_dispatch:
-    inputs:
-      runner:
-        description: Runner backend
-        required: true
-        default: self-hosted
-        type: choice
-        options:
-          - self-hosted
-          - github-hosted
 
 permissions:
   contents: write
@@ -31,7 +22,7 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main'))
-    runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["ubuntu-latest"]' || '["self-hosted","linux","x64","flow-release"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm-publish
     steps:
