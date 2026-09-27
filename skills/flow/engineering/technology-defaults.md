@@ -41,4 +41,4 @@ Use these as bounded defaults, not mandatory architecture templates. A deviation
 
 ## Decision rule
 
-When an existing mature repository has a clearly enforced convention, `preserve` may retain it. Under `improve`, technology defaults and project requirements outrank accidental existing style.
+When an existing mature repository has a clearly enforced convention, `preserve` may retain it. Under `incremental`, apply improved defaults proportionally to new/touched areas without incidental broad refactoring. Under `refactor`, apply the approved target engineering contract across the explicitly authorized refactor scope. Technology defaults never override an approved engineering.md.

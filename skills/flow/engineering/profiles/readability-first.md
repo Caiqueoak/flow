@@ -1,12 +1,14 @@
 ---
 id: flow/readability-first@1
-label: Readability First — Recommended
-description: Readable, cohesive code with explicit responsibilities and proportional complexity.
+label: Readability First v1 — Legacy Compatibility
+description: Legacy readability-first profile retained only for existing Flow projects that already reference version 1.
 ---
 
 # Readability First
 
-Load this reusable preference template only when synthesizing or explicitly revising engineering.md. After human approval, engineering.md is the project engineering source of truth; do not reload this profile during ordinary implementation.
+This profile is retained for compatibility with existing approved engineering contracts. New Flow projects default to `flow/readability-first@2`. Do not silently rewrite an existing approved project from v1 to v2; adopt the newer profile only through an explicit engineering-contract revision.
+
+Load this reusable preference template only when synthesizing or explicitly revising engineering.md for a project that still selects v1. After human approval, engineering.md is the project engineering source of truth; do not reload this profile during ordinary implementation.
 
 - Write code for easy understanding through familiar, consistent patterns. Prefer clarity over cleverness.
 - Apply Clean Code and SOLID. SRP is mandatory: each function, class, file and module has one cohesive responsibility and reason to change. SRP does not require tiny fragments or extra layers.
