@@ -17,15 +17,6 @@ on:
       - 'AGENTS.md'
       - 'docs/**'
   workflow_dispatch:
-    inputs:
-      runner:
-        description: Runner backend
-        required: true
-        default: self-hosted
-        type: choice
-        options:
-          - self-hosted
-          - github-hosted
 
 permissions:
   contents: read
@@ -37,7 +28,7 @@ concurrency:
 jobs:
   validate:
     name: Validate changed scope
-    runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["ubuntu-latest"]' || '["self-hosted","linux","x64","flow-ci"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       windows: ${{ steps.scope.outputs.windows }}
@@ -182,7 +173,7 @@ jobs:
     name: Windows integration compatibility
     needs: validate
     if: needs.validate.outputs.windows == 'true'
-    runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["windows-latest"]' || '["self-hosted","windows","x64","flow-windows-main"]') }}
+    runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - name: Check out revision
