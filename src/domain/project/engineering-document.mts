@@ -60,11 +60,17 @@ function sectionBody(text: string, heading: string): string {
 
   const endOffset = lines.slice(start + 1).findIndex((line) => /^#{1,2} /.test(line));
   const end = endOffset < 0 ? lines.length : start + 1 + endOffset;
-  return lines.slice(start + 1, end).join('\n').trim();
+  return lines
+    .slice(start + 1, end)
+    .join('\n')
+    .trim();
 }
 
 function isTopologyPlaceholder(body: string): boolean {
-  const normalized = body.toLowerCase().replace(/[.!:;]+$/g, '').trim();
+  const normalized = body
+    .toLowerCase()
+    .replace(/[.!:;]+$/g, '')
+    .trim();
   return TOPOLOGY_PLACEHOLDERS.has(normalized);
 }
 
