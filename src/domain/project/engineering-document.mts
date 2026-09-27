@@ -17,7 +17,7 @@ export const ENGINEERING_HEADINGS = [
   '## Security and operations',
   '## Deterministic gates',
   '## Deferred complexity',
-  '## Exceptions',
+  '## Exceptions'
 ];
 
 export const ENGINEERING_TOPOLOGY_HEADINGS = [
@@ -25,7 +25,7 @@ export const ENGINEERING_TOPOLOGY_HEADINGS = [
   '## Modules and ownership',
   '## Dependency direction and boundaries',
   '## Vertical slices and code organization',
-  '## Naming and readability conventions',
+  '## Naming and readability conventions'
 ] as const;
 
 const TOPOLOGY_PLACEHOLDERS = new Set(['not applicable', 'n/a', 'tbd', 'todo', 'deferred']);
@@ -34,17 +34,9 @@ export function validateEngineeringDocument(text: string) {
   const result = validateDocument(text, ENGINEERING_HEADINGS);
   const baseline = isRecord(result.baseline) ? result.baseline : {};
 
-  if (
-    !ENGINEERING_PROFILE_IDS.includes(
-      baseline.profile as (typeof ENGINEERING_PROFILE_IDS)[number],
-    )
-  )
+  if (!ENGINEERING_PROFILE_IDS.includes(baseline.profile as (typeof ENGINEERING_PROFILE_IDS)[number]))
     result.errors.push(`baseline.profile must be one of: ${ENGINEERING_PROFILE_IDS.join(', ')}.`);
-  if (
-    !['preserve', 'incremental', 'refactor', 'not_applicable'].includes(
-      String(baseline.existing_code_policy),
-    )
-  )
+  if (!['preserve', 'incremental', 'refactor', 'not_applicable'].includes(String(baseline.existing_code_policy)))
     result.errors.push('baseline.existing_code_policy is invalid.');
 
   for (const heading of ENGINEERING_TOPOLOGY_HEADINGS) {
