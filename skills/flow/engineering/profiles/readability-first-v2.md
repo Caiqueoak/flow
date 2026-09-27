@@ -1,6 +1,6 @@
 ---
 id: flow/readability-first@2
-label: Readability First v2 — Recommended
+label: Readability First v2 — Recommended Default
 description: Stack-agnostic engineering defaults for readable, cohesive, strongly-typed and behavior-oriented code.
 ---
 
@@ -11,7 +11,9 @@ description: Stack-agnostic engineering defaults for readable, cohesive, strongl
 - Optimize for readability, maintainability, predictability, and simplicity.
 - Prefer code that communicates intent without requiring the reader to mentally execute implementation details.
 - Prefer the simplest design that satisfies current requirements; avoid cleverness, speculative abstractions, and unnecessary complexity.
+- Apply Clean Code and KISS pragmatically: improve clarity and changeability without adding ceremony for its own sake.
 - Optimize for both human developers and coding agents.
+- When choosing between valid implementations, ask: **Is this easy to understand?**
 
 ## Architecture
 
@@ -19,6 +21,7 @@ description: Stack-agnostic engineering defaults for readable, cohesive, strongl
 - Keep behavior, policies, models, validation, and relevant tests close to the owning capability.
 - Keep high cohesion inside a slice and low coupling between slices. Avoid cross-slice dependencies; promote the smallest stable contract or mechanism when reuse is real.
 - Maintain a small shared kernel. Shared code is for genuinely reused mechanisms and shared domain concepts, never a dumping ground.
+- Keep domain and deterministic application logic framework-agnostic where doing so reduces coupling and improves testability or portability. Do not introduce abstraction merely to claim agnosticism.
 
 > Declarative at the domain and orchestration level, functional for deterministic transformations, imperative only at system boundaries.
 
@@ -109,3 +112,5 @@ When multiple structures are valid, prefer the one that reduces search cost and 
 ## Decision rule
 
 When multiple designs are valid, prefer the one that is easier to read, communicates domain intent, has fewer responsibilities, keeps related code closer, duplicates less knowledge, hides fewer effects, requires less context, is easier to test and modify safely, and introduces fewer unnecessary abstractions.
+
+Before accepting the design, ask again: **Is this easy to understand?**

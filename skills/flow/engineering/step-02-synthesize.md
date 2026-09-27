@@ -2,8 +2,8 @@
 
 Read the approved PRD, config, repository evidence, technology-defaults.md and the exact engineering profile selected by config before drafting:
 
-- `flow/readability-first@2` -> `profiles/readability-first-v2.md`
-- `flow/readability-first@1` -> `profiles/readability-first.md`
+- `flow/readability-first@2` -> `profiles/readability-first-v2.md` (current default)
+- `flow/readability-first@1` -> `profiles/readability-first.md` (legacy compatibility only)
 
 Use the selected profile as defaults and recommendation criteria, not as text to copy mechanically. For brownfield, inspect the actual repository first and distinguish observed state from desired state. If config records `undecided`, present `preserve`, `incremental`, and `refactor`, recommend one with project-specific justification, and ask one focused consequential question. Do not finalize the engineering contract until the user chooses. None is inferred from profile mismatch and refactoring requires the user's explicit choice.
 
@@ -54,6 +54,10 @@ Record `not_applicable|preserve|incremental|refactor` with the reason for the ch
 
 ## Exceptions
 
-Materialize concrete paths, responsibilities, dependency direction, naming examples, type/contract conventions, tests and justified exceptions. Explicitly state not applicable/deferred areas and why. Review SRP, SSOT, low coupling/high cohesion, behavior-oriented vertical slices, proximity, readability, deterministic core vs side effects, type boundaries, named constants and complexity ROI. Do not mandate ceremony or speculative abstraction.
+The architecture/topology sections are mandatory normative constraints, not descriptive placeholders. `System shape`, `Modules and ownership`, `Dependency direction and boundaries`, `Vertical slices and code organization`, and `Naming and readability conventions` must concretely define where code belongs, who owns it, which dependency directions are allowed, how behavior is sliced and how readers navigate the codebase. They may not be left as `not applicable`, `TBD`, `TODO` or deferred.
+
+Materialize concrete paths, responsibilities, dependency direction, naming examples, type/contract conventions, tests and justified exceptions. Explicitly state not applicable/deferred areas and why only outside the mandatory architecture/topology sections. Review SRP, SSOT, low coupling/high cohesion, behavior-oriented vertical slices, proximity, readability, deterministic core vs side effects, type boundaries, named constants and complexity ROI. Do not mandate ceremony or speculative abstraction.
+
+Once approved, engineering.md is the project engineering source of truth. Ordinary implementation must fit this topology. If future work requires a material change to system shape, ownership, dependency direction, vertical-slice organization or a documented architectural exception, revise the affected engineering section, return the contract to draft and obtain approval before implementing the architectural change. Never allow a feature to create a second implicit architecture merely because it is locally convenient.
 
 Draft gates.yaml schema_version: 2 with only command/builtin gates using real project tooling. Qualitative review stays instructions, not agentic gates or regex coverage. Do not install tooling or change application code before approval. Route to approval.
