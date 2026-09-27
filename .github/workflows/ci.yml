@@ -33,6 +33,24 @@ jobs:
     outputs:
       windows: ${{ steps.scope.outputs.windows }}
     steps:
+      - name: Require Conventional Commit PR title
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          node --input-type=module <<'NODE'
+            const title = process.env.PR_TITLE ?? '';
+            const conventionalTitle = /^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert)(\([^)]+\))?(!)?: .+/;
+
+            if (!conventionalTitle.test(title)) {
+              console.error(
+                'PR title must use Conventional Commits, e.g. "feat(flow): add capability" or "fix(release): handle publishing".',
+              );
+              process.exit(1);
+            }
+          NODE
+
       - name: Check out revision
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
