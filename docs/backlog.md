@@ -67,6 +67,7 @@ Working notes for the next Flow iteration. This file captures design decisions a
   - whether parallelism materially reduces elapsed work;
   - whether the workers can receive clear, bounded contexts and acceptance criteria.
 - The skill should establish baseline heuristics for expected performance while preserving model judgment. It should help avoid both under-parallelization of obviously independent work and over-parallelization that creates coordination overhead.
+- The baseline is guidance, not a fixed concurrency cap: the model may choose fewer or more subagents when the actual dependency graph and change surface justify it, and should keep the orchestration proportional to the work.
 - Depending on the work, valid decisions include:
   - orchestrator handles directly;
   - one worker handles the whole work item;
