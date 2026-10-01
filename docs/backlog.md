@@ -16,10 +16,17 @@ Working notes for the next Flow iteration. This file captures design decisions a
 - Discovery should calibrate the real project context organically: users, stakes, longevity, distribution, UX expectations, data, operations, cost, failure impact, and other dimensions relevant to the specific product.
 - Discovery must not advance to scope/PRD finalization until every relevant dimension identified by the discovery skill has been answered or explicitly resolved.
 - The skill must maintain awareness of unresolved dimensions so the agent cannot simply forget one and continue.
+- Discovery completion rule: maintain a dynamic set of relevant dimensions as `resolved`, `unresolved`, or explicitly `deferred/not relevant`; scope/PRD presentation is blocked while any relevant dimension remains unresolved.
 - Ask questions in batches only when answers are sufficiently independent. Questions whose answers depend on earlier answers must wait for a later batch.
 - When useful, provide options plus a recommended option and concise rationale, while leaving the decision with the user.
 - Include an explicit challenge/grill step inspired by BMAD/forge-style elicitation so plausible assumptions are pressure-tested before implementation.
 - The next question batch must be derived from prior answers, not pre-scripted.
+
+## Human checkpoints
+
+- Default human checkpoints: approved PRD; experience/UX when relevant; approved engineering; and the end of each work item.
+- The user may explicitly pre-authorize continuous execution through work-item checkpoints (for example, continue until MVP), but newly discovered consequential ambiguity still returns to the user.
+- A work item is not considered definitively accepted until its implementation/review checkpoint is resolved.
 
 ## Product and UX definition
 
@@ -41,7 +48,7 @@ Working notes for the next Flow iteration. This file captures design decisions a
 ## Orchestration and subagents
 
 - The main chat agent should primarily act as orchestrator and reviewer.
-- Implementation work can be delegated to fresh-context subagents/workers.
+- Non-simple implementation work must be delegated to one or more fresh-context subagents/workers. The orchestrator may implement directly only when the change is genuinely simple and bounded.
 - Workers receive only the bounded context needed for their assignment and return implementation results, verification evidence, decisions, and blockers.
 - The orchestrator remains responsible for user interaction, synthesis, integration judgment, architectural consistency, and the final review opinion.
 - The model decides dynamically whether to spawn subagents, how many to spawn, which responsibilities to delegate, and which executions should be parallel versus sequential.
@@ -78,14 +85,15 @@ Working notes for the next Flow iteration. This file captures design decisions a
 
 ## Worktrees, branches, and PR lifecycle — investigate
 
-Potential model:
+Adopted baseline:
 
-1. isolate implementation in a branch/worktree;
-2. complete and review the active work item;
-3. user validates/accepts the work item;
-4. publish the branch;
-5. create a PR;
-6. remove the local worktree so it does not accumulate on disk.
+1. one active work item maps to one implementation branch;
+2. open a draft PR early enough to provide remote traceability/backup while implementation is in progress;
+3. use a worktree only when isolation or concurrent writers materially justify it;
+4. complete implementation and review on the work-item branch;
+5. user validates/accepts the work item unless continuous execution was explicitly pre-authorized;
+6. transition the PR out of draft / integrate according to repository policy;
+7. delete any temporary worktree once it is no longer needed so it does not accumulate on disk.
 
 Questions to resolve before adopting this:
 
@@ -98,13 +106,14 @@ Questions to resolve before adopting this:
 - Should a worktree be created only when actual concurrent writers or isolation risk justify it?
 - Should the branch boundary be the work item rather than the task, even if workers execute tasks inside it?
 
-Current preference to test: **one active work item and one work-item branch; use worktrees only when isolation/concurrent writes clearly justify them rather than making them mandatory.**
+Decision: **one active work item and one work-item branch; worktrees are optional isolation primitives, not a mandatory Flow abstraction.** Task-level worktrees are not the default and must justify their synchronization/integration cost.
 
 ## Context lifecycle / Ralph-style loop
 
 - Treat worker contexts as disposable; fresh worker context is the primary context-management mechanism.
 - Persist everything needed to continue in canonical project artifacts rather than relying on chat history.
 - At stable boundaries (approved PRD, experience, engineering, completed work item), allow the orchestrator to rehydrate from canonical state instead of carrying transient reasoning indefinitely.
+- Primary orchestrator reset boundary: end of a work item. Earlier resets after large discovery/engineering phases are allowed when context pressure warrants them.
 - Candidate work-item loop:
   1. rehydrate canonical state;
   2. select/decompose ready work;
@@ -118,7 +127,9 @@ Current preference to test: **one active work item and one work-item branch; use
 
 ## Review
 
-- Review must produce a human-readable **parecer**, not merely a status field.
+- Review is a backlog/history of review passes, findings, resolutions, and final opinions for the work item rather than a single overwritten status.
+- Each review pass must produce a human-readable **parecer**, not merely a status field.
+- Findings remain traceable until resolved, superseded, explicitly accepted as residual risk, or carried into later work; subsequent review passes append the new state instead of erasing prior findings.
 - The review should explain:
   - what was delivered;
   - whether intent and acceptance criteria are met;
@@ -128,7 +139,13 @@ Current preference to test: **one active work item and one work-item branch; use
   - residual risks.
 - The orchestrator should review work it did not implement when practical, reducing self-review bias.
 - Review can use specialized subagents/lenses (acceptance, engineering, edge cases, verification) when proportional to the change, with the orchestrator synthesizing the final parecer.
-- Machine-readable review metadata may exist for routing, but it is not a substitute for the review opinion.
+- Review outcomes use a small routing vocabulary such as `approved`, `changes_required`, and `blocked`; machine-readable metadata exists for routing/history but is not a substitute for the parecer.
+
+## BMAD → Flow harvest before implementation
+
+- Before implementing Flow vNext, perform a systematic comparison of the relevant BMAD skills and classify each useful mechanism as `reuse concept`, `adapt`, or `discard`.
+- Prioritize discovery/elicitation, challenge/forge, PRD create-update-validate, UX/experience, architecture, and review/context-handoff patterns.
+- Reuse BMAD as a design reference, not as a dependency or rigid workflow to copy.
 
 ## POC / evaluation
 
