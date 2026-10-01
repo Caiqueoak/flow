@@ -22,6 +22,25 @@ Working notes for the next Flow iteration. This file captures design decisions a
 - Include an explicit challenge/grill step inspired by BMAD/forge-style elicitation so plausible assumptions are pressure-tested before implementation.
 - The next question batch must be derived from prior answers, not pre-scripted.
 
+## Resumable draft state
+
+- Every decision-heavy Flow phase must persist an incremental draft, not only the final approved artifact.
+- Draft state must be updated as the user answers questions, makes decisions, rejects options, defers topics, or introduces new constraints.
+- A fresh chat must be able to resume safely from repository state without depending on hidden chat context.
+- Each decision-phase draft should preserve at least:
+  - current phase and subphase;
+  - decisions already made and their rationale when relevant;
+  - unresolved dimensions/questions;
+  - deferred/not-relevant dimensions;
+  - assumptions still being tested;
+  - latest user-approved direction;
+  - next decision frontier / next safe action.
+- Drafts must be clearly distinguishable from approved/final artifacts so partial thinking cannot be mistaken for an accepted contract.
+- Discovery is the first required case, but the same resumability principle applies to other decision-heavy phases such as experience/UX, engineering, planning, and review/recovery where state can span multiple conversations.
+- Persist after meaningful decision batches/checkpoints rather than waiting until phase completion.
+- Doctor/recovery behavior must verify that persisted draft state is internally consistent with canonical approved artifacts and Git/repository state before continuing.
+- During Flow vNext implementation, audit the current repository to confirm where state is currently written, whether writes are consistent/atomic enough for resume, and where draft/checkpoint persistence is missing.
+
 ## Human checkpoints
 
 - Default human checkpoints: approved PRD; experience/UX when relevant; approved engineering; and the end of each work item.
