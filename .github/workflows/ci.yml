@@ -7,7 +7,6 @@ on:
       - '.github/dependabot.yml'
       - '.gitignore'
       - 'AGENTS.md'
-      - 'docs/**'
   push:
     branches: [main]
     paths-ignore:
