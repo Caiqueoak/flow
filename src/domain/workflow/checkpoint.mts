@@ -76,7 +76,9 @@ export function parseCheckpoint(value: unknown, { source = 'checkpoint' }: { sou
   if (new Set(nextFrontier).size !== nextFrontier.length)
     fail(`${source}.next_frontier contains duplicate dimension IDs.`);
 
-  const unresolved = new Set(dimensions.filter((dimension) => dimension.state === 'unresolved').map((dimension) => dimension.id));
+  const unresolved = new Set(
+    dimensions.filter((dimension) => dimension.state === 'unresolved').map((dimension) => dimension.id)
+  );
   for (const id of nextFrontier)
     if (!unresolved.has(id)) fail(`${source}.next_frontier '${id}' must reference an unresolved dimension.`);
 

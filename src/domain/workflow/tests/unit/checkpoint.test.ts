@@ -29,7 +29,10 @@ test('checkpoint preserves compact resumability state', () => {
 });
 
 test('checkpoint next frontier must reference unresolved dimensions', () => {
-  assert.throws(() => parseCheckpoint(checkpoint({ next_frontier: ['D001'] })), /must reference an unresolved dimension/);
+  assert.throws(
+    () => parseCheckpoint(checkpoint({ next_frontier: ['D001'] })),
+    /must reference an unresolved dimension/
+  );
 });
 
 test('approval-ready checkpoint rejects unresolved state and assumptions under test', () => {

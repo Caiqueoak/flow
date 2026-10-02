@@ -81,7 +81,15 @@ function loadWorkItemDirectory(parent: string, folder: string): LoadedWorkItem {
   const base = path.join(parent, folder);
   const id = match[1] as WorkItemId;
   const shell = validateWorkItemShell(base, id);
-  return { ...shell.spec.metadata, id, folder, specBody: shell.spec.body, tasks: shell.tasks, review: shell.review, base };
+  return {
+    ...shell.spec.metadata,
+    id,
+    folder,
+    specBody: shell.spec.body,
+    tasks: shell.tasks,
+    review: shell.review,
+    base
+  };
 }
 
 function validateWorkItemShell(directory: string, expectedWorkItem: WorkItemId) {

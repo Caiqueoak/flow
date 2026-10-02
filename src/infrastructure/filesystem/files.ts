@@ -17,10 +17,7 @@ export function readText(file: string): string {
 
 export function atomicWriteText(file: string, content: string, options: AtomicWriteOptions = {}): void {
   options.validate?.(content);
-  const temporary = path.join(
-    path.dirname(file),
-    `.${path.basename(file)}.${process.pid}.${randomUUID()}.tmp`
-  );
+  const temporary = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${randomUUID()}.tmp`);
   try {
     fs.writeFileSync(temporary, content, 'utf8');
     (options.replace ?? fs.renameSync)(temporary, file);

@@ -1,10 +1,4 @@
-import {
-  fail,
-  positionalArguments,
-  projectRoot,
-  recordOutput,
-  resolveSubcommand
-} from '../command-runtime.js';
+import { fail, positionalArguments, projectRoot, recordOutput, resolveSubcommand } from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
 import { runBegin } from './commands/begin.js';
 import { runClear } from './commands/clear.js';

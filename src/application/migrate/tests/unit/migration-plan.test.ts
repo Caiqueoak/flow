@@ -244,7 +244,11 @@ test('does not turn operational write failures into format rescue', (t) => {
   const root = canonicalProject(t, '0.8.0');
   const before = fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8');
   const originalWrite = fs.writeFileSync;
-  fs.writeFileSync = ((file: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, options?: unknown) => {
+  fs.writeFileSync = ((
+    file: fs.PathOrFileDescriptor,
+    data: string | NodeJS.ArrayBufferView,
+    options?: unknown
+  ) => {
     const fileName = path.basename(String(file));
     if (
       String(file).includes('_flow-migration-') &&
@@ -339,7 +343,6 @@ test('upgrades canonical tasks and gates while preserving migrated commit proven
   assert.equal(gates.gates[0].cost, 'medium');
   assert.ok(result.backup && fs.existsSync(result.backup));
 });
-
 
 test('upgrades state v2 and reconstructs only a canonically provable active work item', (t) => {
   const root = canonicalProject(t, '0.7.0');
