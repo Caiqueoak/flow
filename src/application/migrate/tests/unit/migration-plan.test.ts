@@ -7,6 +7,11 @@ import { parse } from 'yaml';
 import { captureCommandOutcome } from '../../../command-runtime.js';
 import { emptyState, stringifyState } from '../../../../domain/workflow/execution-state.mjs';
 import { migrateProject, migrationPlan, runMigrate } from '../../operations/apply.mjs';
+import {
+  documentMetadata,
+  isProjectDocumentApproved
+} from '../../../../domain/project/document.mjs';
+import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
 
 function temporaryProject(t: test.TestContext, prefix: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -354,6 +359,55 @@ test('upgrades v2 state without trusting its dormant execution cursor', (t) => {
   assert.equal(state.migration.status, 'completed');
   assert.equal(state.execution, undefined);
   assert.equal(state.stop_reason, undefined);
+});
+
+test('adopts existing approved project documents with exact revisions', (t) => {
+  const root = canonicalProject(t, '0.8.0');
+  fs.writeFileSync(path.join(root, '_flow', 'state.yaml'), stringifyState(emptyState()));
+  const docs = path.join(root, '_flow', 'docs');
+  fs.mkdirSync(docs, { recursive: true });
+
+  const legacy = (headings: readonly string[], metadata = '') =>
+    `---\nschema_version: 1\nstatus: approved\napproved_at: 2026-01-01T00:00:00.000Z\n${metadata}---\n\n${headings
+      .map((heading) => `${heading}\nConcrete contract.`)
+      .join('\n\n')}\n`;
+
+  fs.writeFileSync(
+    path.join(docs, 'prd.md'),
+    legacy([
+      '# Product Requirements',
+      '## Purpose',
+      '## Users',
+      '## Scope',
+      '## Requirements',
+      '## Constraints',
+      '## Non-goals'
+    ])
+  );
+  fs.writeFileSync(
+    path.join(docs, 'engineering.md'),
+    legacy(
+      ENGINEERING_HEADINGS,
+      'baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: not_applicable\n'
+    )
+  );
+
+  const plan = migrationPlan(root, '0.8.0');
+  assert.ok(plan.changes.includes('bind exact approval revision for docs/prd.md'));
+  assert.ok(plan.changes.includes('bind exact approval revision for docs/engineering.md'));
+
+  const result = migrateProject(root, { targetVersion: '0.8.0' });
+  assert.equal(result.unchanged, false);
+
+  const prd = fs.readFileSync(path.join(docs, 'prd.md'), 'utf8');
+  const engineering = fs.readFileSync(path.join(docs, 'engineering.md'), 'utf8');
+  assert.equal(documentMetadata(prd).schema_version, 2);
+  assert.equal(documentMetadata(prd).experience, 'not_required');
+  assert.equal(documentMetadata(prd).approval?.at, '2026-01-01T00:00:00.000Z');
+  assert.equal(isProjectDocumentApproved(prd), true);
+  assert.equal(documentMetadata(engineering).schema_version, 2);
+  assert.equal(documentMetadata(engineering).approval?.at, '2026-01-01T00:00:00.000Z');
+  assert.equal(isProjectDocumentApproved(engineering), true);
 });
 
 test('returns a true no-op for a current canonical project', (t) => {
