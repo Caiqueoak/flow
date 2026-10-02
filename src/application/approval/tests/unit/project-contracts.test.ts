@@ -49,7 +49,10 @@ test('project contract helpers identify canonical documents and structural error
 
 test('required project contracts follow approved PRD experience relevance', (t) => {
   const project = root(t);
-  assert.deepEqual(requiredProjectContracts(project).map((contract) => contract.kind), ['prd']);
+  assert.deepEqual(
+    requiredProjectContracts(project).map((contract) => contract.kind),
+    ['prd']
+  );
   assert.equal(inspectProjectContract(project, 'prd').exists, false);
   assert.throws(() => assertProjectContractsAuthorized(project), /prd\.md is not authorized/);
 
@@ -57,16 +60,12 @@ test('required project contracts follow approved PRD experience relevance', (t) 
     path.join(project, '_flow', 'docs', 'prd.md'),
     approve(draft(PRD_HEADINGS, 'experience: required\n'))
   );
-  assert.deepEqual(requiredProjectContracts(project).map((contract) => contract.kind), [
-    'prd',
-    'experience',
-    'engineering'
-  ]);
-
-  fs.writeFileSync(
-    path.join(project, '_flow', 'docs', 'experience.md'),
-    approve(draft(['# Experience']))
+  assert.deepEqual(
+    requiredProjectContracts(project).map((contract) => contract.kind),
+    ['prd', 'experience', 'engineering']
   );
+
+  fs.writeFileSync(path.join(project, '_flow', 'docs', 'experience.md'), approve(draft(['# Experience'])));
   fs.writeFileSync(
     path.join(project, '_flow', 'docs', 'engineering.md'),
     approve(
@@ -100,6 +99,9 @@ test('not-required experience omits experience from downstream authorization', (
     )
   );
 
-  assert.deepEqual(requiredProjectContracts(project).map((contract) => contract.kind), ['prd', 'engineering']);
+  assert.deepEqual(
+    requiredProjectContracts(project).map((contract) => contract.kind),
+    ['prd', 'engineering']
+  );
   assert.doesNotThrow(() => assertProjectContractsAuthorized(project));
 });

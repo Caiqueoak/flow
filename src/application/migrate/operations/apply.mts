@@ -333,10 +333,7 @@ function upgradeLegacyProjectDocumentApproval(
   if (fileName === 'prd.md') {
     const parsed = parseProjectDocument(candidate);
     if (parsed.metadata.experience === undefined) {
-      candidate = serializeProjectDocument(
-        { ...parsed.metadata, experience: 'not_required' },
-        parsed.body
-      );
+      candidate = serializeProjectDocument({ ...parsed.metadata, experience: 'not_required' }, parsed.body);
     }
   }
 

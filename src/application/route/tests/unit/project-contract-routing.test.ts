@@ -85,10 +85,7 @@ test('route enforces exact PRD and required experience approvals before engineer
 
 test('route skips experience when the exact-approved PRD says not_required', (t) => {
   const root = project(t);
-  writeApproved(
-    path.join(root, '_flow', 'docs', 'prd.md'),
-    draft(PRD_HEADINGS, 'experience: not_required\n')
-  );
+  writeApproved(path.join(root, '_flow', 'docs', 'prd.md'), draft(PRD_HEADINGS, 'experience: not_required\n'));
 
   assert.deepEqual(routeProject(root), {
     action: 'continue',

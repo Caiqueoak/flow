@@ -18,7 +18,15 @@ export interface ApprovalResult {
   revision: string;
 }
 
-export function recordApproval({ root, target, approvedAt }: { root: string; target: string; approvedAt: string }): ApprovalResult {
+export function recordApproval({
+  root,
+  target,
+  approvedAt
+}: {
+  root: string;
+  target: string;
+  approvedAt: string;
+}): ApprovalResult {
   const kind = canonicalProjectDocumentKind(target);
   if (kind) return recordProjectDocumentApproval(root, target, kind, approvedAt);
 
@@ -46,9 +54,7 @@ function recordProjectDocumentApproval(
   const approved = approveProjectDocument(current, approvedAt);
   const approvedErrors = validateProjectDocument(kind, approved.text);
   if (approvedErrors.length) {
-    throw new Error(
-      `Cannot approve ${target} under the current project-document schema: ${approvedErrors.join(' ')}`
-    );
+    throw new Error(`Cannot approve ${target} under the current project-document schema: ${approvedErrors.join(' ')}`);
   }
 
   writeText(file, approved.text);

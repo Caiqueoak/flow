@@ -7,10 +7,7 @@ import { parse } from 'yaml';
 import { captureCommandOutcome } from '../../../command-runtime.js';
 import { emptyState, stringifyState } from '../../../../domain/workflow/execution-state.mjs';
 import { migrateProject, migrationPlan, runMigrate } from '../../operations/apply.mjs';
-import {
-  documentMetadata,
-  isProjectDocumentApproved
-} from '../../../../domain/project/document.mjs';
+import { documentMetadata, isProjectDocumentApproved } from '../../../../domain/project/document.mjs';
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
 
 function temporaryProject(t: test.TestContext, prefix: string) {

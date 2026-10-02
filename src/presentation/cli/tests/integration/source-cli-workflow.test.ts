@@ -57,16 +57,12 @@ function project(t: test.TestContext) {
 
 function prdDocument(status: 'draft' | 'approved') {
   const draft = `---\nschema_version: 2\nstatus: draft\nexperience: not_required\n---\n\n${PRD_HEADINGS.map((heading) => `${heading}\nText.`).join('\n\n')}\n`;
-  return status === 'approved'
-    ? approveProjectDocument(draft, '2026-01-01T00:00:00.000Z').text
-    : draft;
+  return status === 'approved' ? approveProjectDocument(draft, '2026-01-01T00:00:00.000Z').text : draft;
 }
 
 function engineeringDocument(status: 'draft' | 'approved', policy: string) {
   const draft = `---\nschema_version: 2\nstatus: draft\nbaseline:\n  profile: flow/readability-first@2\n  existing_code_policy: ${policy}\n---\n\n${ENGINEERING_HEADINGS.map((heading) => `${heading}\nText.`).join('\n\n')}\n`;
-  return status === 'approved'
-    ? approveProjectDocument(draft, '2026-01-01T00:00:00.000Z').text
-    : draft;
+  return status === 'approved' ? approveProjectDocument(draft, '2026-01-01T00:00:00.000Z').text : draft;
 }
 
 function writeApprovedProjectBaseline(root: string, policy = 'not_applicable') {

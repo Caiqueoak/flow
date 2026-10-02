@@ -50,7 +50,10 @@ export function documentMetadata(text: string): DocumentMetadata {
   return parseProjectDocument(text).metadata;
 }
 
-export function approveProjectDocument(text: string, approvedAt: string): {
+export function approveProjectDocument(
+  text: string,
+  approvedAt: string
+): {
   text: string;
   revision: string;
 } {

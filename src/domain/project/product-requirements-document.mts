@@ -14,10 +14,7 @@ export function validatePrdDocument(text: string) {
     '## Non-goals'
   ]);
 
-  if (
-    result.schema_version === 2 &&
-    !EXPERIENCE_RELEVANCE.includes(result.experience as ExperienceRelevance)
-  ) {
+  if (result.schema_version === 2 && !EXPERIENCE_RELEVANCE.includes(result.experience as ExperienceRelevance)) {
     result.errors.push('experience must be required or not_required for schema_version 2.');
   }
 

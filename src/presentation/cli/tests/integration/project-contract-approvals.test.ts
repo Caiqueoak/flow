@@ -54,10 +54,7 @@ function document(headings: readonly string[], metadata = '') {
 }
 
 function writePrd(root: string, experience: 'required' | 'not_required') {
-  fs.writeFileSync(
-    path.join(root, '_flow', 'docs', 'prd.md'),
-    document(PRD_HEADINGS, `experience: ${experience}\n`)
-  );
+  fs.writeFileSync(path.join(root, '_flow', 'docs', 'prd.md'), document(PRD_HEADINGS, `experience: ${experience}\n`));
 }
 
 function writeEngineering(root: string) {
@@ -153,10 +150,7 @@ test('stale engineering approval cannot authorize task mutation', (t) => {
   assert.equal(run(root, ['approval', 'record', '_flow/docs/prd.md']).status, 0);
   assert.equal(run(root, ['approval', 'record', '_flow/docs/engineering.md']).status, 0);
 
-  assert.equal(
-    run(root, ['work-item', 'create', 'W101', '--title', 'Item', '--outcome', 'Outcome']).status,
-    0
-  );
+  assert.equal(run(root, ['work-item', 'create', 'W101', '--title', 'Item', '--outcome', 'Outcome']).status, 0);
   const base = path.join(root, '_flow', 'work-items', 'W101-item');
   const spec = path.join(base, 'spec.md');
   fs.appendFileSync(
