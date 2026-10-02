@@ -1,4 +1,4 @@
-export const STATE_SCHEMA_VERSION = 2;
+export const STATE_SCHEMA_VERSION = 3;
 
 export const WORKFLOW = Object.freeze({
   discovery: ['define_problem', 'explore_product', 'assess_viability', 'consolidate'],

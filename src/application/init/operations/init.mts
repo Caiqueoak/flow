@@ -19,6 +19,8 @@ import { installRuntimeSkill } from '../../../infrastructure/runtime/runtime-ski
 import { ENGINEERING_PROFILES } from '../../../infrastructure/runtime/engineering-profiles.js';
 import { FLOW_SCHEMA_VERSION } from '../../../domain/project/project.js';
 import { GATES_SCHEMA_VERSION } from '../../../domain/gate/gate.js';
+import { emptyState } from '../../../domain/workflow/execution-state.mjs';
+import { writeExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 import {
   directoryEntryNames,
   ensureDirectory,
@@ -136,6 +138,7 @@ export async function runInit({
   writeConfig(root, config);
   if (!existed) {
     writeText(path.join(flowDirectory, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
+    writeExecutionState(root, emptyState());
     ensureDirectory(path.join(flowDirectory, 'work-items'));
     ensureDirectory(path.join(flowDirectory, 'generated'));
     writeText(path.join(flowDirectory, 'generated', '.gitignore'), '*\n!.gitignore\n');
