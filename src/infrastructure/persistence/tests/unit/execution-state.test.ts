@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { emptyState } from '../../../domain/workflow/execution-state.mjs';
+import { emptyState } from '../../../../domain/workflow/execution-state.mjs';
 import { executionStatePath, loadExecutionState, writeExecutionState } from '../../execution-state.mjs';
 
 test('execution-state persistence begins from an empty v3 state when no file exists', () => {

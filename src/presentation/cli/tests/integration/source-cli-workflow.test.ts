@@ -101,6 +101,7 @@ test('global help lists the stable public command surface', async () => {
     'gates',
     'work-item',
     'task',
+    'checkpoint',
     'approval',
     'scope'
   ]) {

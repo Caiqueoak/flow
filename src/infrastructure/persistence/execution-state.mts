@@ -30,7 +30,7 @@ export function writeExecutionState(
   ensureDirectory(path.dirname(file));
   const text = stringifyState(state);
   atomicWriteText(file, text, {
-    replace,
+    ...(replace ? { replace } : {}),
     validate: (candidate) => parseState(candidate, { source: file })
   });
   return parseState(text, { source: file });

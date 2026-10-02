@@ -5,8 +5,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { stringify } from 'yaml';
 import { createWorkItemShell, loadWorkItems, workItemsDirectory } from '../../work-items.mjs';
-import { serializeWorkItemSpec } from '../../../domain/work-item/specification.mjs';
-import { stringifyReview } from '../../../domain/work-item/review.mjs';
+import { serializeWorkItemSpec } from '../../../../domain/work-item/specification.mjs';
+import { stringifyReview } from '../../../../domain/work-item/review.mjs';
 
 function shell() {
   return {
