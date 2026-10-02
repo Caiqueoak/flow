@@ -18,6 +18,8 @@ import { projectRoot } from '../../command-runtime.js';
 import { installRuntimeSkill } from '../../../infrastructure/runtime/runtime-skills.js';
 import { ENGINEERING_PROFILES } from '../../../infrastructure/runtime/engineering-profiles.js';
 import { FLOW_SCHEMA_VERSION } from '../../../domain/project/project.js';
+import { emptyState } from '../../../domain/workflow/execution-state.mjs';
+import { writeExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 import { GATES_SCHEMA_VERSION } from '../../../domain/gate/gate.js';
 import {
   directoryEntryNames,
@@ -139,6 +141,7 @@ export async function runInit({
     ensureDirectory(path.join(flowDirectory, 'work-items'));
     ensureDirectory(path.join(flowDirectory, 'generated'));
     writeText(path.join(flowDirectory, 'generated', '.gitignore'), '*\n!.gitignore\n');
+    writeExecutionState(root, emptyState());
   }
   for (const runtime of config.runtimes)
     info(`Ã¢Å“â€œ ${runtime.type}: ${path.relative(root, installRuntimeSkill(root, runtime, packageRoot))}`);

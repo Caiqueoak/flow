@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { parse, stringify } from 'yaml';
+import { parse } from 'yaml';
 import { FLOW_SCHEMA_VERSION } from '../../domain/project/project.js';
 import { READABILITY_FIRST_PROFILE } from '../runtime/engineering-profiles.js';
+import { ensureDirectory, writeYaml } from '../filesystem/index.js';
 
 export interface RuntimeConfiguration {
   type: string;
@@ -52,8 +53,8 @@ export function writeConfig(root: string, config: FlowConfiguration): void {
       existing_code_policy: normalizeExistingCodePolicy(config.engineering?.existing_code_policy)
     }
   };
-  fs.mkdirSync(path.join(root, '_flow'), { recursive: true });
-  fs.writeFileSync(configPath(root), stringify(normalized, { lineWidth: 0 }), 'utf8');
+  ensureDirectory(path.join(root, '_flow'));
+  writeYaml(configPath(root), normalized);
 }
 
 function normalizeExistingCodePolicy(value: string | undefined): string {

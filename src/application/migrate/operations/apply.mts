@@ -205,8 +205,6 @@ function migrateStaged(root: string, targetVersion: string): void {
   if (migrationPathExists(path.join(flow, 'GRAPH.md'))) deleteMigrationFile(path.join(flow, 'GRAPH.md'));
   if (migrationPathExists(oldFile)) moveMigrationPath(oldFile, path.join(flow, 'docs', 'legacy-backlog.yaml'));
   const state = emptyState();
-  state.execution.phase = 'reconcile';
-  state.execution.step = 'resolve_conflicts';
   state.migration.status = 'pending_reconciliation';
   writeMigrationText(path.join(flow, 'state.yaml'), stringifyState(state));
   if (!migrationPathExists(path.join(flow, 'gates.yaml')))
@@ -474,8 +472,6 @@ function rebuildStagedForReconciliation(staging: string, sourceFlow: string, tar
   writeMigrationText(path.join(staged, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
 
   const state = emptyState();
-  state.execution.phase = 'reconcile';
-  state.execution.step = 'resolve_conflicts';
   state.migration.status = 'pending_reconciliation';
   writeMigrationText(path.join(staged, 'state.yaml'), stringifyState(state));
   syncProject(staging);

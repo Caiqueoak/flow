@@ -1,57 +1,91 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { emptyState, parseState, stringifyState, WORKFLOW_STEPS, type ExecutionState } from '../../execution-state.mjs';
+import { emptyState, parseState, stringifyState, type ExecutionState } from '../../execution-state.mjs';
 
-function state(overrides: Record<string, unknown> = {}) {
-  return stringifyState({ ...emptyState(), ...overrides } as ExecutionState);
-}
-
-test('execution state round-trips canonical state', () => {
-  const state: ExecutionState = { ...emptyState(), active: { work_item: 'W101', task: 'W101-T001' } };
+test('execution state v3 round-trips checkpoint state', () => {
+  const state: ExecutionState = {
+    ...emptyState(),
+    active: { work_item: 'W101' },
+    checkpoint: {
+      phase: 'planning',
+      step: 'create_tasks',
+      target: { kind: 'work_item_plan', ref: '_flow/work-items/W101-example/tasks.yaml', revision: null },
+      status: 'active',
+      inputs: [{ ref: '_flow/work-items/W101-example/spec.md', revision: 'spec-revision' }],
+      dimensions: [{ id: 'D001', state: 'unresolved', summary: 'Choose task boundary.' }],
+      assumptions: [],
+      latest_authorized_direction: 'Prefer cohesive tasks.',
+      next_frontier: ['D001'],
+      updated_at: '2026-10-02T12:00:00Z'
+    }
+  };
   assert.deepEqual(parseState(stringifyState(state)), state);
 });
 
-test('execution state rejects malformed lifecycle and task ownership', () => {
+test('execution state reads v2 without trusting its dormant cursor or active task', () => {
+  const parsed = parseState(`schema_version: 2
+execution:
+  phase: implementation
+  step: execute_task
+active:
+  work_item: W101
+  task: W101-T001
+stop_reason: external_action
+migration:
+  status: pending_reconciliation
+`);
+
+  assert.deepEqual(parsed, {
+    schema_version: 3,
+    migration: { status: 'pending_reconciliation' },
+    active: { work_item: 'W101' },
+    checkpoint: null
+  });
+});
+
+test('execution state rejects malformed v3 structure', () => {
   assert.throws(() => parseState('{'), /invalid/);
   assert.throws(() => parseState('[]'), /must be a mapping/);
   assert.throws(() => parseState('schema_version: 1'), /schema_version/);
-  assert.throws(() => parseState(state({ execution: { phase: 'unknown', step: 'unknown' } })), /phase is invalid/);
-  assert.throws(
-    () => parseState(state({ execution: { phase: 'discovery', step: 'draft' } })),
-    /step 'draft' is invalid/
-  );
-  assert.throws(() => parseState(state({ stop_reason: 'pause' })), /stop_reason/);
-  assert.throws(() => parseState(state({ migration: { status: 'running' } })), /migration.status/);
-  assert.throws(() => parseState(state({ active: { work_item: 'bad', task: null } })), /active.work_item/);
-  assert.throws(() => parseState(state({ active: { work_item: 'W101', task: 'bad' } })), /active.task is invalid/);
   assert.throws(
     () =>
-      parseState(
-        'schema_version: 2\nexecution:\n  phase: discovery\n  step: define_problem\nactive:\n  work_item: W101\n  task: W102-T001\n'
-      ),
-    /does not belong/
+      parseState(`schema_version: 3
+migration:
+  status: running
+active:
+  work_item: null
+checkpoint: null
+`),
+    /migration.status/
+  );
+  assert.throws(
+    () =>
+      parseState(`schema_version: 3
+migration:
+  status: not_required
+active:
+  work_item: bad
+checkpoint: null
+`),
+    /active.work_item/
+  );
+  assert.throws(
+    () =>
+      parseState(`schema_version: 3
+migration:
+  status: not_required
+active:
+  work_item: null
+`),
+    /checkpoint must be present/
   );
 });
 
-test('execution state accepts every workflow step, stop reason and migration status', () => {
-  for (const [phase, steps] of Object.entries(WORKFLOW_STEPS)) {
-    for (const step of steps) {
-      const parsed = parseState(state({ execution: { phase, step } }));
-      assert.deepEqual(parsed.execution, { phase, step });
-    }
-  }
-  for (const stop_reason of [
-    null,
-    'consequential_decision',
-    'external_action',
-    'unrecoverable_blocker',
-    'finished'
-  ] as const)
-    assert.equal(parseState(state({ stop_reason })).stop_reason, stop_reason);
-  for (const status of ['not_required', 'pending_reconciliation', 'completed'] as const)
-    assert.equal(parseState(state({ migration: { status } })).migration.status, status);
-  assert.deepEqual(parseState(state({ active: { work_item: null, task: 'W101-T001' } })).active, {
-    work_item: null,
-    task: 'W101-T001'
+test('empty execution state is the minimal v3 structural envelope', () => {
+  assert.deepEqual(emptyState(), {
+    schema_version: 3,
+    migration: { status: 'not_required' },
+    active: { work_item: null },
+    checkpoint: null
   });
 });

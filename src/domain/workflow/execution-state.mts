@@ -1,33 +1,27 @@
 import { parseDocument, stringify } from 'yaml';
 import { UserInputError as ArtifactValidationError } from '../errors.js';
-import { STATE_SCHEMA_VERSION, WORKFLOW } from './workflow.js';
-import { WORK_ITEM_ID, type WorkItemId } from '../work-item/work-item.js';
-import { QUALIFIED_TASK_ID, type QualifiedTaskId } from '../task/task.js';
+import { type WorkItemId, WORK_ITEM_ID } from '../work-item/work-item.js';
+import { parseCheckpoint, type Checkpoint } from './checkpoint.mjs';
+import { STATE_SCHEMA_VERSION } from './workflow.js';
 
-const PHASES = new Set(Object.keys(WORKFLOW));
-export const WORKFLOW_STEPS = WORKFLOW;
-const STOP_REASONS = new Set([null, 'consequential_decision', 'external_action', 'unrecoverable_blocker', 'finished']);
+const LEGACY_STATE_SCHEMA_VERSION = 2;
+const MIGRATION_STATUSES = ['not_required', 'pending_reconciliation', 'completed'] as const;
 
-type WorkflowPhase = keyof typeof WORKFLOW;
-type WorkflowStep = (typeof WORKFLOW)[WorkflowPhase][number];
-type StopReason = 'consequential_decision' | 'external_action' | 'unrecoverable_blocker' | 'finished' | null;
-type MigrationStatus = 'not_required' | 'pending_reconciliation' | 'completed';
+export type MigrationStatus = (typeof MIGRATION_STATUSES)[number];
 
 export interface ExecutionState {
-  schema_version: number;
-  execution: { phase: WorkflowPhase; step: WorkflowStep };
-  active: { work_item: WorkItemId | null; task: QualifiedTaskId | null };
-  stop_reason: StopReason;
+  schema_version: typeof STATE_SCHEMA_VERSION;
   migration: { status: MigrationStatus };
+  active: { work_item: WorkItemId | null };
+  checkpoint: Checkpoint | null;
 }
 
 export function emptyState(): ExecutionState {
   return {
     schema_version: STATE_SCHEMA_VERSION,
-    execution: { phase: 'discovery', step: 'define_problem' },
-    active: { work_item: null, task: null },
-    stop_reason: null,
-    migration: { status: 'not_required' }
+    migration: { status: 'not_required' },
+    active: { work_item: null },
+    checkpoint: null
   };
 }
 
@@ -37,49 +31,52 @@ export function parseState(text: string, { source = 'state.yaml' }: { source?: s
     throw new ArtifactValidationError(`${source} is invalid: ${document.errors[0]?.message ?? 'unknown YAML error'}`);
   const value: unknown = document.toJS();
   if (!isRecord(value)) throw new ArtifactValidationError(`${source} must be a mapping.`);
+
+  if (value.schema_version === LEGACY_STATE_SCHEMA_VERSION) return parseLegacyState(value, source);
   if (value.schema_version !== STATE_SCHEMA_VERSION)
-    throw new ArtifactValidationError(`${source} schema_version must be ${STATE_SCHEMA_VERSION}.`);
-  const execution = isRecord(value.execution) ? value.execution : {};
-  const phase = execution.phase;
-  if (typeof phase !== 'string' || !PHASES.has(phase))
-    throw new ArtifactValidationError(`${source} execution.phase is invalid.`);
-  const typedPhase = phase as WorkflowPhase;
-  const step = execution.step;
-  if (typeof step !== 'string' || !(WORKFLOW_STEPS[typedPhase] as readonly string[]).includes(step))
-    throw new ArtifactValidationError(`${source} execution.step '${step}' is invalid for phase '${phase}'.`);
-  const stopReason = value.stop_reason ?? null;
-  if (!STOP_REASONS.has(stopReason as StopReason))
-    throw new ArtifactValidationError(`${source} stop_reason is invalid.`);
-  const migration = isRecord(value.migration) ? value.migration : {};
-  const migrationStatus = migration.status ?? 'not_required';
-  if (!['not_required', 'pending_reconciliation', 'completed'].includes(String(migrationStatus)))
-    throw new ArtifactValidationError(`${source} migration.status is invalid.`);
-  const active = isRecord(value.active) ? value.active : {};
-  const activeWorkItem = active.work_item ?? null;
-  const activeTask = active.task ?? null;
-  if (activeWorkItem !== null && (typeof activeWorkItem !== 'string' || !WORK_ITEM_ID.test(activeWorkItem)))
-    throw new ArtifactValidationError(`${source} active.work_item is invalid.`);
-  if (activeTask !== null && (typeof activeTask !== 'string' || !QUALIFIED_TASK_ID.test(activeTask)))
-    throw new ArtifactValidationError(`${source} active.task is invalid.`);
-  if (activeTask && activeWorkItem && !activeTask.startsWith(`${activeWorkItem}-`))
-    throw new ArtifactValidationError(`${source} active.task does not belong to active.work_item.`);
+    throw new ArtifactValidationError(
+      `${source} schema_version must be ${LEGACY_STATE_SCHEMA_VERSION} or ${STATE_SCHEMA_VERSION}.`
+    );
+
+  if (!isRecord(value.migration)) throw new ArtifactValidationError(`${source} migration must be a mapping.`);
+  if (!isRecord(value.active)) throw new ArtifactValidationError(`${source} active must be a mapping.`);
+  if (!Object.hasOwn(value, 'checkpoint')) throw new ArtifactValidationError(`${source} checkpoint must be present.`);
+
   return {
     schema_version: STATE_SCHEMA_VERSION,
-    execution: {
-      phase: typedPhase,
-      step: step as WorkflowStep
-    },
-    active: {
-      work_item: activeWorkItem as WorkItemId | null,
-      task: activeTask as QualifiedTaskId | null
-    },
-    stop_reason: stopReason as StopReason,
-    migration: { status: migrationStatus as MigrationStatus }
+    migration: { status: migrationStatus(value.migration.status, `${source} migration.status`) },
+    active: { work_item: workItem(value.active.work_item ?? null, `${source} active.work_item`) },
+    checkpoint: value.checkpoint === null ? null : parseCheckpoint(value.checkpoint, { source: `${source} checkpoint` })
   };
 }
 
 export function stringifyState(state: ExecutionState): string {
-  return stringify(state, { lineWidth: 0 });
+  const text = stringify(state, { lineWidth: 0 });
+  parseState(text);
+  return text;
+}
+
+function parseLegacyState(value: Record<string, unknown>, source: string): ExecutionState {
+  const migration = isRecord(value.migration) ? value.migration : {};
+  const active = isRecord(value.active) ? value.active : {};
+  return {
+    schema_version: STATE_SCHEMA_VERSION,
+    migration: { status: migrationStatus(migration.status ?? 'not_required', `${source} migration.status`) },
+    active: { work_item: workItem(active.work_item ?? null, `${source} active.work_item`) },
+    checkpoint: null
+  };
+}
+
+function migrationStatus(value: unknown, label: string): MigrationStatus {
+  if (typeof value !== 'string' || !(MIGRATION_STATUSES as readonly string[]).includes(value))
+    throw new ArtifactValidationError(`${label} is invalid.`);
+  return value as MigrationStatus;
+}
+
+function workItem(value: unknown, label: string): WorkItemId | null {
+  if (value === null) return null;
+  if (typeof value !== 'string' || !WORK_ITEM_ID.test(value)) throw new ArtifactValidationError(`${label} is invalid.`);
+  return value as WorkItemId;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,24 +1,18 @@
-import path from 'node:path';
 import { stringify } from 'yaml';
-import {
-  FLOW_DIRECTORY,
-  ID_PADDING,
-  REVIEW_FILE,
-  SPEC_FILE,
-  TASKS_FILE,
-  WORK_ITEM_SPEC_TITLE,
-  WORK_ITEMS_DIRECTORY
-} from '../../../domain/project/project.js';
+import { ID_PADDING, WORK_ITEM_SPEC_TITLE } from '../../../domain/project/project.js';
 import {
   DEFAULT_WORK_ITEM_KIND,
   DEFAULT_WORK_ITEM_PRIORITY,
   WORK_ITEM_ID_PREFIX,
   type WorkItemId,
-  type WorkItemKind
+  type WorkItemKind,
+  type WorkItemSpecMetadata
 } from '../../../domain/work-item/work-item.js';
+import { serializeWorkItemSpec } from '../../../domain/work-item/specification.mjs';
+import { stringifyReview } from '../../../domain/work-item/review.mjs';
 import { commaSeparatedValues, optionValue, requiredOption } from '../../command-runtime.js';
 import { fail, recordOutput as writeOutput } from '../../command-runtime.js';
-import { ensureDirectory, writeText, writeYaml } from '../../../infrastructure/filesystem/index.js';
+import { createWorkItemShell } from '../../../infrastructure/persistence/work-items.mjs';
 import { loadProjectWorkItems } from '../work-item-context.js';
 
 interface CreateWorkItemInput {
@@ -40,23 +34,26 @@ export function createWorkItem(root: string, requestedId: string | undefined, ar
     fail(`${id} already exists.`);
   }
 
-  const directory = path.join(root, FLOW_DIRECTORY, WORK_ITEMS_DIRECTORY, `${id}-${slugify(title)}`);
-  ensureDirectory(directory);
-
-  writeWorkItemShells(directory, {
+  const folder = `${id}-${slugify(title)}`;
+  createWorkItemShell(
+    root,
+    folder,
     id,
-    title,
-    outcome,
-    kind: (optionValue(args, '--kind') ?? DEFAULT_WORK_ITEM_KIND) as WorkItemKind,
-    priority: Number(optionValue(args, '--priority') ?? DEFAULT_WORK_ITEM_PRIORITY),
-    dependsOn: commaSeparatedValues(optionValue(args, '--depends-on')) as WorkItemId[]
-  });
+    buildWorkItemShell({
+      id,
+      title,
+      outcome,
+      kind: (optionValue(args, '--kind') ?? DEFAULT_WORK_ITEM_KIND) as WorkItemKind,
+      priority: Number(optionValue(args, '--priority') ?? DEFAULT_WORK_ITEM_PRIORITY),
+      dependsOn: commaSeparatedValues(optionValue(args, '--depends-on')) as WorkItemId[]
+    })
+  );
 
   writeOutput(`${id} created.`);
 }
 
-function writeWorkItemShells(directory: string, input: CreateWorkItemInput): void {
-  const metadata = {
+function buildWorkItemShell(input: CreateWorkItemInput) {
+  const metadata: WorkItemSpecMetadata = {
     schema_version: 1,
     work_item: input.id,
     title: input.title,
@@ -67,21 +64,24 @@ function writeWorkItemShells(directory: string, input: CreateWorkItemInput): voi
     blockers: [],
     maturity: 'outlined'
   };
+  const body = `\n${WORK_ITEM_SPEC_TITLE}\n\n## Outcome\n\n${input.outcome}\n`;
 
-  writeText(
-    path.join(directory, SPEC_FILE),
-    `---\n${stringify(metadata).trimEnd()}\n---\n\n${WORK_ITEM_SPEC_TITLE}\n\n## Outcome\n\n${input.outcome}\n`
-  );
-  writeYaml(path.join(directory, TASKS_FILE), {
-    schema_version: 3,
-    work_item: input.id,
-    tasks: []
-  });
-  writeYaml(path.join(directory, REVIEW_FILE), {
-    schema_version: 1,
-    work_item: input.id,
-    status: 'pending'
-  });
+  return {
+    spec: serializeWorkItemSpec(metadata, body),
+    tasks: stringify(
+      {
+        schema_version: 3,
+        work_item: input.id,
+        tasks: []
+      },
+      { lineWidth: 0 }
+    ),
+    review: stringifyReview({
+      schema_version: 1,
+      work_item: input.id,
+      status: 'pending'
+    })
+  };
 }
 
 function nextWorkItemId(ids: readonly WorkItemId[]): WorkItemId {
