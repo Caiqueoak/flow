@@ -1,7 +1,14 @@
 import path from 'node:path';
+import { canonicalProjectDocumentKind, validateProjectDocument } from '../../project-contracts.mjs';
+import { clearCheckpoint } from '../../checkpoint/operations/checkpoint.mjs';
+import { loadExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
 import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
+import {
+  approveProjectDocument,
+  documentRevision
+} from '../../../domain/project/document.mjs';
 import {
   parseWorkItemSpec,
   serializeWorkItemSpec,
@@ -9,18 +16,53 @@ import {
 } from '../../../domain/work-item/specification.mjs';
 import { readText, writeText } from '../../../infrastructure/filesystem/index.js';
 
-export function recordApproval({ root, target, approvedAt }: { root: string; target: string; approvedAt: string }): {
-  workItemId: string;
-} {
+export interface ApprovalResult {
+  label: string;
+  revision: string;
+}
+
+export function recordApproval({ root, target, approvedAt }: { root: string; target: string; approvedAt: string }): ApprovalResult {
+  const kind = canonicalProjectDocumentKind(target);
+  if (kind) return recordProjectDocumentApproval(root, target, kind, approvedAt);
+
   const file = path.resolve(root, target);
   const item = findWorkItemBySpec(root, file);
   const spec = parseWorkItemSpec(readText(file), { expectedWorkItem: item.id });
-  spec.metadata.approval = {
-    at: approvedAt,
-    revision: specificationRevision(spec.metadata, spec.body)
-  };
+  const revision = specificationRevision(spec.metadata, spec.body);
+  spec.metadata.approval = { at: approvedAt, revision };
   writeText(file, serializeWorkItemSpec(spec.metadata, spec.body));
-  return { workItemId: item.id };
+  clearMatchingCheckpoint(root, target.replaceAll('\\', '/'), revision);
+  return { label: `${item.id} specification`, revision };
+}
+
+function recordProjectDocumentApproval(
+  root: string,
+  target: string,
+  kind: NonNullable<ReturnType<typeof canonicalProjectDocumentKind>>,
+  approvedAt: string
+): ApprovalResult {
+  const file = path.resolve(root, target);
+  const current = readText(file);
+  const errors = validateProjectDocument(kind, current);
+  if (errors.length) throw new Error(`Cannot approve ${target}: ${errors.join(' ')}`);
+
+  const approved = approveProjectDocument(current, approvedAt);
+  writeText(file, approved.text);
+  clearMatchingCheckpoint(root, target.replaceAll('\\', '/'), approved.revision);
+  return { label: target.replaceAll('\\', '/'), revision: approved.revision };
+}
+
+function clearMatchingCheckpoint(root: string, targetRef: string, targetRevision: string): void {
+  const checkpoint = loadExecutionState(root).checkpoint;
+  if (
+    checkpoint?.status !== 'approval_ready' ||
+    checkpoint.target.ref !== targetRef ||
+    checkpoint.target.revision !== targetRevision
+  ) {
+    return;
+  }
+
+  clearCheckpoint(root, { targetRef, targetRevision });
 }
 
 function findWorkItemBySpec(root: string, specFile: string): LoadedWorkItem {
@@ -28,9 +70,6 @@ function findWorkItemBySpec(root: string, specFile: string): LoadedWorkItem {
     (candidate) => path.resolve(candidate.base, SPEC_FILE) === specFile
   );
 
-  if (!item) {
-    throw new Error('Approvals may only record a canonical work-item spec.');
-  }
-
-  return item!;
+  if (!item) throw new Error('Approvals may only record a canonical project document or work-item spec.');
+  return item;
 }
