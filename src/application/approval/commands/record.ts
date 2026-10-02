@@ -44,6 +44,13 @@ function recordProjectDocumentApproval(
   if (errors.length) throw new Error(`Cannot approve ${target}: ${errors.join(' ')}`);
 
   const approved = approveProjectDocument(current, approvedAt);
+  const approvedErrors = validateProjectDocument(kind, approved.text);
+  if (approvedErrors.length) {
+    throw new Error(
+      `Cannot approve ${target} under the current project-document schema: ${approvedErrors.join(' ')}`
+    );
+  }
+
   writeText(file, approved.text);
   clearMatchingCheckpoint(root, target.replaceAll('\\', '/'), approved.revision);
   return { label: target.replaceAll('\\', '/'), revision: approved.revision };
