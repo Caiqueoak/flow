@@ -35,3 +35,24 @@ test('atomic text replacement publishes the complete candidate', (t) => {
 
   assert.equal(fs.readFileSync(file, 'utf8'), 'new\n');
 });
+
+
+test('atomic text replacement keeps the previous canonical file when rename fails', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-atomic-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, 'artifact.md');
+  fs.writeFileSync(file, 'old\n');
+
+  const originalRename = fs.renameSync;
+  fs.renameSync = (() => {
+    throw new Error('simulated rename failure');
+  }) as typeof fs.renameSync;
+  try {
+    assert.throws(() => atomicWriteText(file, 'new\n'), /simulated rename failure/);
+  } finally {
+    fs.renameSync = originalRename;
+  }
+
+  assert.equal(fs.readFileSync(file, 'utf8'), 'old\n');
+  assert.deepEqual(fs.readdirSync(root).filter((name) => name.includes('.flow-tmp-')), []);
+});

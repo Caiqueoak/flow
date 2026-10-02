@@ -6,6 +6,8 @@ import { parseBacklog } from '../../../domain/work-item/backlog.mjs';
 import { parseGates } from '../../../domain/gate/gate-definition.mjs';
 import { syncProject } from '../../../infrastructure/projections/project.mjs';
 import { validateProject } from '../../project-validation.mjs';
+import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
+import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 import {
   readConfig,
   writeConfig,
@@ -410,9 +412,7 @@ function upgradeCanonicalStaged(root: string, targetVersion: string): void {
       }
       writeMigrationText(taskPath, stringify(value, { lineWidth: 0 }));
     }
-  const stateFile = path.join(flow, 'state.yaml');
-  const state = migrationPathExists(stateFile) ? parseState(readMigrationText(stateFile)) : emptyState();
-  writeMigrationText(stateFile, stringifyState(state));
+  upgradeExecutionState(root, flow);
   const config = readConfig(root) ?? defaultConfig(targetVersion);
   config.flow_version = targetVersion;
   writeConfig(root, config);
@@ -432,6 +432,21 @@ function upgradeCanonicalStaged(root: string, targetVersion: string): void {
     }
     writeMigrationText(gatesFile, stringify(gates, { lineWidth: 0 }));
   }
+}
+
+function upgradeExecutionState(root: string, flow: string): void {
+  const stateFile = path.join(flow, 'state.yaml');
+  const raw = migrationPathExists(stateFile) ? asRecord(parse(readMigrationText(stateFile))) : {};
+  const state = migrationPathExists(stateFile) ? parseState(readMigrationText(stateFile)) : emptyState();
+
+  if (raw.schema_version !== emptyState().schema_version) {
+    const items = loadWorkItems(root);
+    const byId = new Map(items.map((item) => [item.id, item]));
+    const active = items.filter((item) => ['in_progress', 'review'].includes(lifecycle(item, byId).status));
+    state.active.work_item = active.length === 1 ? active[0]!.id : null;
+  }
+
+  writeMigrationText(stateFile, stringifyState(state));
 }
 
 function recoverExistingCodePolicy(sourceFlow: string): string {

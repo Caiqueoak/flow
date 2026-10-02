@@ -7,6 +7,7 @@ import { validateAcyclic, ArtifactValidationError } from '../../domain/work-item
 import type { LoadedWorkItem, WorkItemId } from '../../domain/work-item/work-item.js';
 
 const folderPattern = /^(W\d{3,})-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const stagingFolderPattern = /^\..+\.flow-tmp-/;
 const read = (file: string) => fs.readFileSync(file, 'utf8');
 export function workItemsDirectory(root: string): string {
   return path.join(root, '_flow', 'work-items');
@@ -16,7 +17,7 @@ export function loadWorkItems(root: string): LoadedWorkItem[] {
   if (!fs.existsSync(dir)) return [];
   const items = fs
     .readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
+    .filter((e) => e.isDirectory() && !stagingFolderPattern.test(e.name))
     .map((entry): LoadedWorkItem => {
       const match = entry.name.match(folderPattern);
       if (!match) throw new ArtifactValidationError(`Invalid work-item folder '${entry.name}'.`);

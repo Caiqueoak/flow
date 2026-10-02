@@ -42,14 +42,14 @@ export function parseState(text: string, { source = 'state.yaml' }: { source?: s
 }
 
 export function stringifyState(state: ExecutionState): string {
-  const canonical = parseState(stringify({ ...state, schema_version: STATE_SCHEMA_VERSION }, { lineWidth: 0 }));
+  const canonical = parseState(stringify(state, { lineWidth: 0 }));
   return stringify(canonical, { lineWidth: 0 });
 }
 
 function parseLegacyState(value: Record<string, unknown>, source: string): ExecutionState {
   return {
     schema_version: STATE_SCHEMA_VERSION,
-    active: { work_item: parseActiveWorkItem(value.active, source) },
+    active: { work_item: null },
     checkpoint: null,
     migration: { status: parseMigrationStatus(value.migration, source) }
   };

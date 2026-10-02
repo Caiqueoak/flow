@@ -53,3 +53,15 @@ test('failed staged validation cannot expose a partial canonical work item', (t)
   assert.deepEqual(fs.readdirSync(workItems), []);
   assert.deepEqual(loadWorkItems(root), []);
 });
+
+
+test('interrupted staging directory is not exposed as a canonical work item', (t) => {
+  const root = project(t);
+  const workItems = path.join(root, '_flow', 'work-items');
+  const staging = path.join(workItems, '.W101-interrupted.flow-tmp-partial');
+  fs.mkdirSync(staging);
+  fs.writeFileSync(path.join(staging, 'spec.md'), 'partial\n');
+
+  assert.deepEqual(loadWorkItems(root), []);
+  assert.equal(fs.existsSync(staging), true);
+});

@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
 import { captureCommandOutcome } from '../../../command-runtime.js';
+import { emptyState, stringifyState } from '../../../../domain/workflow/execution-state.mjs';
 import { migrateProject, migrationPlan, runMigrate } from '../../operations/apply.mjs';
 
 function temporaryProject(t: test.TestContext, prefix: string) {
@@ -336,8 +337,28 @@ test('upgrades canonical tasks and gates while preserving migrated commit proven
   assert.ok(result.backup && fs.existsSync(result.backup));
 });
 
+test('upgrades v2 state without trusting its dormant execution cursor', (t) => {
+  const root = canonicalProject(t, '0.8.0');
+  fs.writeFileSync(
+    path.join(root, '_flow', 'state.yaml'),
+    'schema_version: 2\nexecution:\n  phase: implementation\n  step: execute_task\nactive:\n  work_item: W999\n  task: W999-T001\nstop_reason: external_action\nmigration:\n  status: completed\n'
+  );
+
+  const result = migrateProject(root, { targetVersion: '0.8.0' });
+  const state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+
+  assert.equal(result.unchanged, false);
+  assert.equal(state.schema_version, 3);
+  assert.deepEqual(state.active, { work_item: null });
+  assert.equal(state.checkpoint, null);
+  assert.equal(state.migration.status, 'completed');
+  assert.equal(state.execution, undefined);
+  assert.equal(state.stop_reason, undefined);
+});
+
 test('returns a true no-op for a current canonical project', (t) => {
   const root = canonicalProject(t, '0.8.0');
+  fs.writeFileSync(path.join(root, '_flow', 'state.yaml'), stringifyState(emptyState()));
   const before = fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8');
 
   assert.deepEqual(migrateProject(root, { targetVersion: '0.8.0' }), { unresolved: [], unchanged: true });

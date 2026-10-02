@@ -37,7 +37,7 @@ migration:
 `);
   assert.deepEqual(parsed, {
     schema_version: 3,
-    active: { work_item: 'W101' },
+    active: { work_item: null },
     checkpoint: null,
     migration: { status: 'completed' }
   });
