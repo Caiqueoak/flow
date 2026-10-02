@@ -36,6 +36,7 @@ Working notes for the next Flow iteration. This file captures design decisions a
   - latest user-approved direction;
   - next decision frontier / next safe action.
 - Drafts must be clearly distinguishable from approved/final artifacts so partial thinking cannot be mistaken for an accepted contract.
+- Drafts are temporary resumability state. When a decision phase is approved and its canonical artifact/state has been safely persisted, delete the corresponding draft instead of keeping parallel historical copies.
 - Discovery is the first required case, but the same resumability principle applies to other decision-heavy phases such as experience/UX, engineering, planning, and review/recovery where state can span multiple conversations.
 - Persist after meaningful decision batches/checkpoints rather than waiting until phase completion.
 - Doctor/recovery behavior must verify that persisted draft state is internally consistent with canonical approved artifacts and Git/repository state before continuing.
@@ -68,7 +69,10 @@ Working notes for the next Flow iteration. This file captures design decisions a
 
 - The main chat agent should primarily act as orchestrator and reviewer.
 - Non-simple implementation work must be delegated to one or more fresh-context subagents/workers. The orchestrator may implement directly only when the change is genuinely simple and bounded.
-- Workers receive only the bounded context needed for their assignment and return implementation results, verification evidence, decisions, and blockers.
+- Worker handoffs must optimize for token efficiency as well as correctness. Send the minimum context that still makes project rules, task objective, scope, relevant acceptance criteria, relevant engineering/experience constraints, explicit non-goals, dependencies, and expected verification unambiguous.
+- Do not copy whole PRDs, engineering documents, work items, or repository history into a worker prompt when a relevant slice or stable file reference is sufficient.
+- Worker outputs should also be compact: changed behavior/surface, verification evidence, material decisions/deviations, and blockers/residual risk. Avoid restating the prompt or narrating routine work.
+- Use the work-item review history to evaluate whether the handoff contract is too thin or too verbose: repeated missed constraints, preventable repair findings, unnecessary exploration, and review churn are evidence for tuning the contract.
 - The orchestrator remains responsible for user interaction, synthesis, integration judgment, architectural consistency, and the final review opinion.
 - The model decides dynamically whether to spawn subagents, how many to spawn, which responsibilities to delegate, and which executions should be parallel versus sequential.
 - Do not encode a fixed worker count or mechanically spawn one agent per task.
@@ -94,6 +98,8 @@ Working notes for the next Flow iteration. This file captures design decisions a
   - whether the workers can receive clear, bounded contexts and acceptance criteria.
 - The skill should establish baseline heuristics for expected performance while preserving model judgment. It should help avoid both under-parallelization of obviously independent work and over-parallelization that creates coordination overhead.
 - The baseline is guidance, not a fixed concurrency cap: the model may choose fewer or more subagents when the actual dependency graph and change surface justify it, and should keep the orchestration proportional to the work.
+- Prefer the cheapest/fastest model that has demonstrated sufficient quality for a bounded worker role. Escalate model capability/reasoning when task ambiguity, integration risk, or review history shows the cheaper tier is insufficient.
+- Runtime capability is adaptive rather than assumed: Claude Code supports a per-subagent `model` and explicitly documents routing workers to cheaper models such as Haiku. Current Codex tooling supports subagent model/reasoning selection in some multi-agent configurations and a default subagent model in configuration, but support can vary by Codex version/mode; Flow must detect/use the runtime capability when available and otherwise inherit the parent model without breaking the workflow.
 - Depending on the work, valid decisions include:
   - orchestrator handles directly;
   - one worker handles the whole work item;
@@ -102,38 +108,29 @@ Working notes for the next Flow iteration. This file captures design decisions a
   - some tasks run in parallel while dependency-sensitive work remains sequential.
 - Parallel read-only review/research agents are lower risk and can be used more freely than parallel writers.
 
-## Worktrees, branches, and PR lifecycle — investigate
+## Worktrees, branches, and PR lifecycle
 
 Adopted baseline:
 
 1. one active work item maps to one implementation branch;
-2. open a draft PR early enough to provide remote traceability/backup while implementation is in progress;
+2. create the draft PR after the first meaningful implementation/checkpoint is persisted and the branch is useful to publish, rather than creating empty PRs;
 3. use a worktree only when isolation or concurrent writers materially justify it;
-4. complete implementation and review on the work-item branch;
-5. user validates/accepts the work item unless continuous execution was explicitly pre-authorized;
-6. transition the PR out of draft / integrate according to repository policy;
-7. delete any temporary worktree once it is no longer needed so it does not accumulate on disk.
-
-Questions to resolve before adopting this:
-
-- Is a worktree actually necessary if only one work item is active and the graph only parallelizes tasks?
-- If task workers write concurrently, should they share one worktree, receive separate task worktrees, or avoid concurrent writes entirely?
-- Would one worktree per task create more merge/synchronization cost than value?
-- How should workers stay synchronized with the canonical repository when the user or another process changes the original checkout?
-- What happens when shared files such as package manifests, schemas, app composition, migrations, or global config are touched by multiple workers?
-- How are conflicts surfaced without making Flow itself a Git orchestration engine?
-- Should a worktree be created only when actual concurrent writers or isolation risk justify it?
-- Should the branch boundary be the work item rather than the task, even if workers execute tasks inside it?
+4. avoid parallel writers on the same likely change surface; shared manifests, schemas, migrations, app composition, routing, and global configuration are strong signals to serialize or assign one integration owner;
+5. complete implementation and review on the work-item branch;
+6. user validates/accepts the work item unless continuous execution was explicitly pre-authorized;
+7. transition the PR out of draft / integrate according to repository policy;
+8. delete any temporary worktree once it is no longer needed so it does not accumulate on disk.
 
 Decision: **one active work item and one work-item branch; worktrees are optional isolation primitives, not a mandatory Flow abstraction.** Task-level worktrees are not the default and must justify their synchronization/integration cost.
 
-## Context lifecycle / Ralph-style loop
+## Context lifecycle / user-controlled reset
 
 - Treat worker contexts as disposable; fresh worker context is the primary context-management mechanism.
 - Persist everything needed to continue in canonical project artifacts rather than relying on chat history.
-- At stable boundaries (approved PRD, experience, engineering, completed work item), allow the orchestrator to rehydrate from canonical state instead of carrying transient reasoning indefinitely.
-- Primary orchestrator reset boundary: end of a work item. Earlier resets after large discovery/engineering phases are allowed when context pressure warrants them.
-- Candidate work-item loop:
+- Flow must never require the current chat to remain alive for continuity.
+- Resetting the main/orchestrator chat context is a user action, not an automatic Flow action. The user may start a new chat at any time after a persisted checkpoint, and the new orchestrator must rehydrate from repository state.
+- Flow may recommend a fresh chat when context has become large or a stable boundary has been reached, but it must not assume or perform the reset on the user's behalf.
+- Candidate resumable work-item loop:
   1. rehydrate canonical state;
   2. select/decompose ready work;
   3. delegate as appropriate;
@@ -141,14 +138,16 @@ Decision: **one active work item and one work-item branch; worktrees are optiona
   5. perform independent review;
   6. repair if required;
   7. obtain user work-item validation where required;
-  8. persist;
-  9. discard transient context and continue fresh.
+  8. persist a complete checkpoint;
+  9. continue in the current chat or allow the user to resume from a fresh chat.
 
 ## Review
 
-- Review is a backlog/history of review passes, findings, resolutions, and final opinions for the work item rather than a single overwritten status.
+- Review history lives **inside the work-item artifact**; do not create a separate review file/tree as the canonical review backlog.
+- The work item keeps an append-only history of task/work-item review passes so a future agent can see what the reviewer/orchestrator checked, what it found, what repairs it requested, and how each finding was resolved.
 - Each review pass must produce a human-readable **parecer**, not merely a status field.
-- Findings remain traceable until resolved, superseded, explicitly accepted as residual risk, or carried into later work; subsequent review passes append the new state instead of erasing prior findings.
+- Findings should use stable IDs where useful so later passes can mark them resolved, superseded, accepted as residual risk, or carried forward without erasing history.
+- The review history should make the reviewer/orchestrator actions traceable: scope inspected, evidence checked, findings raised, repair tasks created/reopened, and final disposition.
 - The review should explain:
   - what was delivered;
   - whether intent and acceptance criteria are met;
@@ -159,6 +158,7 @@ Decision: **one active work item and one work-item branch; worktrees are optiona
 - The orchestrator should review work it did not implement when practical, reducing self-review bias.
 - Review can use specialized subagents/lenses (acceptance, engineering, edge cases, verification) when proportional to the change, with the orchestrator synthesizing the final parecer.
 - Review outcomes use a small routing vocabulary such as `approved`, `changes_required`, and `blocked`; machine-readable metadata exists for routing/history but is not a substitute for the parecer.
+- Review history is also the primary empirical feedback loop for worker-contract/model tuning: identify which omissions or cheap-model failures repeatedly generate repair work, then adjust the minimum handoff context or model-selection baseline rather than expanding every prompt preemptively.
 
 ## BMAD → Flow harvest before implementation
 
@@ -171,6 +171,9 @@ Decision: **one active work item and one work-item branch; worktrees are optiona
 - The first Flowboard POC was implemented with GPT-6 Luna. Treat its behavior as evidence about skill quality rather than assuming model weakness.
 - Re-run comparable scenarios across models later to measure how much behavior comes from Flow versus model capability.
 - Useful measurements:
+  - worker input/output token cost when the runtime exposes it;
+  - review findings attributable to missing handoff context versus implementation quality;
+  - repair/retry rate by worker model/tier;
   - unresolved discovery dimensions skipped;
   - assumptions made without user decision;
   - unnecessary questions;
