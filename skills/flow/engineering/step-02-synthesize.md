@@ -1,6 +1,6 @@
 # Engineering — recommend a contract
 
-Read the approved PRD, config, repository evidence, technology-defaults.md and the exact engineering profile selected by config before drafting:
+Read the exact-approved PRD, the exact-approved `_flow/docs/experience.md` when the PRD requires it, config, repository evidence, technology-defaults.md and the exact engineering profile selected by config before drafting:
 
 - `flow/readability-first@2` -> `profiles/readability-first-v2.md` (current default)
 - `flow/readability-first@1` -> `profiles/readability-first.md` (legacy compatibility only)
@@ -9,9 +9,11 @@ Use the selected profile as defaults and recommendation criteria, not as text to
 
 Recommend a complete but proportional technical contract. Keep global product behavior in the PRD and bounded delivery behavior in work-item specs; engineering records only the technical/code/infra constraints that realize them.
 
+Before consequential engineering work, resume or begin the W1 checkpoint targeting `_flow/docs/engineering.md` and persist meaningful decision batches. Do not duplicate engineering prose in checkpoint state. When the final draft is materialized and consequential dimensions are resolved, run `flow checkpoint ready` so the runtime records its exact target revision.
+
 Frontmatter:
 
-- `schema_version: 1`
+- `schema_version: 2`
 - `status: draft`
 - `baseline.profile`: exact versioned profile id selected in config
 - `baseline.existing_code_policy: preserve|incremental|refactor|not_applicable` — never persist `undecided` in the engineering contract
