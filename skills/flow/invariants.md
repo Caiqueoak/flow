@@ -7,8 +7,8 @@
 5. Discovery is recommendation-driven: present reasonable options, recommend one with justification, and ask only consequential questions.
 6. Keep the complete known MVP work-item map so the dependency graph remains useful, but deepen only the next eligible item.
 7. A work-item is a cohesive implementation outcome. Phase-only planning, preparation, evidence, readiness, validation and review belong to tasks/gates unless they are independently valuable deliverables.
-8. The human authorizes the exact ready SPEC revision when it contains consequential choices not already authorized. Do not manufacture approval checkpoints for routine execution.
-9. Read the approved engineering contract before implementation. In brownfield, distinguish observed state, desired state and the chosen adoption strategy.
+8. Human approval authorizes exact canonical revisions: PRD, required experience, engineering, and consequential ready SPECs. Material edits invalidate prior authorization even if an `approved` label remains. Do not manufacture approval checkpoints for routine execution.
+9. Read the exact-approved PRD, required experience contract, and engineering contract before implementation. In brownfield, distinguish observed state, desired state and the chosen adoption strategy.
 10. The approved `_flow/docs/engineering.md` is the mandatory project architecture/topology contract. New or changed code must conform to its system shape, ownership, dependency direction, vertical-slice organization, naming/readability conventions and explicit exceptions. If a task requires a material topology or architecture change, revise and approve engineering.md before implementing that change; never create a parallel architecture implicitly.
 11. Profiles provide defaults and recommendations; they never authorize retroactive refactoring.
 12. Dependencies belong in depends_on. External approvals/actions and consequential unresolved decisions belong in structured blockers.
