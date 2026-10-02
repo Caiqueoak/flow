@@ -17,7 +17,7 @@ const approvalCommands = {
 export const command: CommandDefinition = {
   name: 'approval',
   description: 'Persist an explicit human approval for a document revision.',
-  usage: 'flow approval record <work-item-spec.md> [--at <ISO timestamp>]',
+  usage: 'flow approval record <canonical-document> [--at <ISO timestamp>]',
   arguments: [{ name: 'operation', required: true }],
   flags: [projectPathOption, { name: '--at', value: '<timestamp>' }],
   effects: 'Updates approved frontmatter.',
@@ -31,10 +31,10 @@ export function runApproval({ args }: { args: string[] }): void {
   const [action, target] = positionalArguments(args);
 
   if (!target) {
-    fail('Usage: flow approval record <spec.md>.');
+    fail('Usage: flow approval record <canonical-document>.');
   }
 
-  resolveSubcommand(approvalCommands, action, 'Usage: flow approval record <spec.md>.')(target, args);
+  resolveSubcommand(approvalCommands, action, 'Usage: flow approval record <canonical-document>.')(target, args);
 }
 
 function runRecord(target: string, args: readonly string[]): void {
@@ -44,7 +44,7 @@ function runRecord(target: string, args: readonly string[]): void {
 
   const approvedAt = approvalTimestamp(optionValue(args, '--at'));
   const result = recordApproval({ root: projectRoot(args), target, approvedAt });
-  writeOutput(`${result.workItemId} specification approved.`);
+  writeOutput(`${result.label} approved at revision ${result.revision}.`);
 }
 
 function approvalTimestamp(value: string | undefined): string {
