@@ -9,6 +9,9 @@ import {
   WORK_ITEM_SPEC_TITLE,
   WORK_ITEMS_DIRECTORY
 } from '../../../domain/project/project.js';
+import { parseTasks } from '../../../domain/task/task-list.mjs';
+import { parseReview } from '../../../domain/work-item/review.mjs';
+import { parseWorkItemSpec } from '../../../domain/work-item/specification.mjs';
 import {
   DEFAULT_WORK_ITEM_KIND,
   DEFAULT_WORK_ITEM_PRIORITY,
@@ -18,7 +21,16 @@ import {
 } from '../../../domain/work-item/work-item.js';
 import { commaSeparatedValues, optionValue, requiredOption } from '../../command-runtime.js';
 import { fail, recordOutput as writeOutput } from '../../command-runtime.js';
-import { ensureDirectory, writeText, writeYaml } from '../../../infrastructure/filesystem/index.js';
+import {
+  createTemporarySiblingDirectory,
+  publishDirectory,
+  readText,
+  removeDirectory,
+  writeText,
+  writeYaml
+} from '../../../infrastructure/filesystem/index.js';
+import { parseCheckpoint } from '../../../domain/workflow/checkpoint.mjs';
+import { loadExecutionState, writeExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 import { loadProjectWorkItems } from '../work-item-context.js';
 
 interface CreateWorkItemInput {
@@ -41,18 +53,55 @@ export function createWorkItem(root: string, requestedId: string | undefined, ar
   }
 
   const directory = path.join(root, FLOW_DIRECTORY, WORK_ITEMS_DIRECTORY, `${id}-${slugify(title)}`);
-  ensureDirectory(directory);
-
-  writeWorkItemShells(directory, {
-    id,
-    title,
-    outcome,
-    kind: (optionValue(args, '--kind') ?? DEFAULT_WORK_ITEM_KIND) as WorkItemKind,
-    priority: Number(optionValue(args, '--priority') ?? DEFAULT_WORK_ITEM_PRIORITY),
-    dependsOn: commaSeparatedValues(optionValue(args, '--depends-on')) as WorkItemId[]
-  });
+  const staging = createTemporarySiblingDirectory(directory);
+  try {
+    writeWorkItemShells(staging, {
+      id,
+      title,
+      outcome,
+      kind: (optionValue(args, '--kind') ?? DEFAULT_WORK_ITEM_KIND) as WorkItemKind,
+      priority: Number(optionValue(args, '--priority') ?? DEFAULT_WORK_ITEM_PRIORITY),
+      dependsOn: commaSeparatedValues(optionValue(args, '--depends-on')) as WorkItemId[]
+    });
+    validateWorkItemShell(staging, id);
+    ensurePlanningCheckpointBeforeFirstWorkItem(root, items.length);
+    publishDirectory(staging, directory);
+  } finally {
+    removeDirectory(staging);
+  }
 
   writeOutput(`${id} created.`);
+}
+
+function ensurePlanningCheckpointBeforeFirstWorkItem(root: string, existingWorkItemCount: number): void {
+  if (existingWorkItemCount > 0) return;
+
+  const state = loadExecutionState(root);
+  const current = state.checkpoint;
+  if (current) {
+    if (
+      current.phase === 'planning' &&
+      current.target.kind === 'work_item_map' &&
+      current.target.ref === '_flow/work-items'
+    ) {
+      return;
+    }
+    fail('Cannot create the first work item while another checkpoint is active.');
+  }
+
+  state.checkpoint = parseCheckpoint({
+    phase: 'planning',
+    step: 'map_work_items',
+    target: { kind: 'work_item_map', ref: '_flow/work-items', revision: null },
+    status: 'active',
+    inputs: [],
+    dimensions: [],
+    assumptions: [],
+    latest_authorized_direction: null,
+    next_frontier: [],
+    updated_at: new Date().toISOString()
+  });
+  writeExecutionState(root, state);
 }
 
 function writeWorkItemShells(directory: string, input: CreateWorkItemInput): void {
@@ -82,6 +131,12 @@ function writeWorkItemShells(directory: string, input: CreateWorkItemInput): voi
     work_item: input.id,
     status: 'pending'
   });
+}
+
+function validateWorkItemShell(directory: string, id: WorkItemId): void {
+  parseWorkItemSpec(readText(path.join(directory, SPEC_FILE)), { expectedWorkItem: id });
+  parseTasks(readText(path.join(directory, TASKS_FILE)), { expectedWorkItem: id });
+  parseReview(readText(path.join(directory, REVIEW_FILE)), { expectedWorkItem: id });
 }
 
 function nextWorkItemId(ids: readonly WorkItemId[]): WorkItemId {

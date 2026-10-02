@@ -202,7 +202,7 @@ When comparing current Flow against vNext, randomize or alternate execution orde
 
 **Proposed acceptance threshold:**
 
-- >= 90% rubric match across repeated fixtures;
+- > = 90% rubric match across repeated fixtures;
 - 0 cases where B04-B is entirely implemented by the orchestrator without a documented fixture-specific reason;
 - no quality gain is claimed from higher worker count alone.
 
@@ -237,7 +237,7 @@ When comparing current Flow against vNext, randomize or alternate execution orde
 **Proposed acceptance threshold:**
 
 - 0 unsafe parallel-writer decisions in known-conflict fixtures;
-- >= 90% evaluator-rubric match across independent/conflict fixture pairs.
+- > = 90% evaluator-rubric match across independent/conflict fixture pairs.
 
 ### B06 — Worker receives a relevant project constraint
 
@@ -307,8 +307,8 @@ Each seeded issue has evaluator severity and expected evidence.
 **Proposed acceptance threshold:**
 
 - 100% blocking defect recall;
-- >= 90% overall seeded-defect recall;
-- >= 80% finding precision;
+- > = 90% overall seeded-defect recall;
+- > = 80% finding precision;
 - 0 fabricated-evidence findings.
 
 ### B08 — Repair after review
@@ -342,7 +342,7 @@ Each seeded issue has evaluator severity and expected evidence.
 **Proposed acceptance threshold:**
 
 - 100% blocking findings genuinely closed before approval;
-- >= 90% seeded findings closed on first repair pass;
+- > = 90% seeded findings closed on first repair pass;
 - <= 5% repair-regression rate across the suite.
 
 ### B09 — Work-item review history quality
@@ -413,7 +413,7 @@ Maximum score: 12.
 **Proposed acceptance threshold:**
 
 - 0 unnecessary escalation in the simple control fixture across the reference runs;
-- >= 90% recovery after a clearly evidenced cheaper-worker failure;
+- > = 90% recovery after a clearly evidenced cheaper-worker failure;
 - no acceptance-quality regression versus using the stronger configuration directly.
 
 ### B11 — Token-efficient handoffs
@@ -651,10 +651,10 @@ A vNext release candidate should not be considered an evaluation success from on
 
 Across repeated benchmark runs:
 
-- >= 95% overall hard-pass rate;
-- >= 90% overall seeded-defect recall and >= 80% finding precision;
-- >= 90% first-pass repair closure for seeded findings;
-- >= 90% orchestration decision rubric match;
+- > = 95% overall hard-pass rate;
+- > = 90% overall seeded-defect recall and >= 80% finding precision;
+- > = 90% first-pass repair closure for seeded findings;
+- > = 90% orchestration decision rubric match;
 - median review-history quality >= 10/12;
 - no material increase in required user interventions versus the matched current-Flow baseline.
 

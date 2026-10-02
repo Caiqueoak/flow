@@ -1,11 +1,13 @@
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { projectRoot, recordOutput as info } from '../../command-runtime.js';
-import { emptyState, stringifyState } from '../../../domain/workflow/execution-state.mjs';
+import { emptyState, parseState, stringifyState } from '../../../domain/workflow/execution-state.mjs';
 import { parseBacklog } from '../../../domain/work-item/backlog.mjs';
 import { parseGates } from '../../../domain/gate/gate-definition.mjs';
 import { syncProject } from '../../../infrastructure/projections/project.mjs';
 import { validateProject } from '../../project-validation.mjs';
+import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
+import { lifecycle as deriveWorkItemLifecycle } from '../../../domain/work-item/lifecycle.js';
 import {
   readConfig,
   writeConfig,
@@ -205,8 +207,6 @@ function migrateStaged(root: string, targetVersion: string): void {
   if (migrationPathExists(path.join(flow, 'GRAPH.md'))) deleteMigrationFile(path.join(flow, 'GRAPH.md'));
   if (migrationPathExists(oldFile)) moveMigrationPath(oldFile, path.join(flow, 'docs', 'legacy-backlog.yaml'));
   const state = emptyState();
-  state.execution.phase = 'reconcile';
-  state.execution.step = 'resolve_conflicts';
   state.migration.status = 'pending_reconciliation';
   writeMigrationText(path.join(flow, 'state.yaml'), stringifyState(state));
   if (!migrationPathExists(path.join(flow, 'gates.yaml')))
@@ -264,6 +264,17 @@ function inspectCurrent(root: string, targetVersion: string): string[] {
     parseGates(readMigrationText(path.join(flow, 'gates.yaml')));
   } catch {
     changes.push('upgrade gates.yaml');
+  }
+  const stateFile = path.join(flow, 'state.yaml');
+  if (!migrationPathExists(stateFile)) changes.push('create state.yaml');
+  else {
+    try {
+      const rawState = asRecord(parse(readMigrationText(stateFile)));
+      parseState(readMigrationText(stateFile));
+      if (rawState.schema_version !== emptyState().schema_version) changes.push('upgrade state.yaml');
+    } catch {
+      changes.push('upgrade state.yaml');
+    }
   }
   return [...new Set(changes)];
 }
@@ -401,6 +412,7 @@ function upgradeCanonicalStaged(root: string, targetVersion: string): void {
       }
       writeMigrationText(taskPath, stringify(value, { lineWidth: 0 }));
     }
+  upgradeExecutionState(root, flow);
   const config = readConfig(root) ?? defaultConfig(targetVersion);
   config.flow_version = targetVersion;
   writeConfig(root, config);
@@ -420,6 +432,23 @@ function upgradeCanonicalStaged(root: string, targetVersion: string): void {
     }
     writeMigrationText(gatesFile, stringify(gates, { lineWidth: 0 }));
   }
+}
+
+function upgradeExecutionState(root: string, flow: string): void {
+  const stateFile = path.join(flow, 'state.yaml');
+  const raw = migrationPathExists(stateFile) ? asRecord(parse(readMigrationText(stateFile))) : {};
+  const state = migrationPathExists(stateFile) ? parseState(readMigrationText(stateFile)) : emptyState();
+
+  if (raw.schema_version !== emptyState().schema_version) {
+    const items = loadWorkItems(root);
+    const byId = new Map(items.map((item) => [item.id, item]));
+    const active = items.filter((item) =>
+      ['in_progress', 'review'].includes(deriveWorkItemLifecycle(item, byId).status)
+    );
+    state.active.work_item = active.length === 1 ? active[0]!.id : null;
+  }
+
+  writeMigrationText(stateFile, stringifyState(state));
 }
 
 function recoverExistingCodePolicy(sourceFlow: string): string {
@@ -474,8 +503,6 @@ function rebuildStagedForReconciliation(staging: string, sourceFlow: string, tar
   writeMigrationText(path.join(staged, 'gates.yaml'), `schema_version: ${GATES_SCHEMA_VERSION}\ngates: []\n`);
 
   const state = emptyState();
-  state.execution.phase = 'reconcile';
-  state.execution.step = 'resolve_conflicts';
   state.migration.status = 'pending_reconciliation';
   writeMigrationText(path.join(staged, 'state.yaml'), stringifyState(state));
   syncProject(staging);

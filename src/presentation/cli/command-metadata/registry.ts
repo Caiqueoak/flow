@@ -1,4 +1,5 @@
 import { command as approval } from '../../../application/approval/command.js';
+import { command as checkpoint } from '../../../application/checkpoint/command.js';
 import { command as diagnostics } from '../../../application/doctor/command.js';
 import { command as gates } from '../../../application/gates/command.js';
 import { command as initialization } from '../../../application/init/command.js';
@@ -26,6 +27,7 @@ export const commands: readonly CommandDefinition[] = [
   gates,
   workItems,
   tasks,
+  checkpoint,
   approval,
   scope,
   schemaGeneration
