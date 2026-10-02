@@ -1,5 +1,9 @@
 import path from 'node:path';
-import { canonicalProjectDocumentKind, validateProjectDocument } from '../../project-contracts.mjs';
+import {
+  assertProjectContractsAuthorized,
+  canonicalProjectDocumentKind,
+  validateProjectDocument
+} from '../../project-contracts.mjs';
 import { clearCheckpoint } from '../../checkpoint/operations/checkpoint.mjs';
 import { loadExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
@@ -30,6 +34,7 @@ export function recordApproval({
   const kind = canonicalProjectDocumentKind(target);
   if (kind) return recordProjectDocumentApproval(root, target, kind, approvedAt);
 
+  assertProjectContractsAuthorized(root);
   const file = path.resolve(root, target);
   const item = findWorkItemBySpec(root, file);
   const spec = parseWorkItemSpec(readText(file), { expectedWorkItem: item.id });
