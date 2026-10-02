@@ -188,6 +188,7 @@ test('work-item spec approval rejects edits after checkpoint ready without parti
   assert.equal(run(root, ['approval', 'record', '_flow/docs/engineering.md']).status, 0);
 
   const spec = writeReadySpec(root);
+  assert.equal(run(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']).status, 0);
   const target = path.relative(root, spec).replaceAll('\\', '/');
   beginApprovalReadyCheckpoint(root, { kind: 'work_item_spec', ref: target }, 'specification');
 
