@@ -15,6 +15,7 @@ import { promoteWorkItem } from './commands/promote.js';
 import { completeWorkItemReview } from './commands/review-complete.js';
 import { updateWorkItemIdentity } from './commands/set.js';
 import { findWorkItem } from './work-item-context.js';
+import { assertProjectContractsAuthorized } from '../project-contracts.mjs';
 
 interface WorkItemCommandContext {
   root: string;
@@ -68,6 +69,10 @@ export function runWorkItem({ args }: { args: string[] }): void {
   }
 
   const execute = resolveSubcommand(workItemCommands, action, `Unknown work-item operation '${action}'.`);
+
+  if (['create', 'set', 'priority', 'dependencies', 'promote', 'review-complete'].includes(action)) {
+    assertProjectContractsAuthorized(root);
+  }
 
   execute({ root, target, args });
 
