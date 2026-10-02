@@ -13,6 +13,34 @@ test('execution-state persistence begins from an empty v3 state when no file exi
 
 test('execution-state persistence atomically writes validated checkpoint state', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-state-write-'));
+  const state = stateWithCheckpoint('Choose primary workflow.');
+
+  assert.deepEqual(writeExecutionState(root, state), state);
+  assert.deepEqual(loadExecutionState(root), state);
+  assert.equal(fs.existsSync(executionStatePath(root)), true);
+});
+
+test('failed checkpoint replacement preserves the previous canonical state', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-state-replace-failure-'));
+  const previous = stateWithCheckpoint('Previous decision frontier.');
+  const candidate = stateWithCheckpoint('Candidate decision frontier.');
+  writeExecutionState(root, previous);
+
+  assert.throws(
+    () =>
+      writeExecutionState(root, candidate, {
+        replace: () => {
+          throw new Error('replace failed');
+        }
+      }),
+    /replace failed/
+  );
+
+  assert.deepEqual(loadExecutionState(root), previous);
+  assert.deepEqual(fs.readdirSync(path.join(root, '_flow')), ['state.yaml']);
+});
+
+function stateWithCheckpoint(summary: string) {
   const state = emptyState();
   state.checkpoint = {
     phase: 'discovery',
@@ -20,14 +48,11 @@ test('execution-state persistence atomically writes validated checkpoint state',
     target: { kind: 'project_document', ref: '_flow/docs/prd.md', revision: null },
     status: 'active',
     inputs: [],
-    dimensions: [{ id: 'D001', state: 'unresolved', summary: 'Choose primary workflow.' }],
+    dimensions: [{ id: 'D001', state: 'unresolved', summary }],
     assumptions: [],
     latest_authorized_direction: null,
     next_frontier: ['D001'],
     updated_at: '2026-10-02T12:00:00Z'
   };
-
-  assert.deepEqual(writeExecutionState(root, state), state);
-  assert.deepEqual(loadExecutionState(root), state);
-  assert.equal(fs.existsSync(executionStatePath(root)), true);
-});
+  return state;
+}

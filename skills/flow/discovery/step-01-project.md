@@ -2,6 +2,10 @@
 
 Scale discovery depth to ambiguity and consequence, not document length. Discovery is available both when starting a project and when later work exposes a material product or engineering question.
 
+Before asking or re-asking consequential questions, run `npx --no-install flow checkpoint show --json`. If it returns a matching discovery checkpoint targeting `_flow/docs/prd.md`, resume from its recorded dimensions, assumptions, latest authorized direction and `next_frontier` instead of relying on prior chat history.
+
+When no matching checkpoint exists and discovery becomes decision-heavy, start one through `flow checkpoint begin --data <json>`. Keep the payload compact: phase/subphase, target reference, exact input references/revisions when known, resolved/unresolved/deferred/not-relevant dimensions, assumptions under test, latest authorized direction and the next decision frontier. Do not copy PRD content into checkpoint state.
+
 For each consequential topic:
 
 1. explain why the decision matters;
@@ -24,4 +28,4 @@ Technical discovery is allowed here when it affects product decisions. Implement
 
 For existing repositories without Flow, inspect the repository and read `brownfield.md`. Understand both the existing product behavior and the user's requested product change here; produce/approve the PRD before engineering evaluates preserve, incremental or refactor adoption.
 
-Persist durable decisions, rejected alternatives, assumptions and unresolved consequential questions so discovery resumes without repetition. Do not turn discovery into a questionnaire; use the selected profile and repository evidence to make defaults and recommendations.
+After every meaningful decision batch, persist the updated compact checkpoint with `flow checkpoint update --data <json>` before continuing or stopping. Stable dimension IDs should survive turns when referenced by the frontier. Discovery completion/approval cleanup remains owned by the project-document approval boundary; W1 does not preimplement the exact-revision approval behavior introduced by W2.

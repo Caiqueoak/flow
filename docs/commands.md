@@ -6,7 +6,7 @@ Flow is CLI-first. The application source tree mirrors the public command surfac
 
 Every public `flow <command>` owns `src/application/<command>/command.ts`.
 
-Supported root commands are `init`, `doctor`, `migrate`, `status`, `validate`, `route`, `sync`, `trace`, `gates`, `work-item`, `task`, `approval`, `scope`, and `schemas`.
+Supported root commands are `init`, `doctor`, `migrate`, `status`, `validate`, `route`, `sync`, `trace`, `gates`, `work-item`, `task`, `checkpoint`, `approval`, `scope`, and `schemas`.
 
 ## Public subcommands
 
@@ -23,6 +23,12 @@ flow task commit      -> application/task/commands/commit.ts
 flow work-item create          -> application/work-item/commands/create.ts
 flow work-item blocker-add     -> application/work-item/commands/blocker-add.ts
 flow work-item review-complete -> application/work-item/commands/review-complete.ts
+
+flow checkpoint begin  -> application/checkpoint/commands/begin.ts
+flow checkpoint update -> application/checkpoint/commands/update.ts
+flow checkpoint ready  -> application/checkpoint/commands/ready.ts
+flow checkpoint clear  -> application/checkpoint/commands/clear.ts
+flow checkpoint show   -> application/checkpoint/commands/show.ts
 ```
 
 A file under `commands/` must correspond to a public CLI command. Private implementation behavior belongs under `operations/` or another responsibility-specific internal folder.
