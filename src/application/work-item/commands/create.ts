@@ -29,6 +29,11 @@ import {
   writeText,
   writeYaml
 } from '../../../infrastructure/filesystem/index.js';
+import { parseCheckpoint } from '../../../domain/workflow/checkpoint.mjs';
+import {
+  loadExecutionState,
+  writeExecutionState
+} from '../../../infrastructure/persistence/execution-state.mjs';
 import { loadProjectWorkItems } from '../work-item-context.js';
 
 interface CreateWorkItemInput {
@@ -62,12 +67,44 @@ export function createWorkItem(root: string, requestedId: string | undefined, ar
       dependsOn: commaSeparatedValues(optionValue(args, '--depends-on')) as WorkItemId[]
     });
     validateWorkItemShell(staging, id);
+    ensurePlanningCheckpointBeforeFirstWorkItem(root, items.length);
     publishDirectory(staging, directory);
   } finally {
     removeDirectory(staging);
   }
 
   writeOutput(`${id} created.`);
+}
+
+function ensurePlanningCheckpointBeforeFirstWorkItem(root: string, existingWorkItemCount: number): void {
+  if (existingWorkItemCount > 0) return;
+
+  const state = loadExecutionState(root);
+  const current = state.checkpoint;
+  if (current) {
+    if (
+      current.phase === 'planning' &&
+      current.target.kind === 'work_item_map' &&
+      current.target.ref === '_flow/work-items'
+    ) {
+      return;
+    }
+    fail('Cannot create the first work item while another checkpoint is active.');
+  }
+
+  state.checkpoint = parseCheckpoint({
+    phase: 'planning',
+    step: 'map_work_items',
+    target: { kind: 'work_item_map', ref: '_flow/work-items', revision: null },
+    status: 'active',
+    inputs: [],
+    dimensions: [],
+    assumptions: [],
+    latest_authorized_direction: null,
+    next_frontier: [],
+    updated_at: new Date().toISOString()
+  });
+  writeExecutionState(root, state);
 }
 
 function writeWorkItemShells(directory: string, input: CreateWorkItemInput): void {

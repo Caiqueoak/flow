@@ -12,6 +12,6 @@ Use `flow work-item create --title ... --outcome ...` plus the other CLI work-it
 
 ## W1 planning checkpoint
 
-Once the first canonical work-item shell exists, persist a compact planning checkpoint through `flow checkpoint begin --data <json>` (or update the existing matching checkpoint). Use a planning target such as `kind: work_item_map`, `ref: _flow/work-items`, with no target revision until a later contract defines one. Record only mapping decisions, unresolved/deferred dimensions, assumptions, authorized direction and the next frontier.
+Creating the first canonical work-item shell starts the compact planning checkpoint durably before that shell is published. `flow work-item create` owns this ordering, so never hand-edit `_flow/state.yaml` or create a competing checkpoint first. After the first shell exists, update the active checkpoint through `flow checkpoint update --data <json>` as mapping decisions become known. Its target is `kind: work_item_map`, `ref: _flow/work-items`, with no target revision until a later contract defines one. Record only mapping decisions, unresolved/deferred dimensions, assumptions, authorized direction and the next frontier.
 
 After the known MVP outcome map is structurally complete, projections are regenerated and validation succeeds, clear that active planning checkpoint with `flow checkpoint clear --target-ref _flow/work-items`. Never hand-edit `_flow/state.yaml`.
