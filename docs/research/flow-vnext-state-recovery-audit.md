@@ -20,7 +20,7 @@ The most important vNext change is therefore not another workflow layer. It is a
 | `_flow/docs/prd.md` | Skill-authored; validated by `src/domain/project/product-requirements-document.mts` | `status: draft|approved`, optional `approved_at` | Product phase routing | Final contract exists, but no incremental discovery checkpoint and no approval revision binding |
 | `_flow/docs/engineering.md` | Skill-authored; validated by `src/domain/project/engineering-document.mts` | `status: draft|approved`, `approved_at`, baseline | Engineering phase routing | Good final contract; no incremental decision checkpoint and no approval revision binding |
 | `_flow/work-items/W###-*/spec.md` | Work-item commands + specification domain | Canonical work-item scope and metadata | Specification routing | Strongest approval model: exact revision hash is bound to authorization |
-| `tasks.yaml` | Task commands | `pending|in_progress|completed` | Active task and decomposition | Good task state, but decomposition has no draft/finalized boundary and global single-mutator is not enforced |
+| `tasks.yaml` | Task commands | `pending|in_progress|completed` | Active task and decomposition | Good task state, but decomposition has no draft/finalized boundary; current guidance assumes a single mutating task, while vNext needs explicit safety checks that permit independent intra-work-item parallel tasks |
 | `review.yaml` | Review-complete command | `pending|approved` plus timestamp | Work-item completion | Final status only; no durable incremental review/checkpoint history |
 | `_flow/gates.yaml` | Skill-authored + gate runtime | Canonical deterministic gates | Verification | Can remain structurally unchanged |
 | `_flow/generated/backlog.yaml` / `graph.md` | `src/infrastructure/projections/project.mts` | Disposable, ignored generated projections; atomic temp+rename | Visibility only | Correctly non-canonical; keep |
@@ -164,7 +164,7 @@ Quick Doctor verifies basic presence, config, canonical work-item parseability, 
 - active workflow checkpoint coherence;
 - lifecycle state against Git trace evidence;
 - review approval against its review commit;
-- multiple active tasks across different work items;
+- multiple active work items, or active task mutations whose dependency/change-surface/isolation constraints make them unsafe to run concurrently;
 - whether a partial planning/discovery draft is being incorrectly routed forward;
 - stale approval metadata after a spec/document edit.
 
@@ -183,15 +183,17 @@ Quick Doctor verifies basic presence, config, canonical work-item parseability, 
 
 Add a recovery consistency pass shared by Doctor, validate, and route. It should be read-only and explain the safe repair direction rather than mutate automatically.
 
-### High — The “one mutating work item/task at a time” invariant is not globally enforced
+### High — Current single-mutator guidance is not enforced, and it is too restrictive for the accepted vNext model
 
 **Problem**
 
-`skills/flow/invariants.md` says one mutating work item and task at a time across the project.
+`skills/flow/invariants.md` currently says one mutating work item and task at a time across the project. That is the stale/current invariant discovered by this audit, not the accepted vNext target.
 
 `runStart()` only checks whether another task is in progress inside the selected work item's own `tasks.yaml`. `loadWorkItems()` does not reject multiple work items that each contain an in-progress task. Route simply uses `find()` and picks one active item.
 
-The old/generated backlog parser contains a one-`in_progress` check, but canonical work-item loading and derived projections do not use that check to enforce the runtime invariant.
+The old/generated backlog parser contains a one-`in_progress` check, but canonical work-item loading and derived projections do not use that check to enforce even the current invariant.
+
+For vNext, the normal baseline is one active work item. Within that work item, multiple tasks/workers may run in parallel when the orchestrator determines they are genuinely independent. That decision must consider dependency relationships, change-surface overlap, shared mutable resources, available isolation, integration cost, and verification needs.
 
 **Evidence / files**
 
@@ -204,7 +206,9 @@ The old/generated backlog parser contains a one-`in_progress` check, but canonic
 
 **Recommendation**
 
-Enforce the invariant in the canonical transition boundary used by `task start` and in validation/Doctor. Routing should fail with an explicit recovery diagnosis if multiple active mutations already exist; it should never silently choose one.
+Enforce one active work item as the normal project baseline in the canonical transition boundary, validation, and Doctor. Do not enforce one globally active task.
+
+For active tasks inside that work item, runtime should detect and prevent unsafe or conflicting concurrent mutations while permitting intentional safe parallelism. The orchestrator should choose parallel vs sequential execution from dependency, overlapping change surfaces, shared mutable resources, isolation, integration cost, and verification requirements. Routing should fail with an explicit recovery diagnosis for multiple active work items or unsafe/conflicting active task mutations; it should not reject independent intra-work-item tasks merely because another task is already active.
 
 ### Medium — Review state is not resumable and does not preserve review history
 
@@ -354,7 +358,7 @@ Introduce one domain/application transition boundary used by mutating commands, 
 
 - approved current PRD/engineering where required;
 - exact approved work-item SPEC;
-- one active mutating work item/task project-wide;
+- one active work item as the normal baseline, while allowing multiple active tasks inside it only when concurrency is judged safe from dependencies, change-surface overlap, shared mutable resources, isolation, integration cost, and verification needs;
 - legal task dependency state;
 - no forward transition while the owning checkpoint is incomplete.
 
@@ -372,7 +376,8 @@ Add checks for:
 
 - checkpoint vs canonical artifact revision;
 - stale/missing approval revision;
-- multiple active tasks/work items;
+- multiple active work items;
+- unsafe/conflicting active task mutations within the active work item, without treating safe intentional intra-work-item parallelism as an error;
 - completed task without canonical Git trace and canonical trace without matching lifecycle state;
 - approved review without its canonical review commit;
 - incomplete/partial Flow transactions;
@@ -417,7 +422,7 @@ The skills should say when and why to checkpoint; the runtime should own how the
 | Checkpoint schema, ownership and atomic persistence | Required | No |
 | Whether unresolved required decisions block approval/forward routing | Required | Skill decides what is consequential/relevant |
 | Exact-revision PRD/engineering/SPEC authorization | Required | Skill presents recommendation and asks the human |
-| One active mutating task/work item | Required | No |
+| One active work item baseline; safe/conflicting intra-work-item task concurrency checks | Required | Orchestrator/skill decides parallel vs sequential execution using dependency, overlap, shared-resource, isolation, integration, and verification context |
 | Legal lifecycle/dependency transitions | Required | No |
 | Git trace ↔ lifecycle consistency | Required | Skill interprets unusual evidence when recovery is ambiguous |
 | Draft cleanup after approval | Required and idempotent | Skill should not manually remember cleanup |
@@ -451,7 +456,9 @@ Add integration tests that intentionally interrupt and resume at these points:
 - after one of several planned work-item shells;
 - after one of several planned tasks;
 - after engineering draft mutation following approval;
-- with two work items containing in-progress tasks;
+- with two work items containing in-progress tasks, which should be diagnosed against the one-active-work-item baseline;
+- with two independent tasks in the same active work item, which should remain valid when concurrency safety checks pass;
+- with two conflicting tasks in the same active work item, which should be blocked or diagnosed before concurrent mutation;
 - after task-state write but before/without a matching Git evidence commit;
 - after a matching task commit with stale local lifecycle state;
 - midway through review with persisted findings;
