@@ -77,10 +77,7 @@ function recordProjectDocumentApproval(
 
 function assertApprovalReadyRevision(root: string, targetRef: string, targetRevision: string): void {
   const checkpoint = loadExecutionState(root).checkpoint;
-  if (
-    checkpoint?.status !== 'approval_ready' ||
-    normalizeTargetRef(checkpoint.target.ref) !== targetRef
-  ) {
+  if (checkpoint?.status !== 'approval_ready' || normalizeTargetRef(checkpoint.target.ref) !== targetRef) {
     return;
   }
 

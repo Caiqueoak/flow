@@ -155,7 +155,8 @@ test('matching approval-ready revision is approved and clears its checkpoint', (
   writePrd(root, 'not_required');
   beginApprovalReadyCheckpoint(root, { kind: 'project_document', ref: '_flow/docs/prd.md' });
 
-  const presentedRevision = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).checkpoint.target.revision;
+  const presentedRevision = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).checkpoint.target
+    .revision;
   const approved = run(root, ['approval', 'record', '_flow/docs/prd.md']);
   assert.equal(approved.status, 0, approved.stderr);
 
