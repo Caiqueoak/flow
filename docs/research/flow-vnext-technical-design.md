@@ -118,7 +118,7 @@ Tasks retain the lifecycle:
 
 Multiple in_progress tasks are allowed inside the active work item only when deterministic concurrency guards can prove there is no declared dependency/change-surface/shared-resource conflict. The orchestrator still decides whether parallel execution is worthwhile.
 
-Non-simple implementation must delegate meaningful responsibility to one or more workers when the runtime can do so. A cohesive responsibility may still be handled by one worker; Flow never maps worker count mechanically to task count.
+Non-simple implementation must delegate meaningful responsibility to one or more workers. If the active runtime cannot provide workers, that implementation responsibility blocks or defers until the orchestrator switches to a capable runtime or uses another explicit worker mechanism; it must not silently absorb the implementation itself. Genuinely simple and bounded implementation may still be performed directly by the orchestrator, and ordinary orchestrator responsibilities such as user interaction, synthesis, integration judgment and review do not require worker availability. A cohesive responsibility may still be handled by one worker; Flow never maps worker count mechanically to task count.
 
 ### 2.8 Review and repair
 
@@ -651,16 +651,20 @@ The orchestration skill builds an in-memory capability profile from the runtime 
 
 nested delegation/resume may be observed, but vNext does not depend on them.
 
-Graceful fallback:
+Capability fallback:
 
-1. no worker spawning -> orchestrator performs the responsibility, recording the capability limitation;
+1. no worker spawning:
+   - genuinely simple and bounded implementation may still be performed directly by the orchestrator;
+   - ordinary orchestrator responsibilities such as user interaction, synthesis, integration judgment and review remain available;
+   - non-simple implementation blocks or defers, surfaces the capability limitation, and requires a capable runtime or another explicit worker mechanism before implementation continues;
+   - the orchestrator must not silently bypass mandatory delegation by implementing non-simple work itself;
 2. no model override -> inherit runtime model;
 3. no effort override -> inherit/default effort;
 4. no context control -> send a self-sufficient minimum handoff and accept runtime-owned context behavior;
 5. no safe workspace isolation -> do not run conflicting writers concurrently;
 6. no usage telemetry -> tune from review outcomes/retries/output size instead.
 
-The CLI does not implement a vendor-specific agent launcher in vNext. Runtime-native spawning remains a skill/orchestrator responsibility.
+The CLI does not implement a vendor-specific agent launcher in vNext. Runtime-native spawning remains a skill/orchestrator responsibility, and an explicit external worker mechanism may satisfy mandatory delegation when the active runtime itself cannot spawn workers.
 
 ## 11. Minimal worker contract
 
@@ -950,65 +954,65 @@ Deterministic tests prove structural invariants. Human/rubric benchmarks prove j
 
 ## 18. Implementation decomposition
 
-These are observable delivery work items, not planning phases.
+These are observable delivery work items, not planning phases or architecture layers. Infrastructure/runtime plumbing is implemented as tasks inside the first outcome that requires it.
 
-### W1 — Atomic checkpoint persistence
+### W1 — Decision-heavy work can stop and resume safely from repository state
 
-**Delivers:** state.yaml v3, atomic canonical writes, checkpoint persistence/cleanup and atomic work-item shell creation.
+**Delivers:** resumable discovery/planning behavior. Enabling tasks introduce state.yaml v3, atomic canonical writes, checkpoint persistence/cleanup and atomic work-item shell creation.
 
 **Depends on:** none.
 
-**Observable acceptance:** interruptible discovery/planning state can be atomically persisted and a partially created work item never appears canonical.
+**Observable acceptance:** interrupting decision-heavy discovery or planning leaves enough canonical repository state for a fresh chat to resume the same decision frontier; an interrupted work-item creation never exposes a partial shell as canonical; approved/persisted outcomes clear their temporary checkpoint safely.
 
-### W2 — Exact project approval and optional experience contract
+### W2 — Approved project contracts remain trustworthy and experience routes correctly
 
 **Delivers:** shared project-document revision approval, PRD experience relevance, optional experience.md and exact approval guards.
 
 **Depends on:** W1.
 
-**Observable acceptance:** editing approved PRD/experience/engineering content invalidates downstream authorization; experience routes only when required.
+**Observable acceptance:** editing approved PRD/experience/engineering content invalidates downstream authorization; experience routes only when required by the approved PRD.
 
-### W3 — Recovery-aware route, validate and Doctor
+### W3 — Fresh chats recover the correct next safe action
 
-**Delivers:** checkpoint-first routing, shared recovery consistency checks, stale-cleanup repair and planning/specification resume guards.
+**Delivers:** checkpoint-first routing, shared recovery consistency checks, stale-cleanup repair and planning/specification resume guards across route, validate and Doctor.
 
 **Depends on:** W1, W2.
 
-**Observable acceptance:** partial decision/planning work always resumes at the same safe frontier and consequential inconsistencies stop before mutation.
+**Observable acceptance:** a fresh chat, Doctor and normal routing reconstruct the same safe continuation from repository/Git state; partial decision/planning work resumes at the correct frontier and consequential inconsistencies stop before mutation.
 
-### W4 — Safe intra-work-item parallel task execution
+### W4 — One active work item can execute independent tasks safely in parallel
 
 **Delivers:** real active work-item focus, multiple in_progress tasks, mutation claims, conflict prevention and commit-surface verification.
 
 **Depends on:** W1, W3.
 
-**Observable acceptance:** independent same-work-item tasks can execute concurrently; dependent/overlapping/shared-resource writers cannot.
+**Observable acceptance:** independent same-work-item tasks can execute concurrently; dependent, overlapping or shared-resource writers cannot.
 
-### W5 — Resumable review and repair history
+### W5 — Review and repair history survives interruption and remains traceable
 
 **Delivers:** review.yaml v2, active review checkpoint, append-only passes/findings/resolutions, worker evidence and clean final-disposition guards.
 
 **Depends on:** W1, W3.
 
-**Observable acceptance:** interrupted review resumes, repairs do not erase prior findings, and unresolved blocking findings prevent approval.
+**Observable acceptance:** interrupted review resumes from durable state, repairs do not erase prior findings, later passes can trace resolutions to repair evidence, and unresolved blocking findings prevent approval.
 
-### W6 — Runtime-agnostic orchestration behavior
+### W6 — Non-simple execution delegates efficiently using runtime capabilities and minimum-sufficient context
 
-**Delivers:** orchestration skill, minimum worker contract, capability detection/fallback, cheapest-capable routing, failure-cause escalation and branch/worktree guidance.
+**Delivers:** orchestration skill, minimum worker contract, capability detection and mandatory-delegation gate, cheapest-capable routing, failure-cause escalation and branch/worktree guidance.
 
 **Depends on:** W3, W4, W5.
 
-**Observable acceptance:** non-simple work delegates when capability exists, handoffs are bounded, safe parallelism is chosen dynamically, and unsupported runtime features degrade safely.
+**Observable acceptance:** non-simple implementation delegates through an available worker mechanism; if none is available it blocks/defers with the capability limitation surfaced instead of falling back to direct implementation. Genuinely simple bounded changes and ordinary orchestrator responsibilities still proceed without workers. Worker handoffs remain bounded, safe parallelism is chosen dynamically, and unsupported optional runtime features degrade safely.
 
-### W7 — vNext lifecycle skills and compatibility migration
+### W7 — Existing projects can adopt vNext and traverse the complete lifecycle safely
 
 **Delivers:** discovery/experience/engineering/planning/spec/build/review/reconcile skills aligned with the new runtime; schema compatibility/adoption for existing projects.
 
 **Depends on:** W2, W3, W4, W5, W6.
 
-**Observable acceptance:** an existing project resumes without loss of canonical state and a new project can traverse the complete vNext lifecycle without stale guidance.
+**Observable acceptance:** an existing project adopts vNext without loss of canonical state and can resume correctly; a new or migrated project can traverse the complete vNext lifecycle without stale guidance or bypassing required checkpoints/delegation.
 
-### W8 — vNext regression and benchmark fixtures
+### W8 — vNext behavior can be regression and benchmark tested
 
 **Delivers:** deterministic interruption/conflict fixtures plus the PR #51 high-signal benchmark harness/results format.
 
@@ -1063,7 +1067,7 @@ Flow vNext is complete only when these statements are true:
 - one active work item is the normal delivery boundary;
 - independent tasks inside it may run concurrently when deterministic conflict guards pass and the orchestrator judges parallelism worthwhile;
 - unsafe/conflicting mutations are blocked;
-- non-simple implementation uses workers when the runtime supports them;
+- non-simple implementation is delegated through a worker mechanism; when none is available, implementation blocks/defers rather than falling back to direct orchestrator implementation;
 - worker context is minimum-sufficient and model/effort escalation is evidence-driven;
 - review history is durable, append-only and sufficient to understand findings, repairs, resolutions and residual risk;
 - deterministic runtime remains limited to structural integrity;
