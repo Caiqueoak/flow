@@ -5,14 +5,12 @@ import { writeYaml } from '../../../infrastructure/filesystem/index.js';
 import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
 import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 import { findTask, loadTaskContext } from '../task-context.js';
-import { assertProjectContractsAuthorized } from '../../project-contracts.mjs';
 
 export function runStart(target: string | undefined, args: readonly string[]): void {
   const root = projectRoot(args);
   const context = loadTaskContext(root, target);
   const task = findTask(context.tasks.tasks, target);
 
-  assertProjectContractsAuthorized(root);
   ensureWorkItemIsNotBlocked(root, context.item);
   ensureNoTaskIsInProgress(context.tasks);
   ensureDependenciesAreCompleted(context.item, task, context.tasks);
