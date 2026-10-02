@@ -22,7 +22,10 @@ test('atomic text replacement preserves the previous file when candidate validat
   );
 
   assert.equal(fs.readFileSync(file, 'utf8'), 'previous\n');
-  assert.deepEqual(fs.readdirSync(root).filter((name) => name.includes('.flow-tmp-')), []);
+  assert.deepEqual(
+    fs.readdirSync(root).filter((name) => name.includes('.flow-tmp-')),
+    []
+  );
 });
 
 test('atomic text replacement publishes the complete candidate', (t) => {
@@ -35,7 +38,6 @@ test('atomic text replacement publishes the complete candidate', (t) => {
 
   assert.equal(fs.readFileSync(file, 'utf8'), 'new\n');
 });
-
 
 test('atomic text replacement keeps the previous canonical file when rename fails', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-atomic-'));
@@ -54,5 +56,8 @@ test('atomic text replacement keeps the previous canonical file when rename fail
   }
 
   assert.equal(fs.readFileSync(file, 'utf8'), 'old\n');
-  assert.deepEqual(fs.readdirSync(root).filter((name) => name.includes('.flow-tmp-')), []);
+  assert.deepEqual(
+    fs.readdirSync(root).filter((name) => name.includes('.flow-tmp-')),
+    []
+  );
 });

@@ -14,20 +14,20 @@ The most important vNext change is therefore not another workflow layer. It is a
 
 ## Current-state map
 
-| State / artifact | Current owner | Durable behavior | Recovery role | Audit result |
-| --- | --- | --- | --- | --- |
-| `_flow/config.yaml` | `src/infrastructure/persistence/configuration.mts` | Canonical config, direct file write | Version/runtime/profile bootstrap | Keep; make canonical writes atomic |
-| `_flow/docs/prd.md` | Skill-authored; validated by `src/domain/project/product-requirements-document.mts` | `status: draft|approved`, optional `approved_at` | Product phase routing | Final contract exists, but no incremental discovery checkpoint and no approval revision binding |
-| `_flow/docs/engineering.md` | Skill-authored; validated by `src/domain/project/engineering-document.mts` | `status: draft|approved`, `approved_at`, baseline | Engineering phase routing | Good final contract; no incremental decision checkpoint and no approval revision binding |
-| `_flow/work-items/W###-*/spec.md` | Work-item commands + specification domain | Canonical work-item scope and metadata | Specification routing | Strongest approval model: exact revision hash is bound to authorization |
-| `tasks.yaml` | Task commands | `pending|in_progress|completed` | Active task and decomposition | Good task state, but decomposition has no draft/finalized boundary; current guidance assumes a single mutating task, while vNext needs explicit safety checks that permit independent intra-work-item parallel tasks |
-| `review.yaml` | Review-complete command | `pending|approved` plus timestamp | Work-item completion | Final status only; no durable incremental review/checkpoint history |
-| `_flow/gates.yaml` | Skill-authored + gate runtime | Canonical deterministic gates | Verification | Can remain structurally unchanged |
-| `_flow/generated/backlog.yaml` / `graph.md` | `src/infrastructure/projections/project.mts` | Disposable, ignored generated projections; atomic temp+rename | Visibility only | Correctly non-canonical; keep |
-| `_flow/state.yaml` | `src/domain/workflow/execution-state.mts`; migration writer | Schema models phase, step, active work, stop reason, migration | Intended cursor/recovery state | In production it is effectively migration-only; generic cursor fields are not maintained or routed |
-| Git task commits | `flow task commit`, `flow trace` | W###-T### subject + trailers; SHA derived | Durable implementation evidence | Strong identity model; validation/Doctor do not currently enforce lifecycle-to-trace consistency |
-| Git work-item review commit | `flow work-item review-complete` | Canonical review commit subject | Completion evidence | Useful durable boundary, but review status can be trusted without verifying the commit during routing/validation |
-| Migration backups/staging | migration infrastructure | Staging/swap and backup semantics | Migration recovery | Strong specialized recovery surface; keep |
+| State / artifact                            | Current owner                                                                       | Durable behavior                                               | Recovery role                      | Audit result                                                                                                     |
+| ------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `_flow/config.yaml`                         | `src/infrastructure/persistence/configuration.mts`                                  | Canonical config, direct file write                            | Version/runtime/profile bootstrap  | Keep; make canonical writes atomic                                                                               |
+| `_flow/docs/prd.md`                         | Skill-authored; validated by `src/domain/project/product-requirements-document.mts` | `status: draft                                                 | approved`, optional `approved_at`  | Product phase routing                                                                                            | Final contract exists, but no incremental discovery checkpoint and no approval revision binding |
+| `_flow/docs/engineering.md`                 | Skill-authored; validated by `src/domain/project/engineering-document.mts`          | `status: draft                                                 | approved`, `approved_at`, baseline | Engineering phase routing                                                                                        | Good final contract; no incremental decision checkpoint and no approval revision binding        |
+| `_flow/work-items/W###-*/spec.md`           | Work-item commands + specification domain                                           | Canonical work-item scope and metadata                         | Specification routing              | Strongest approval model: exact revision hash is bound to authorization                                          |
+| `tasks.yaml`                                | Task commands                                                                       | `pending                                                       | in_progress                        | completed`                                                                                                       | Active task and decomposition                                                                   | Good task state, but decomposition has no draft/finalized boundary; current guidance assumes a single mutating task, while vNext needs explicit safety checks that permit independent intra-work-item parallel tasks |
+| `review.yaml`                               | Review-complete command                                                             | `pending                                                       | approved` plus timestamp           | Work-item completion                                                                                             | Final status only; no durable incremental review/checkpoint history                             |
+| `_flow/gates.yaml`                          | Skill-authored + gate runtime                                                       | Canonical deterministic gates                                  | Verification                       | Can remain structurally unchanged                                                                                |
+| `_flow/generated/backlog.yaml` / `graph.md` | `src/infrastructure/projections/project.mts`                                        | Disposable, ignored generated projections; atomic temp+rename  | Visibility only                    | Correctly non-canonical; keep                                                                                    |
+| `_flow/state.yaml`                          | `src/domain/workflow/execution-state.mts`; migration writer                         | Schema models phase, step, active work, stop reason, migration | Intended cursor/recovery state     | In production it is effectively migration-only; generic cursor fields are not maintained or routed               |
+| Git task commits                            | `flow task commit`, `flow trace`                                                    | W###-T### subject + trailers; SHA derived                      | Durable implementation evidence    | Strong identity model; validation/Doctor do not currently enforce lifecycle-to-trace consistency                 |
+| Git work-item review commit                 | `flow work-item review-complete`                                                    | Canonical review commit subject                                | Completion evidence                | Useful durable boundary, but review status can be trusted without verifying the commit during routing/validation |
+| Migration backups/staging                   | migration infrastructure                                                            | Staging/swap and backup semantics                              | Migration recovery                 | Strong specialized recovery surface; keep                                                                        |
 
 ## Gaps and severity
 
@@ -278,17 +278,17 @@ After runtime checkpoint ownership is decided, rewrite recovery guidance to name
 
 ## Fresh-chat recovery by phase
 
-| Interruption point | What survives today | What a fresh chat does today | Risk |
-| --- | --- | --- | --- |
-| Discovery before PRD materialization | Usually only chat context | Route restarts generic discovery | Prior answers/rejections can be lost or repeated |
-| Discovery after structurally valid draft PRD | PRD text | Route goes to approval | Unresolved dimensions can be skipped |
-| Engineering during synthesis | Draft engineering text | Valid draft routes to approval | Open engineering choices are not first-class |
-| MVP work-item mapping after some shells | Partial canonical shells | Route deepens first outlined item | Mapping phase can end accidentally |
-| Work-item specification while still outlined | Partial `spec.md` | Route returns specification deepen | Relatively recoverable, but unresolved decision set is implicit |
-| Task decomposition after some tasks | Partial `tasks.yaml` | Route may start first task | Decomposition can end accidentally |
-| Active task implementation | `in_progress` task + working tree/Git | Route returns active task | Best current recovery case; Doctor still lacks dirty/trace consistency checks |
-| Review midway | Mostly chat; possibly repair tasks | Route returns review again | Findings/history must be rediscovered |
-| Migration reconciliation | backup + `state.yaml` pending status | Route returns reconcile | Durable specialized state, but completion mutation is not a first-class CLI transition |
+| Interruption point                           | What survives today                   | What a fresh chat does today       | Risk                                                                                   |
+| -------------------------------------------- | ------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------- |
+| Discovery before PRD materialization         | Usually only chat context             | Route restarts generic discovery   | Prior answers/rejections can be lost or repeated                                       |
+| Discovery after structurally valid draft PRD | PRD text                              | Route goes to approval             | Unresolved dimensions can be skipped                                                   |
+| Engineering during synthesis                 | Draft engineering text                | Valid draft routes to approval     | Open engineering choices are not first-class                                           |
+| MVP work-item mapping after some shells      | Partial canonical shells              | Route deepens first outlined item  | Mapping phase can end accidentally                                                     |
+| Work-item specification while still outlined | Partial `spec.md`                     | Route returns specification deepen | Relatively recoverable, but unresolved decision set is implicit                        |
+| Task decomposition after some tasks          | Partial `tasks.yaml`                  | Route may start first task         | Decomposition can end accidentally                                                     |
+| Active task implementation                   | `in_progress` task + working tree/Git | Route returns active task          | Best current recovery case; Doctor still lacks dirty/trace consistency checks          |
+| Review midway                                | Mostly chat; possibly repair tasks    | Route returns review again         | Findings/history must be rediscovered                                                  |
+| Migration reconciliation                     | backup + `state.yaml` pending status  | Route returns reconcile            | Durable specialized state, but completion mutation is not a first-class CLI transition |
 
 ## What can remain unchanged
 
@@ -417,21 +417,21 @@ The skills should say when and why to checkpoint; the runtime should own how the
 
 ## Runtime enforcement vs skill-only guidance
 
-| Concern | Runtime enforcement | Skill-only guidance |
-| --- | --- | --- |
-| Checkpoint schema, ownership and atomic persistence | Required | No |
-| Whether unresolved required decisions block approval/forward routing | Required | Skill decides what is consequential/relevant |
-| Exact-revision PRD/engineering/SPEC authorization | Required | Skill presents recommendation and asks the human |
-| One active work item baseline; safe/conflicting intra-work-item task concurrency checks | Required | Orchestrator/skill decides parallel vs sequential execution using dependency, overlap, shared-resource, isolation, integration, and verification context |
-| Legal lifecycle/dependency transitions | Required | No |
-| Git trace ↔ lifecycle consistency | Required | Skill interprets unusual evidence when recovery is ambiguous |
-| Draft cleanup after approval | Required and idempotent | Skill should not manually remember cleanup |
-| Partial-write detection/recovery state | Required | Skill can explain the repair |
-| What questions to ask and how many | No | Skill |
-| Product/engineering recommendation and rationale | No | Skill |
-| Whether an implementation detail is consequential | Structural boundary in runtime; judgment in skill | Skill |
-| Review lenses and qualitative findings | Persisted structure required; content is judgment | Skill |
-| Fresh-chat rehydration sequence | Runtime supplies authoritative state | Skill reads/summarizes it and continues |
+| Concern                                                                                 | Runtime enforcement                               | Skill-only guidance                                                                                                                                      |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Checkpoint schema, ownership and atomic persistence                                     | Required                                          | No                                                                                                                                                       |
+| Whether unresolved required decisions block approval/forward routing                    | Required                                          | Skill decides what is consequential/relevant                                                                                                             |
+| Exact-revision PRD/engineering/SPEC authorization                                       | Required                                          | Skill presents recommendation and asks the human                                                                                                         |
+| One active work item baseline; safe/conflicting intra-work-item task concurrency checks | Required                                          | Orchestrator/skill decides parallel vs sequential execution using dependency, overlap, shared-resource, isolation, integration, and verification context |
+| Legal lifecycle/dependency transitions                                                  | Required                                          | No                                                                                                                                                       |
+| Git trace ↔ lifecycle consistency                                                       | Required                                          | Skill interprets unusual evidence when recovery is ambiguous                                                                                             |
+| Draft cleanup after approval                                                            | Required and idempotent                           | Skill should not manually remember cleanup                                                                                                               |
+| Partial-write detection/recovery state                                                  | Required                                          | Skill can explain the repair                                                                                                                             |
+| What questions to ask and how many                                                      | No                                                | Skill                                                                                                                                                    |
+| Product/engineering recommendation and rationale                                        | No                                                | Skill                                                                                                                                                    |
+| Whether an implementation detail is consequential                                       | Structural boundary in runtime; judgment in skill | Skill                                                                                                                                                    |
+| Review lenses and qualitative findings                                                  | Persisted structure required; content is judgment | Skill                                                                                                                                                    |
+| Fresh-chat rehydration sequence                                                         | Runtime supplies authoritative state              | Skill reads/summarizes it and continues                                                                                                                  |
 
 ## Draft cleanup rule
 

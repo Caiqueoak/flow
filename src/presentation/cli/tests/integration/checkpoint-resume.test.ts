@@ -55,14 +55,7 @@ test('checkpoint CLI persists resumable state without hand-editing state.yaml', 
   assert.equal(parse(fs.readFileSync(stateFile, 'utf8')).checkpoint.status, 'approval_ready');
 
   assert.equal(
-    await flow(root, [
-      'checkpoint',
-      'clear',
-      '--target-ref',
-      '_flow/docs/prd.md',
-      '--target-revision',
-      'prd-rev-1'
-    ]),
+    await flow(root, ['checkpoint', 'clear', '--target-ref', '_flow/docs/prd.md', '--target-revision', 'prd-rev-1']),
     'Checkpoint cleared.'
   );
   assert.equal(parse(fs.readFileSync(stateFile, 'utf8')).checkpoint, null);

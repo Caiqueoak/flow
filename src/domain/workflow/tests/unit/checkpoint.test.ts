@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  parseCheckpoint,
-  withCheckpointStatus,
-  type WorkflowCheckpoint
-} from '../../checkpoint.mjs';
+import { parseCheckpoint, withCheckpointStatus, type WorkflowCheckpoint } from '../../checkpoint.mjs';
 
 function checkpoint(overrides: Partial<WorkflowCheckpoint> = {}): WorkflowCheckpoint {
   return {

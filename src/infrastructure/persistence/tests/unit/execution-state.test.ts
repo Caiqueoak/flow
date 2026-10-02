@@ -4,11 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { emptyState, type ExecutionState } from '../../../../domain/workflow/execution-state.mjs';
-import {
-  executionStateFile,
-  loadExecutionState,
-  writeExecutionState
-} from '../../execution-state.mjs';
+import { executionStateFile, loadExecutionState, writeExecutionState } from '../../execution-state.mjs';
 
 test('execution state persistence atomically replaces a valid checkpoint state', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-state-'));

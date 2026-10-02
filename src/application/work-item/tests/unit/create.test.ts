@@ -15,12 +15,7 @@ function project(t: test.TestContext) {
 
 test('successful staged work-item creation publishes the complete canonical shell', (t) => {
   const root = project(t);
-  createWorkItem(root, 'W101', [
-    '--title',
-    'Atomic shell',
-    '--outcome',
-    'A complete shell is visible atomically.'
-  ]);
+  createWorkItem(root, 'W101', ['--title', 'Atomic shell', '--outcome', 'A complete shell is visible atomically.']);
 
   const items = loadWorkItems(root);
   assert.equal(items.length, 1);
@@ -53,7 +48,6 @@ test('failed staged validation cannot expose a partial canonical work item', (t)
   assert.deepEqual(fs.readdirSync(workItems), []);
   assert.deepEqual(loadWorkItems(root), []);
 });
-
 
 test('interrupted staging directory is not exposed as a canonical work item', (t) => {
   const root = project(t);

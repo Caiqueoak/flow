@@ -32,8 +32,5 @@ export const command: CommandDefinition = {
 
 export function runCheckpoint({ args }: { args: string[] }): void {
   const [action] = positionalArguments(args);
-  resolveSubcommand(checkpointCommands, action, `Unknown checkpoint operation '${action}'.`)(
-    projectRoot(args),
-    args
-  );
+  resolveSubcommand(checkpointCommands, action, `Unknown checkpoint operation '${action}'.`)(projectRoot(args), args);
 }

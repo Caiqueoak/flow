@@ -20,10 +20,7 @@ export function atomicWriteText(
   { validate }: { validate?: (candidate: string) => void } = {}
 ): void {
   validate?.(content);
-  const temporary = path.join(
-    path.dirname(file),
-    `.${path.basename(file)}.flow-tmp-${process.pid}-${randomUUID()}`
-  );
+  const temporary = path.join(path.dirname(file), `.${path.basename(file)}.flow-tmp-${process.pid}-${randomUUID()}`);
   try {
     fs.writeFileSync(temporary, content, 'utf8');
     validate?.(fs.readFileSync(temporary, 'utf8'));

@@ -117,7 +117,7 @@ Chat context is ephemeral. Editing a draft in place can lose why a decision chan
 
 Introduce a small Flow-owned persistence primitive for decision-heavy phases. The content vocabulary should be Flow-specific but small: for example decision, rejection, assumption, question/dimension, defer, override, direction, and event. Writes should be atomic and append-only.
 
-The CLI should own structural integrity and atomic persistence; skills should decide *what* is consequential enough to record.
+The CLI should own structural integrity and atomic persistence; skills should decide _what_ is consequential enough to record.
 
 **Do not copy**
 

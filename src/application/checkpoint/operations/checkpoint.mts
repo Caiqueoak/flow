@@ -5,10 +5,7 @@ import {
   withCheckpointStatus,
   type WorkflowCheckpoint
 } from '../../../domain/workflow/checkpoint.mjs';
-import {
-  loadExecutionState,
-  writeExecutionState
-} from '../../../infrastructure/persistence/execution-state.mjs';
+import { loadExecutionState, writeExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 
 type CheckpointPayload = Omit<WorkflowCheckpoint, 'status' | 'updated_at'>;
 

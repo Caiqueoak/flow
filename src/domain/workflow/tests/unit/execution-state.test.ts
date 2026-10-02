@@ -52,16 +52,12 @@ test('execution state rejects malformed v3 structure and migration state', () =>
   assert.throws(() => parseState('schema_version: 1'), /schema_version/);
   assert.throws(
     () =>
-      parseState(
-        'schema_version: 3\nactive:\n  work_item: bad\ncheckpoint: null\nmigration:\n  status: completed\n'
-      ),
+      parseState('schema_version: 3\nactive:\n  work_item: bad\ncheckpoint: null\nmigration:\n  status: completed\n'),
     /active.work_item/
   );
   assert.throws(
     () =>
-      parseState(
-        'schema_version: 3\nactive:\n  work_item: null\ncheckpoint: null\nmigration:\n  status: running\n'
-      ),
+      parseState('schema_version: 3\nactive:\n  work_item: null\ncheckpoint: null\nmigration:\n  status: running\n'),
     /migration.status/
   );
 });

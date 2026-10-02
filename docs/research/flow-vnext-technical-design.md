@@ -153,7 +153,7 @@ state.yaml becomes a small structural envelope, not a second product/engineering
 
 Target shape:
 
-~~~yaml
+```yaml
 schema_version: 3
 
 migration:
@@ -195,7 +195,7 @@ checkpoint:
   next_frontier:
     - D002
   updated_at: 2026-10-02T09:00:00Z
-~~~
+```
 
 checkpoint is null when no temporary decision/planning checkpoint exists.
 
@@ -227,13 +227,13 @@ No generic completed checkpoint is retained. Completion means the canonical targ
 
 PRD, experience and engineering use one project-document approval contract:
 
-~~~yaml
+```yaml
 schema_version: 2
 status: approved
 approval:
   at: 2026-10-02T09:00:00Z
   revision: 64-hex-sha256
-~~~
+```
 
 PRD additionally records experience: required or not_required for new vNext documents.
 
@@ -255,7 +255,7 @@ Keep task identity, dependencies and lifecycle. Remove the current global one-in
 
 Add optional mutation intent:
 
-~~~yaml
+```yaml
 - id: T003
   title: Add repository checkpoint persistence
   state: in_progress
@@ -266,7 +266,7 @@ Add optional mutation intent:
       - src/infrastructure/persistence/execution-state.mts
     resources:
       - workflow-state-schema
-~~~
+```
 
 surfaces are normalized repository-relative files or directory prefixes, not arbitrary globs. resources are opaque stable tokens for shared mutable concerns that are not adequately represented by paths, such as schema ownership or a shared generated contract.
 
@@ -276,7 +276,7 @@ For the first/only active task, mutation claims may be absent. Starting a second
 
 Evolve to schema version 2:
 
-~~~yaml
+```yaml
 schema_version: 2
 work_item: W004
 disposition: changes_required
@@ -321,7 +321,7 @@ passes:
         task: W004-T004
     resolutions: []
     residual_risk: []
-~~~
+```
 
 Later passes do not rewrite R001/F001. They append a resolution such as resolved, reopened, superseded or accepted_residual_risk.
 
@@ -352,23 +352,23 @@ Review history is the intentional exception because review/repair traceability i
 
 ## 4. State ownership and SSOT
 
-| Durable fact | Exact owner | Kind |
-| --- | --- | --- |
-| Product purpose/users/scope/requirements/non-goals | _flow/docs/prd.md | canonical |
-| Whether current scope needs experience definition | PRD frontmatter | canonical |
-| Consequential interaction/experience behavior when required | _flow/docs/experience.md | canonical, optional |
-| Architecture/topology/ownership/dependency rules | _flow/docs/engineering.md | canonical |
-| Work-item outcome/scope/acceptance/local decisions | work-item spec.md | canonical |
-| Work-item dependency graph | spec depends_on fields | canonical |
-| Task decomposition/dependencies/lifecycle/mutation intent | tasks.yaml | canonical |
-| Review passes/findings/repairs/resolutions/final disposition | review.yaml | canonical |
-| Current active delivery work item | _flow/state.yaml active.work_item | canonical structural cursor |
-| In-progress decision/planning frontier | _flow/state.yaml checkpoint | temporary |
-| Implementation identity/evidence | Git commits/trailers | canonical evidence |
-| Gate definitions | _flow/gates.yaml | canonical |
-| Derived backlog/graph | _flow/generated/* | generated/disposable |
-| Runtime capability profile | orchestrator runtime context | derived/ephemeral |
-| Worker summaries | worker response / review evidence references | derived, not SSOT |
+| Durable fact                                                 | Exact owner                                  | Kind                        |
+| ------------------------------------------------------------ | -------------------------------------------- | --------------------------- |
+| Product purpose/users/scope/requirements/non-goals           | _flow/docs/prd.md                            | canonical                   |
+| Whether current scope needs experience definition            | PRD frontmatter                              | canonical                   |
+| Consequential interaction/experience behavior when required  | _flow/docs/experience.md                     | canonical, optional         |
+| Architecture/topology/ownership/dependency rules             | _flow/docs/engineering.md                    | canonical                   |
+| Work-item outcome/scope/acceptance/local decisions           | work-item spec.md                            | canonical                   |
+| Work-item dependency graph                                   | spec depends_on fields                       | canonical                   |
+| Task decomposition/dependencies/lifecycle/mutation intent    | tasks.yaml                                   | canonical                   |
+| Review passes/findings/repairs/resolutions/final disposition | review.yaml                                  | canonical                   |
+| Current active delivery work item                            | _flow/state.yaml active.work_item            | canonical structural cursor |
+| In-progress decision/planning frontier                       | _flow/state.yaml checkpoint                  | temporary                   |
+| Implementation identity/evidence                             | Git commits/trailers                         | canonical evidence          |
+| Gate definitions                                             | _flow/gates.yaml                             | canonical                   |
+| Derived backlog/graph                                        | _flow/generated/*                            | generated/disposable        |
+| Runtime capability profile                                   | orchestrator runtime context                 | derived/ephemeral           |
+| Worker summaries                                             | worker response / review evidence references | derived, not SSOT           |
 
 Rules preventing stale duplication:
 
@@ -637,17 +637,17 @@ Flow does not branch orchestration policy on Claude/Codex names.
 
 The orchestration skill builds an in-memory capability profile from the runtime it is currently executing in:
 
-| Capability | Meaning |
-| --- | --- |
-| spawnWorkers | child workers can be launched |
-| workerModelOverride | model can be selected for a worker |
-| workerEffortOverride | reasoning effort can be selected |
-| contextModes | fresh/full-parent/bounded modes actually exposed |
-| workspaceIsolation | none/session/per-worker isolation actually guaranteed |
-| concurrency | runtime-reported/configured concurrent-worker ceiling when known |
-| usageTelemetry | token/cache/cost data actually exposed |
-| runtimeVersion | version/build for evidence |
-| surface | CLI/app/IDE/non-interactive/etc. |
+| Capability           | Meaning                                                          |
+| -------------------- | ---------------------------------------------------------------- |
+| spawnWorkers         | child workers can be launched                                    |
+| workerModelOverride  | model can be selected for a worker                               |
+| workerEffortOverride | reasoning effort can be selected                                 |
+| contextModes         | fresh/full-parent/bounded modes actually exposed                 |
+| workspaceIsolation   | none/session/per-worker isolation actually guaranteed            |
+| concurrency          | runtime-reported/configured concurrent-worker ceiling when known |
+| usageTelemetry       | token/cache/cost data actually exposed                           |
+| runtimeVersion       | version/build for evidence                                       |
+| surface              | CLI/app/IDE/non-interactive/etc.                                 |
 
 nested delegation/resume may be observed, but vNext does not depend on them.
 
@@ -704,14 +704,14 @@ Use the cheapest historically capable model/effort for the bounded responsibilit
 
 Failure handling is cause-specific:
 
-| Failure cause | Default response |
-| --- | --- |
-| missing_context | add the missing reference/slice; do not raise model first |
-| worker_quality | retry/repair; raise effort or model after evidence of insufficiency |
-| integration_conflict | serialize/repartition/change isolation; model escalation is not the fix |
-| scope_leak | tighten ownership/non-goals; escalate only if discipline still fails |
-| verification_gap | strengthen expected evidence/checks |
-| orchestration_error | change delegation/decomposition/parallelism; keep worker model if otherwise adequate |
+| Failure cause        | Default response                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| missing_context      | add the missing reference/slice; do not raise model first                            |
+| worker_quality       | retry/repair; raise effort or model after evidence of insufficiency                  |
+| integration_conflict | serialize/repartition/change isolation; model escalation is not the fix              |
+| scope_leak           | tighten ownership/non-goals; escalate only if discipline still fails                 |
+| verification_gap     | strengthen expected evidence/checks                                                  |
+| orchestration_error  | change delegation/decomposition/parallelism; keep worker model if otherwise adequate |
 
 Escalate to user/orchestrator rather than a stronger worker when the missing input is a consequential product/experience/engineering decision.
 
@@ -752,24 +752,24 @@ After integration/final disposition:
 
 ## 14. Runtime responsibility versus skill judgment
 
-| Concern | Deterministic runtime | Skill/model judgment |
-| --- | --- | --- |
-| Checkpoint schema and atomic persistence | yes | decide meaningful content |
-| Relevant discovery/engineering dimensions | no | yes |
-| Block forward progress with unresolved recorded dimensions | yes | decide relevance/consequence |
-| Question batching/recommendation/challenge | no | yes |
-| Exact revision approval | yes | ask/interpret human approval |
-| Experience relevance | persist/route result | decide/recommend |
-| Work-item/task structural lifecycle | yes | choose decomposition |
-| One active work item | yes | choose next outcome |
-| Concurrent mutation dependency/surface/resource safety | yes | decide whether parallelism is worthwhile |
-| Worker count/model/effort/context mode | capability facts only | yes, evidence-driven |
-| Git trace consistency | yes | interpret ambiguous recovery with human if needed |
-| Review history shape/finding closure | yes | findings, severity, parecer, residual risk |
-| Draft cleanup after approval | yes | no |
-| Generated projections | yes | no |
-| Architecture/product decisions | no | yes |
-| Fresh-chat rehydration | provide authoritative state | summarize and continue |
+| Concern                                                    | Deterministic runtime       | Skill/model judgment                              |
+| ---------------------------------------------------------- | --------------------------- | ------------------------------------------------- |
+| Checkpoint schema and atomic persistence                   | yes                         | decide meaningful content                         |
+| Relevant discovery/engineering dimensions                  | no                          | yes                                               |
+| Block forward progress with unresolved recorded dimensions | yes                         | decide relevance/consequence                      |
+| Question batching/recommendation/challenge                 | no                          | yes                                               |
+| Exact revision approval                                    | yes                         | ask/interpret human approval                      |
+| Experience relevance                                       | persist/route result        | decide/recommend                                  |
+| Work-item/task structural lifecycle                        | yes                         | choose decomposition                              |
+| One active work item                                       | yes                         | choose next outcome                               |
+| Concurrent mutation dependency/surface/resource safety     | yes                         | decide whether parallelism is worthwhile          |
+| Worker count/model/effort/context mode                     | capability facts only       | yes, evidence-driven                              |
+| Git trace consistency                                      | yes                         | interpret ambiguous recovery with human if needed |
+| Review history shape/finding closure                       | yes                         | findings, severity, parecer, residual risk        |
+| Draft cleanup after approval                               | yes                         | no                                                |
+| Generated projections                                      | yes                         | no                                                |
+| Architecture/product decisions                             | no                          | yes                                               |
+| Fresh-chat rehydration                                     | provide authoritative state | summarize and continue                            |
 
 ## 15. Exact implementation surfaces
 

@@ -83,12 +83,9 @@ export function parseCheckpoint(
 
   if (status === 'approval_ready') {
     if (!target.revision) invalid(`${source}.target.revision is required when approval_ready.`);
-    if (unresolved.length)
-      invalid(`${source} cannot be approval_ready while unresolved dimensions remain.`);
-    if (assumptions.length)
-      invalid(`${source} cannot be approval_ready while assumptions remain under test.`);
-    if (nextFrontier.length)
-      invalid(`${source}.next_frontier must be empty when approval_ready.`);
+    if (unresolved.length) invalid(`${source} cannot be approval_ready while unresolved dimensions remain.`);
+    if (assumptions.length) invalid(`${source} cannot be approval_ready while assumptions remain under test.`);
+    if (nextFrontier.length) invalid(`${source}.next_frontier must be empty when approval_ready.`);
   }
 
   return {
@@ -108,10 +105,7 @@ export function parseCheckpoint(
 export function withCheckpointStatus(
   checkpoint: WorkflowCheckpoint,
   status: CheckpointStatus,
-  {
-    targetRevision = checkpoint.target.revision,
-    updatedAt
-  }: { targetRevision?: string | null; updatedAt: string }
+  { targetRevision = checkpoint.target.revision, updatedAt }: { targetRevision?: string | null; updatedAt: string }
 ): WorkflowCheckpoint {
   return parseCheckpoint({
     ...checkpoint,
@@ -162,8 +156,7 @@ function parseDimensions(value: unknown, source: string): CheckpointDimension[] 
     if (seen.has(id)) invalid(`${source} contains duplicate dimension '${id}'.`);
     seen.add(id);
     const state = dimension.state;
-    if (typeof state !== 'string' || !DIMENSION_STATES.has(state))
-      invalid(`${source}[${index}].state is invalid.`);
+    if (typeof state !== 'string' || !DIMENSION_STATES.has(state)) invalid(`${source}[${index}].state is invalid.`);
     return {
       id,
       state: state as CheckpointDimensionState,
@@ -203,8 +196,7 @@ function parseStringList(value: unknown, source: string): string[] {
 }
 
 function requireRecord(value: unknown, source: string): Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value))
-    invalid(`${source} must be a mapping.`);
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) invalid(`${source} must be a mapping.`);
   return value as Record<string, unknown>;
 }
 

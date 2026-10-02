@@ -1,10 +1,5 @@
 import path from 'node:path';
-import {
-  emptyState,
-  parseState,
-  stringifyState,
-  type ExecutionState
-} from '../../domain/workflow/execution-state.mjs';
+import { emptyState, parseState, stringifyState, type ExecutionState } from '../../domain/workflow/execution-state.mjs';
 import { atomicWriteText, fileExists, readText } from '../filesystem/index.js';
 
 export function executionStateFile(root: string): string {
