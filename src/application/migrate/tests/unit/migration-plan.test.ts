@@ -245,7 +245,11 @@ test('does not turn operational write failures into format rescue', (t) => {
   const before = fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8');
   const originalWrite = fs.writeFileSync;
   fs.writeFileSync = ((file: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, options?: unknown) => {
-    if (String(file).includes('_flow-migration-') && path.basename(String(file)) === 'config.yaml') {
+    const fileName = path.basename(String(file));
+    if (
+      String(file).includes('_flow-migration-') &&
+      (fileName === 'config.yaml' || fileName.startsWith('.config.yaml.'))
+    ) {
       const error = new Error('simulated permission failure') as NodeJS.ErrnoException;
       error.code = 'EACCES';
       error.syscall = 'open';
