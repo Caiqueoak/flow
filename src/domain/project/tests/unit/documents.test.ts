@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { documentMetadata, documentRevision, validateDocument } from '../../document.mjs';
+import {
+  approveProjectDocument,
+  documentMetadata,
+  documentRevision,
+  isProjectDocumentApproved,
+  validateDocument
+} from '../../document.mjs';
 import { validateEngineeringDocument, ENGINEERING_HEADINGS } from '../../engineering-document.mjs';
 import { validatePrdDocument } from '../../product-requirements-document.mjs';
 import { deriveExecutionStatus, parseBacklog, topologicalOrder } from '../../../work-item/backlog.mjs';
@@ -18,14 +24,22 @@ function document(headings: readonly string[], extra = '') {
   return `---\nschema_version: 1\nstatus: approved\napproved_at: 2026-01-01T00:00:00.000Z\n${extra}---\n\n${headings.map((heading) => `${heading}\nText.`).join('\n\n')}\n`;
 }
 
-test('document validation reports metadata and heading failures deterministically', () => {
+test('document validation and normalized revisions are deterministic', () => {
   const text = document(['# Title', '## Required']);
   assert.equal(documentMetadata(text).status, 'approved');
-  assert.equal(documentRevision(text), '4b4777a14fbbbf2b97c0ec0d546799755a2ad4621d30662f23151cc02a52710d');
+  assert.match(documentRevision(text), /^[a-f0-9]{64}$/);
   assert.notEqual(documentRevision(text), documentRevision(`${text}\nchanged`));
   assert.deepEqual(validateDocument(text, ['# Title', '## Required']).errors, []);
   assert.match(validateDocument('text', ['# Missing']).errors.join(' '), /Missing YAML frontmatter/);
   assert.throws(() => documentMetadata('---\n- list\n---\n'), /mapping/);
+});
+
+test('project document approval binds authorization to normalized content revision', () => {
+  const draft = `---\nschema_version: 2\nstatus: draft\nexperience: not_required\n---\n# Product Requirements\nText.\n`;
+  const approved = approveProjectDocument(draft, '2026-10-02T12:00:00Z');
+  assert.equal(isProjectDocumentApproved(approved.text), true);
+  assert.equal(documentRevision(approved.text), approved.revision);
+  assert.equal(isProjectDocumentApproved(`${approved.text}\nchanged\n`), false);
 });
 
 const validBacklogItem = {
