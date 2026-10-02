@@ -5,10 +5,7 @@ import { loadExecutionState } from '../../../infrastructure/persistence/executio
 import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
 import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
-import {
-  approveProjectDocument,
-  documentRevision
-} from '../../../domain/project/document.mjs';
+import { approveProjectDocument } from '../../../domain/project/document.mjs';
 import {
   parseWorkItemSpec,
   serializeWorkItemSpec,
