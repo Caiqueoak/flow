@@ -7,7 +7,7 @@ import { parseGates } from '../../../domain/gate/gate-definition.mjs';
 import { syncProject } from '../../../infrastructure/projections/project.mjs';
 import { validateProject } from '../../project-validation.mjs';
 import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
-import { lifecycle } from '../../../domain/work-item/lifecycle.js';
+import { lifecycle as deriveWorkItemLifecycle } from '../../../domain/work-item/lifecycle.js';
 import {
   readConfig,
   writeConfig,
@@ -442,7 +442,7 @@ function upgradeExecutionState(root: string, flow: string): void {
   if (raw.schema_version !== emptyState().schema_version) {
     const items = loadWorkItems(root);
     const byId = new Map(items.map((item) => [item.id, item]));
-    const active = items.filter((item) => ['in_progress', 'review'].includes(lifecycle(item, byId).status));
+    const active = items.filter((item) => ['in_progress', 'review'].includes(deriveWorkItemLifecycle(item, byId).status));
     state.active.work_item = active.length === 1 ? active[0]!.id : null;
   }
 
