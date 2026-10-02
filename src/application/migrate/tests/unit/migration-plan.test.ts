@@ -340,8 +340,47 @@ test('upgrades canonical tasks and gates while preserving migrated commit proven
   assert.ok(result.backup && fs.existsSync(result.backup));
 });
 
+
+test('upgrades state v2 and reconstructs only a canonically provable active work item', (t) => {
+  const root = canonicalProject(t, '0.7.0');
+  canonicalWorkItem(root);
+  const flow = path.join(root, '_flow');
+  fs.writeFileSync(
+    path.join(flow, 'state.yaml'),
+    'schema_version: 2\nexecution:\n  phase: implementation\n  step: execute_task\nactive:\n  work_item: W999\n  task: W999-T001\nstop_reason: external_action\nmigration:\n  status: pending_reconciliation\n'
+  );
+  fs.writeFileSync(
+    path.join(flow, 'work-items', 'W101-item', 'tasks.yaml'),
+    JSON.stringify({
+      schema_version: 2,
+      work_item: 'W101',
+      tasks: [{ id: 'T001', title: 'Active', state: 'in_progress', depends_on: [] }]
+    })
+  );
+  fs.writeFileSync(
+    path.join(flow, 'work-items', 'W101-item', 'review.yaml'),
+    'schema_version: 1\nwork_item: W101\nstatus: pending\n'
+  );
+
+  const plan = migrationPlan(root, '0.8.0');
+  assert.ok(plan.changes.includes('upgrade state.yaml'));
+
+  migrateProject(root, { targetVersion: '0.8.0' });
+  const state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.deepEqual(state, {
+    schema_version: 3,
+    migration: { status: 'pending_reconciliation' },
+    active: { work_item: 'W101' },
+    checkpoint: null
+  });
+});
+
 test('returns a true no-op for a current canonical project', (t) => {
   const root = canonicalProject(t, '0.8.0');
+  fs.writeFileSync(
+    path.join(root, '_flow', 'state.yaml'),
+    'schema_version: 3\nmigration:\n  status: not_required\nactive:\n  work_item: null\ncheckpoint: null\n'
+  );
   const before = fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8');
 
   assert.deepEqual(migrateProject(root, { targetVersion: '0.8.0' }), { unresolved: [], unchanged: true });

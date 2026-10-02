@@ -58,11 +58,10 @@ export function stringifyState(state: ExecutionState): string {
 
 function parseLegacyState(value: Record<string, unknown>, source: string): ExecutionState {
   const migration = isRecord(value.migration) ? value.migration : {};
-  const active = isRecord(value.active) ? value.active : {};
   return {
     schema_version: STATE_SCHEMA_VERSION,
     migration: { status: migrationStatus(migration.status ?? 'not_required', `${source} migration.status`) },
-    active: { work_item: workItem(active.work_item ?? null, `${source} active.work_item`) },
+    active: { work_item: null },
     checkpoint: null
   };
 }

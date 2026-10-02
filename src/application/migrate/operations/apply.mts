@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { projectRoot, recordOutput as info } from '../../command-runtime.js';
-import { emptyState, stringifyState } from '../../../domain/workflow/execution-state.mjs';
+import { emptyState, parseState, stringifyState } from '../../../domain/workflow/execution-state.mjs';
+import { STATE_SCHEMA_VERSION } from '../../../domain/workflow/workflow.js';
 import { parseBacklog } from '../../../domain/work-item/backlog.mjs';
 import { parseGates } from '../../../domain/gate/gate-definition.mjs';
 import { syncProject } from '../../../infrastructure/projections/project.mjs';
@@ -14,6 +15,8 @@ import {
 } from '../../../infrastructure/persistence/configuration.mjs';
 import { FLOW_SCHEMA_VERSION } from '../../../domain/project/project.js';
 import { BACKLOG_SCHEMA_VERSION } from '../../../domain/work-item/work-item.js';
+import { lifecycle as workItemLifecycle } from '../../../domain/work-item/lifecycle.js';
+import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
 import { GATES_SCHEMA_VERSION } from '../../../domain/gate/gate.js';
 import { TASKS_SCHEMA_VERSION } from '../../../domain/task/task.js';
 import type { LifecycleState } from '../../../domain/task/task.js';
@@ -258,6 +261,18 @@ function inspectCurrent(root: string, targetVersion: string): string[] {
         changes.push(`upgrade work-items/${entry.name}/tasks.yaml`);
       }
     }
+  const stateFile = path.join(flow, 'state.yaml');
+  if (!migrationPathExists(stateFile)) changes.push('restore state.yaml');
+  else {
+    try {
+      const stateText = readMigrationText(stateFile);
+      const rawState = asRecord(parse(stateText));
+      parseState(stateText);
+      if (rawState.schema_version !== STATE_SCHEMA_VERSION) changes.push('upgrade state.yaml');
+    } catch {
+      changes.push('upgrade state.yaml');
+    }
+  }
   try {
     parseGates(readMigrationText(path.join(flow, 'gates.yaml')));
   } catch {
@@ -418,6 +433,27 @@ function upgradeCanonicalStaged(root: string, targetVersion: string): void {
     }
     writeMigrationText(gatesFile, stringify(gates, { lineWidth: 0 }));
   }
+  upgradeExecutionState(root);
+}
+
+function upgradeExecutionState(root: string): void {
+  const stateFile = path.join(root, '_flow', 'state.yaml');
+  const next = emptyState();
+
+  if (migrationPathExists(stateFile)) {
+    const text = readMigrationText(stateFile);
+    const raw = asRecord(parse(text));
+    const previous = parseState(text);
+    next.migration.status = previous.migration.status;
+    if (raw.schema_version === STATE_SCHEMA_VERSION) next.checkpoint = previous.checkpoint;
+  }
+
+  const items = loadWorkItems(root);
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const active = items.filter((item) => ['in_progress', 'review'].includes(workItemLifecycle(item, byId).status));
+  if (active.length === 1) next.active.work_item = active[0]!.id;
+
+  writeMigrationText(stateFile, stringifyState(next));
 }
 
 function recoverExistingCodePolicy(sourceFlow: string): string {

@@ -5,7 +5,7 @@ import { emptyState, parseState, stringifyState, type ExecutionState } from '../
 test('execution state v3 round-trips checkpoint state', () => {
   const state: ExecutionState = {
     ...emptyState(),
-    active: { work_item: 'W101' },
+    active: { work_item: null },
     checkpoint: {
       phase: 'planning',
       step: 'create_tasks',
@@ -22,7 +22,7 @@ test('execution state v3 round-trips checkpoint state', () => {
   assert.deepEqual(parseState(stringifyState(state)), state);
 });
 
-test('execution state reads v2 without trusting its dormant cursor or active task', () => {
+test('execution state reads v2 without trusting its dormant cursor or active work markers', () => {
   const parsed = parseState(`schema_version: 2
 execution:
   phase: implementation
