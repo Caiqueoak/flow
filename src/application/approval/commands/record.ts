@@ -5,11 +5,12 @@ import {
   validateProjectDocument
 } from '../../project-contracts.mjs';
 import { clearCheckpoint } from '../../checkpoint/operations/checkpoint.mjs';
+import { UserInputError } from '../../../domain/errors.js';
 import { loadExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
 import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
-import { approveProjectDocument } from '../../../domain/project/document.mjs';
+import { approveProjectDocument, documentRevision } from '../../../domain/project/document.mjs';
 import {
   parseWorkItemSpec,
   serializeWorkItemSpec,
@@ -39,9 +40,12 @@ export function recordApproval({
   const item = findWorkItemBySpec(root, file);
   const spec = parseWorkItemSpec(readText(file), { expectedWorkItem: item.id });
   const revision = specificationRevision(spec.metadata, spec.body);
+  const targetRef = normalizeTargetRef(target);
+  assertApprovalReadyRevision(root, targetRef, revision);
+
   spec.metadata.approval = { at: approvedAt, revision };
   writeText(file, serializeWorkItemSpec(spec.metadata, spec.body));
-  clearMatchingCheckpoint(root, target.replaceAll('\\', '/'), revision);
+  clearMatchingCheckpoint(root, targetRef, revision);
   return { label: `${item.id} specification`, revision };
 }
 
@@ -56,6 +60,10 @@ function recordProjectDocumentApproval(
   const errors = validateProjectDocument(kind, current);
   if (errors.length) throw new Error(`Cannot approve ${target}: ${errors.join(' ')}`);
 
+  const targetRef = normalizeTargetRef(target);
+  const revision = documentRevision(current);
+  assertApprovalReadyRevision(root, targetRef, revision);
+
   const approved = approveProjectDocument(current, approvedAt);
   const approvedErrors = validateProjectDocument(kind, approved.text);
   if (approvedErrors.length) {
@@ -63,21 +71,41 @@ function recordProjectDocumentApproval(
   }
 
   writeText(file, approved.text);
-  clearMatchingCheckpoint(root, target.replaceAll('\\', '/'), approved.revision);
-  return { label: target.replaceAll('\\', '/'), revision: approved.revision };
+  clearMatchingCheckpoint(root, targetRef, approved.revision);
+  return { label: targetRef, revision: approved.revision };
+}
+
+function assertApprovalReadyRevision(root: string, targetRef: string, targetRevision: string): void {
+  const checkpoint = loadExecutionState(root).checkpoint;
+  if (
+    checkpoint?.status !== 'approval_ready' ||
+    normalizeTargetRef(checkpoint.target.ref) !== targetRef
+  ) {
+    return;
+  }
+
+  if (checkpoint.target.revision !== targetRevision) {
+    throw new UserInputError(
+      `Cannot approve ${targetRef}: current revision ${targetRevision} does not match approval-ready checkpoint revision ${checkpoint.target.revision}.`
+    );
+  }
 }
 
 function clearMatchingCheckpoint(root: string, targetRef: string, targetRevision: string): void {
   const checkpoint = loadExecutionState(root).checkpoint;
   if (
     checkpoint?.status !== 'approval_ready' ||
-    checkpoint.target.ref !== targetRef ||
+    normalizeTargetRef(checkpoint.target.ref) !== targetRef ||
     checkpoint.target.revision !== targetRevision
   ) {
     return;
   }
 
-  clearCheckpoint(root, { targetRef, targetRevision });
+  clearCheckpoint(root, { targetRef: checkpoint.target.ref, targetRevision });
+}
+
+function normalizeTargetRef(target: string): string {
+  return target.replaceAll('\\', '/').replace(/^\.\//, '');
 }
 
 function findWorkItemBySpec(root: string, specFile: string): LoadedWorkItem {
