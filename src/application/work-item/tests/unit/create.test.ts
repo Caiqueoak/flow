@@ -69,7 +69,6 @@ test('interrupted staging directory is not exposed as a canonical work item', (t
   assert.equal(fs.existsSync(staging), true);
 });
 
-
 test('first-shell publication failure still leaves the planning checkpoint durable', (t) => {
   const root = project(t);
   const destination = path.join(root, '_flow', 'work-items', 'W101-blocked-publication');
