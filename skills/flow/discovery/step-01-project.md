@@ -25,3 +25,12 @@ Technical discovery is allowed here when it affects product decisions. Implement
 For existing repositories without Flow, inspect the repository and read `brownfield.md`. Understand both the existing product behavior and the user's requested product change here; produce/approve the PRD before engineering evaluates preserve, incremental or refactor adoption.
 
 Persist durable decisions, rejected alternatives, assumptions and unresolved consequential questions so discovery resumes without repetition. Do not turn discovery into a questionnaire; use the selected profile and repository evidence to make defaults and recommendations.
+
+
+## W1 checkpoint persistence
+
+Before asking or answering a new consequential discovery batch, inspect the checkpoint in `_flow/state.yaml`. If it targets `_flow/docs/prd.md`, resume from its resolved/unresolved/deferred/not-relevant dimensions, live assumptions, latest authorized direction and `next_frontier`; do not reconstruct those facts from chat history.
+
+If no matching checkpoint exists, start one with `flow checkpoint begin --data <json>`. Persist each meaningful decision batch with `flow checkpoint update --data <json>`. The JSON is the compact checkpoint payload: `phase`, `step`, `target`, `inputs`, `dimensions`, `assumptions`, `latest_authorized_direction` and `next_frontier`. Do not copy PRD prose into it and do not hand-edit `state.yaml`.
+
+W1 provides the structural `approval_ready` transition, but exact project-document approval and approval-owned cleanup belong to W2. Do not treat checkpoint status as document approval.

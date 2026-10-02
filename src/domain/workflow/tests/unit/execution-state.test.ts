@@ -41,6 +41,9 @@ migration:
     checkpoint: null,
     migration: { status: 'completed' }
   });
+  const migrated = stringifyState(parsed);
+  assert.match(migrated, /^schema_version: 3$/m);
+  assert.doesNotMatch(migrated, /execution:|task:|stop_reason:/);
 });
 
 test('execution state rejects malformed v3 structure and migration state', () => {

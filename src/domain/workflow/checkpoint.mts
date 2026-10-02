@@ -2,13 +2,12 @@ import { UserInputError as ArtifactValidationError } from '../errors.js';
 
 const CHECKPOINT_STATUSES = new Set(['active', 'approval_ready']);
 const DIMENSION_STATES = new Set(['resolved', 'unresolved', 'deferred', 'not_relevant']);
-const TARGET_KINDS = new Set(['project_document', 'work_item_spec', 'work_item']);
 const TOKEN = /^[a-z][a-z0-9_-]*$/;
 const STABLE_ID = /^[A-Za-z][A-Za-z0-9_-]*$/;
 
 export type CheckpointStatus = 'active' | 'approval_ready';
 export type CheckpointDimensionState = 'resolved' | 'unresolved' | 'deferred' | 'not_relevant';
-export type CheckpointTargetKind = 'project_document' | 'work_item_spec' | 'work_item';
+export type CheckpointTargetKind = string;
 
 export interface CheckpointReference {
   ref: string;
@@ -131,11 +130,9 @@ export function sameCheckpointTarget(
 
 function parseTarget(value: unknown, source: string): CheckpointTarget {
   const target = requireRecord(value, source);
-  const kind = target.kind;
-  if (typeof kind !== 'string' || !TARGET_KINDS.has(kind))
-    invalid(`${source}.kind must be project_document, work_item_spec, or work_item.`);
+  const kind = requireToken(target.kind, `${source}.kind`);
   return {
-    kind: kind as CheckpointTargetKind,
+    kind,
     ref: requireNonEmptyString(target.ref, `${source}.ref`),
     revision: optionalString(target.revision, `${source}.revision`)
   };
