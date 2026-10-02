@@ -5,7 +5,7 @@ import { emptyState, parseState, stringifyState, type ExecutionState } from '../
 test('execution state v3 round-trips checkpoint state', () => {
   const state: ExecutionState = {
     ...emptyState(),
-    active: { work_item: null },
+    active: { work_item: 'W101' },
     checkpoint: {
       phase: 'planning',
       step: 'create_tasks',
@@ -38,7 +38,7 @@ migration:
   assert.deepEqual(parsed, {
     schema_version: 3,
     migration: { status: 'pending_reconciliation' },
-    active: { work_item: 'W101' },
+    active: { work_item: null },
     checkpoint: null
   });
 });
