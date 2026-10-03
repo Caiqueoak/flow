@@ -58,6 +58,28 @@
           "legacy_commit": {
             "type": "string",
             "description": "Read-only provenance for migrated completed tasks."
+          },
+          "mutation": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "surfaces": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "resources": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
           }
         }
       }
