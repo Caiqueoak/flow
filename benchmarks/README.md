@@ -4,14 +4,18 @@ W8 provides a repeatable repository-level harness for the initial high-signal be
 
 B01, B02, B05, B06, B07, B08, B11 and B12.
 
-The harness does **not** execute or simulate a model. It prepares an isolated run workspace, records stable run identity, and evaluates externally produced observations against deterministic evaluator-only truth. Judgment dimensions remain rubric-scored and may stay pending until a human or model evaluator supplies scores.
+The harness does **not** execute or simulate a model. It prepares isolated canonical fixture workspaces and evaluates mechanically checkable outcomes from repository state plus evaluator-owned event evidence. Qualitative judgments remain rubric-scored and may stay pending.
 
-## Separation of context and truth
+## Separation of executor output and evaluator truth
 
-- `benchmarks/fixtures.json` contains only agent-visible fixture context.
-- `benchmarks/evaluator-truth.json` contains hard assertions, seeded defect labels, and rubrics.
-- `prepare` copies only the selected agent context into the run workspace.
-- no benchmark depends on chat history; all required agent inputs must be present in the prepared workspace.
+- `benchmarks/fixtures.json` contains agent-visible fixture context and deterministic workspace files.
+- `benchmarks/evaluator-truth.json` contains evaluator-only hard assertions, seeded truth, and rubrics.
+- `prepare` validates fixtures with the real Flow state/work-item/recovery/route parsers before accepting a run.
+- the acting executor works only inside `workspace/` and does not author hard-pass facts.
+- evaluator/runtime adapters may write `evaluator-events.json` at the run root for mechanically observed events such as writer lifecycle or verification outcomes.
+- `observation.json` carries telemetry, optional metrics, rubric scores, and notes; self-reported `facts` are ignored by hard evaluation.
+
+No benchmark depends on hidden chat history.
 
 ## Validate definitions
 
@@ -19,7 +23,7 @@ The harness does **not** execute or simulate a model. It prepares an isolated ru
 npm run benchmark:check
 ```
 
-This is also part of `npm run verify`.
+This is part of `npm run verify`. Validation rejects malformed fixture projects and proves runtime-oriented fixtures are consumable by the canonical Flow parsers/routes they exercise.
 
 ## Prepare a run
 
@@ -33,44 +37,28 @@ npm run benchmark -- prepare \
   --config <config-id>
 ```
 
-The command prints the new run directory. By default it is created under `.flow-evaluation/runs/`. The run directory is the fixture workspace boundary for benchmark artifacts; the harness does not mutate canonical `_flow` project state. A run directory is never reused; use a distinct repeat/run ID for every attempt.
-
-The manifest preserves:
-
-- benchmark ID;
-- exact Flow revision;
-- runtime/model/config identifiers when exposed;
-- repeat number;
-- run ID;
-- telemetry state.
-
-Unknown runtime/model/config values should be omitted and remain `null`, not guessed.
+The command creates a fresh run under `.flow-evaluation/runs/` by default. Existing run directories are never reused. `manifest.json` preserves run identity plus evaluator-owned baseline hashes for the prepared fixture workspace.
 
 ## Execute externally
 
-Run the chosen agent/runtime against only the prepared `workspace/agent-context.json` plus the fixture workspace. Do not expose `benchmarks/evaluator-truth.json` to the acting agent.
+Run the chosen agent/runtime against `workspace/agent-context.json` and the prepared fixture workspace. Do not expose evaluator truth or evaluator event channels to the acting executor.
 
-The external runner writes `observation.json` inside the run directory:
+The external runner writes `observation.json`:
 
 ```json
 {
-  "facts": {
-    "finalized": false,
-    "unresolved_preserved": true
-  },
   "telemetry": {
     "status": "unavailable"
   },
   "rubric_scores": {
     "decision_frontier_quality": 2
-  },
-  "evaluator_notes": "Optional evaluator note."
+  }
 }
 ```
 
-If reliable token/cost telemetry is exposed, use `status: "available"` and include only values actually reported by that runtime. Unavailable telemetry must never be encoded as zero. Do not derive billed cost from token counts without a stored pricing contract.
+Benchmark-specific executor artifacts live inside `workspace/` (for example `handoff.json` or `review-output.json`). Evaluator/runtime adapters record mechanically observed events in `evaluator-events.json` outside the actor workspace when a benchmark needs them.
 
-Rubric scores are optional. Missing scores remain `pending`; the harness never invents model-judged outcomes.
+If reliable token/cost telemetry is exposed, use `status: "available"` and include only values actually reported by that runtime. Unavailable telemetry must never be encoded as zero. Missing rubric scores remain `pending`.
 
 ## Evaluate
 
@@ -78,14 +66,16 @@ Rubric scores are optional. Missing scores remain `pending`; the harness never i
 npm run benchmark -- evaluate --run .flow-evaluation/runs/<run-id>
 ```
 
-This writes `result.json` once. It contains deterministic hard assertion outcomes, rubric definitions/scores, exact run identity, telemetry, and evaluator notes. Re-evaluating the same run is rejected to preserve prior results.
+Evaluation derives hard facts from canonical workspace artifacts, baseline evidence, and evaluator-owned events, then applies evaluator-only assertions. Executor-authored booleans do not determine hard pass/fail. `result.json` is write-once.
+
+B05 deliberately does **not** require parallel execution for independent work. Zero unsafe/conflicting writer overlap is hard; whether independent work should parallelize is capability/proportionality-aware and remains a rubric judgment.
 
 ## Result interpretation
 
-Hard pass/fail is limited to mechanically checkable fixture facts. B11 efficiency comparisons require matched successful runs and real telemetry when available; this harness intentionally does not claim token improvements by itself.
+Hard pass/fail is limited to mechanically checkable evidence. B11 efficiency comparisons still require matched successful runs and real runtime telemetry; this harness does not claim token, cost, or quality improvements by itself.
 
-The W1-W7 test suite remains the structural regression baseline required by technical-design §17, including interruption-safe checkpoint/work-item publication, concurrency conflict prevention, append-only review closure, and stale/conflicting-state reconciliation. W8 adds harness-specific tests for fixture/truth alignment, evaluator-truth isolation, non-overwriting repeated runs, unavailable telemetry semantics, deterministic evaluation, and run-path containment.
+The W1-W7 suite remains the structural regression baseline. W8 adds fixture-integrity, evaluator-evidence, non-overwrite, telemetry, safe-concurrency, seeded-review, repair-history, and recovery-path regressions.
 
 ## Residual limitation
 
-Live model/runtime execution is not portable across supported environments, so W8 stops at the repeatable fixture/manifest/observation/evaluator contract. Run artifacts are evaluation evidence, not canonical Flow project state. A CI or external runtime adapter may invoke the commands above without changing benchmark semantics.
+Live model/runtime execution remains external because Flow does not assume one portable model execution API. Run artifacts are evaluation evidence, not canonical project state, and no benchmark result or improvement is invented by the repository harness.
