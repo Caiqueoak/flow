@@ -43,13 +43,11 @@ export interface RecoveryAssessment {
   checkpoint: WorkflowCheckpoint | null;
   continuation: RecoveryContinuation | null;
   findings: RecoveryFinding[];
-  repair:
-    | {
-        kind: 'clear_stale_checkpoint';
-        target_ref: string;
-        target_revision: string;
-      }
-    | null;
+  repair: {
+    kind: 'clear_stale_checkpoint';
+    target_ref: string;
+    target_revision: string;
+  } | null;
 }
 
 interface ResolvedRevision {
@@ -310,12 +308,7 @@ function staleApprovalRepair(
 ): RecoveryAssessment['repair'] {
   if (checkpoint.status !== 'approval_ready' || !checkpoint.target.revision) return null;
   const resolved = resolveReference(root, checkpoint.target.ref, items);
-  if (
-    resolved.exists &&
-    resolved.valid &&
-    resolved.approved &&
-    resolved.revision === checkpoint.target.revision
-  ) {
+  if (resolved.exists && resolved.valid && resolved.approved && resolved.revision === checkpoint.target.revision) {
     return {
       kind: 'clear_stale_checkpoint',
       target_ref: checkpoint.target.ref,
@@ -325,11 +318,7 @@ function staleApprovalRepair(
   return null;
 }
 
-function resolveReference(
-  root: string,
-  ref: string,
-  items: ReturnType<typeof loadWorkItems>
-): ResolvedRevision {
+function resolveReference(root: string, ref: string, items: ReturnType<typeof loadWorkItems>): ResolvedRevision {
   const normalized = normalizeRef(ref);
   const projectKind = canonicalProjectDocumentKind(normalized);
   if (projectKind) {
@@ -390,9 +379,7 @@ function checkpointContinuation(checkpoint: WorkflowCheckpoint): RecoveryContinu
     return {
       phase: 'discovery',
       instruction:
-        checkpoint.status === 'approval_ready'
-          ? 'discovery/step-02-await-approval.md'
-          : 'discovery/step-01-project.md',
+        checkpoint.status === 'approval_ready' ? 'discovery/step-02-await-approval.md' : 'discovery/step-01-project.md',
       approval_required: checkpoint.status === 'approval_ready'
     };
   }
@@ -410,9 +397,7 @@ function checkpointContinuation(checkpoint: WorkflowCheckpoint): RecoveryContinu
     return {
       phase: 'engineering',
       instruction:
-        checkpoint.status === 'approval_ready'
-          ? 'engineering/step-05-present.md'
-          : 'engineering/step-02-synthesize.md',
+        checkpoint.status === 'approval_ready' ? 'engineering/step-05-present.md' : 'engineering/step-02-synthesize.md',
       approval_required: checkpoint.status === 'approval_ready'
     };
   }

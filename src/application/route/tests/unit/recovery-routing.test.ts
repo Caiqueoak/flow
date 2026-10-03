@@ -6,10 +6,7 @@ import test from 'node:test';
 import { stringify } from 'yaml';
 import { parseCheckpoint } from '../../../../domain/workflow/checkpoint.mjs';
 import { emptyState } from '../../../../domain/workflow/execution-state.mjs';
-import {
-  serializeWorkItemSpec,
-  specificationRevision
-} from '../../../../domain/work-item/specification.mjs';
+import { serializeWorkItemSpec, specificationRevision } from '../../../../domain/work-item/specification.mjs';
 import { writeExecutionState } from '../../../../infrastructure/persistence/execution-state.mjs';
 import type { WorkItemId, WorkItemSpecMetadata } from '../../../../domain/work-item/work-item.js';
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
@@ -65,7 +62,10 @@ function writeWorkItem(root: string, id: WorkItemId = 'W001', tasks: unknown[] =
   const body = '# Work Item Specification\n\n## Outcome\n\nSample.\n';
   fs.writeFileSync(path.join(folder, 'spec.md'), serializeWorkItemSpec(metadata, body));
   fs.writeFileSync(path.join(folder, 'tasks.yaml'), stringify({ schema_version: 3, work_item: id, tasks }));
-  fs.writeFileSync(path.join(folder, 'review.yaml'), stringify({ schema_version: 1, work_item: id, status: 'pending' }));
+  fs.writeFileSync(
+    path.join(folder, 'review.yaml'),
+    stringify({ schema_version: 1, work_item: id, status: 'pending' })
+  );
   return { revision: specificationRevision(metadata, body) };
 }
 

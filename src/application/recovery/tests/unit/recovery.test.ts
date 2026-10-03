@@ -91,7 +91,10 @@ function writeWorkItem(root: string, id: WorkItemId = 'W001'): string {
   const body = '# Work Item Specification\n\n## Outcome\n\nSample.\n';
   fs.writeFileSync(path.join(folder, 'spec.md'), serializeWorkItemSpec(metadata, body));
   fs.writeFileSync(path.join(folder, 'tasks.yaml'), stringify({ schema_version: 3, work_item: id, tasks: [] }));
-  fs.writeFileSync(path.join(folder, 'review.yaml'), stringify({ schema_version: 1, work_item: id, status: 'pending' }));
+  fs.writeFileSync(
+    path.join(folder, 'review.yaml'),
+    stringify({ schema_version: 1, work_item: id, status: 'pending' })
+  );
   return specificationRevision(metadata, body);
 }
 
