@@ -162,6 +162,21 @@ test('approval rejects an active checkpoint without mutation', (t) => {
   assert.equal(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'), stateBefore);
 });
 
+test('approval rejects an approval-ready checkpoint with the wrong target kind', (t) => {
+  const root = project(t);
+  writePrd(root, 'not_required');
+  beginApprovalReadyCheckpoint(root, { kind: 'work_item_spec', ref: '_flow/docs/prd.md' });
+  const prdBefore = fs.readFileSync(path.join(root, '_flow', 'docs', 'prd.md'), 'utf8');
+  const stateBefore = fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8');
+
+  const approved = run(root, ['approval', 'record', '_flow/docs/prd.md']);
+
+  assert.notEqual(approved.status, 0);
+  assert.match(approved.stderr, /approval-ready checkpoint targets work_item_spec _flow\/docs\/prd\.md/);
+  assert.equal(fs.readFileSync(path.join(root, '_flow', 'docs', 'prd.md'), 'utf8'), prdBefore);
+  assert.equal(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'), stateBefore);
+});
+
 test('approval rejects an approval-ready checkpoint for another target', (t) => {
   const root = project(t);
   writePrd(root, 'not_required');
