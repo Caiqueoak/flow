@@ -322,12 +322,7 @@ test('stale checkpoint input routes to reconciliation with a stable recovery cod
 test('finished project with substantive new scope resumes its PRD discovery checkpoint in a fresh route', (t) => {
   const root = project(t);
   authorizeProjectContracts(root);
-  writeWorkItem(
-    root,
-    'W001',
-    [{ id: 'T001', title: 'Delivered', state: 'completed', depends_on: [] }],
-    true
-  );
+  writeWorkItem(root, 'W001', [{ id: 'T001', title: 'Delivered', state: 'completed', depends_on: [] }], true);
   fs.writeFileSync(
     path.join(root, '_flow', 'work-items', 'W001-sample', 'review.yaml'),
     stringify({ schema_version: 1, work_item: 'W001', status: 'approved' })

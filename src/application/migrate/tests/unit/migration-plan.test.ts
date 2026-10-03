@@ -493,10 +493,7 @@ test('completes pending migration reconciliation through a supported transition 
 
   completeMigrationReconciliation(root);
 
-  assert.equal(
-    parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status,
-    'completed'
-  );
+  assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status, 'completed');
   assert.deepEqual(routeProject(root), {
     action: 'continue',
     phase: 'discovery',
