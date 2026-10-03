@@ -84,7 +84,9 @@ test('repair resolution preserves stable finding ID and link', (t) => {
       inspected: ['src/a.ts'],
       parecer: 'Repair required.',
       disposition: 'changes_required',
-      findings: [{ id: 'F001', blocking: true, claim: 'Missing guard.', evidence: ['src/a.ts'], cause: 'worker_quality' }],
+      findings: [
+        { id: 'F001', blocking: true, claim: 'Missing guard.', evidence: ['src/a.ts'], cause: 'worker_quality' }
+      ],
       actions: [{ type: 'repair_task_created', finding: 'F001', task: 'W001-T002' }],
       resolutions: [],
       residual_risk: []
@@ -143,16 +145,17 @@ test('open or reopened blocking finding prevents final approval', (t) => {
 });
 
 test('legacy completed review remains valid without invented findings', () => {
-  const legacy = parseReview(stringify({
-    schema_version: 1,
-    work_item: 'W001',
-    status: 'approved',
-    reviewed_at: '2026-10-01T10:00:00Z'
-  }));
+  const legacy = parseReview(
+    stringify({
+      schema_version: 1,
+      work_item: 'W001',
+      status: 'approved',
+      reviewed_at: '2026-10-01T10:00:00Z'
+    })
+  );
   assert.equal(legacy.schema_version, 1);
   assert.equal(reviewReadyForCompletion(legacy), true);
 });
-
 
 test('superseded and accepted residual risk close blocking findings in folded state', (t) => {
   for (const state of ['superseded', 'accepted_residual_risk'] as const) {
@@ -207,7 +210,9 @@ test('malformed or inconsistent history is rejected', () => {
               inspected: [],
               parecer: 'Invalid.',
               disposition: 'approved',
-              findings: [{ id: 'F001', blocking: true, claim: 'Still open.', evidence: ['src/a.ts'], cause: 'verification_gap' }],
+              findings: [
+                { id: 'F001', blocking: true, claim: 'Still open.', evidence: ['src/a.ts'], cause: 'verification_gap' }
+              ],
               actions: [],
               resolutions: [],
               residual_risk: [],

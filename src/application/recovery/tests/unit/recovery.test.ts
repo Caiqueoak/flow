@@ -606,7 +606,6 @@ test('document revision helper used by recovery matches approved content identit
   assert.equal(documentRevision(approved.text), approved.revision);
 });
 
-
 test('malformed W5 review history is inconsistent across recovery, route, validate and Doctor', (t) => {
   const root = project(t);
   writeWorkItem(root, 'W001', true);

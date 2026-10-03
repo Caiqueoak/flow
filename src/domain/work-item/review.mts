@@ -3,13 +3,7 @@ import { ArtifactValidationError } from './backlog.mjs';
 import { REVIEW_SCHEMA_VERSION, WORK_ITEM_ID, type WorkItemId } from './work-item.js';
 
 export const REVIEW_PASS_DISPOSITIONS = ['approved', 'changes_required', 'blocked'] as const;
-export const REVIEW_FINDING_STATES = [
-  'open',
-  'resolved',
-  'reopened',
-  'superseded',
-  'accepted_residual_risk'
-] as const;
+export const REVIEW_FINDING_STATES = ['open', 'resolved', 'reopened', 'superseded', 'accepted_residual_risk'] as const;
 export const REVIEW_FINDING_CAUSES = [
   'missing_context',
   'worker_quality',
@@ -134,7 +128,8 @@ export function parseReview(
     schema_version: REVIEW_SCHEMA_VERSION,
     work_item: workItem,
     disposition: parseTopLevelDisposition(value.disposition, source),
-    active_pass: value.active_pass === null ? null : parseActivePass(value.active_pass, `${source}.active_pass`, workItem),
+    active_pass:
+      value.active_pass === null ? null : parseActivePass(value.active_pass, `${source}.active_pass`, workItem),
     worker_runs: parseWorkerRuns(value.worker_runs, `${source}.worker_runs`, workItem),
     passes: parsePasses(value.passes, `${source}.passes`, workItem)
   };
@@ -183,27 +178,39 @@ export function unresolvedBlockingFindings(review: WorkItemReviewV2): FoldedFind
 
 export function reviewReadyForCompletion(review: SerializedWorkItemReview): boolean {
   if (review.schema_version === 1) return review.status === 'approved';
-  return review.active_pass === null && review.disposition === 'approved' && unresolvedBlockingFindings(review).length === 0;
+  return (
+    review.active_pass === null && review.disposition === 'approved' && unresolvedBlockingFindings(review).length === 0
+  );
 }
 
 export function completeActivePass(activePass: ActiveReviewPass, finalizedAt: string): ReviewPass {
   const source = 'review.yaml.active_pass';
   if (!activePass.inspected) throw new ArtifactValidationError(`${source}.inspected is required before finalization.`);
   if (!activePass.parecer) throw new ArtifactValidationError(`${source}.parecer is required before finalization.`);
-  if (!activePass.disposition) throw new ArtifactValidationError(`${source}.disposition is required before finalization.`);
+  if (!activePass.disposition)
+    throw new ArtifactValidationError(`${source}.disposition is required before finalization.`);
   if (!activePass.findings) throw new ArtifactValidationError(`${source}.findings is required before finalization.`);
   if (!activePass.actions) throw new ArtifactValidationError(`${source}.actions is required before finalization.`);
-  if (!activePass.resolutions) throw new ArtifactValidationError(`${source}.resolutions is required before finalization.`);
-  if (!activePass.residual_risk) throw new ArtifactValidationError(`${source}.residual_risk is required before finalization.`);
+  if (!activePass.resolutions)
+    throw new ArtifactValidationError(`${source}.resolutions is required before finalization.`);
+  if (!activePass.residual_risk)
+    throw new ArtifactValidationError(`${source}.residual_risk is required before finalization.`);
   assertIso(finalizedAt, `${source}.finalized_at`);
   return { ...activePass, finalized_at: finalizedAt } as ReviewPass;
 }
 
-function parseLegacyReview(value: Record<string, unknown>, expectedWorkItem: string | null, source: string): LegacyWorkItemReview {
+function parseLegacyReview(
+  value: Record<string, unknown>,
+  expectedWorkItem: string | null,
+  source: string
+): LegacyWorkItemReview {
   const workItem = parseWorkItem(value.work_item, expectedWorkItem, source);
   if (typeof value.status !== 'string' || !['pending', 'approved'].includes(value.status))
     throw new ArtifactValidationError(`${source}.status must be pending or approved.`);
-  if (value.reviewed_at !== undefined && (typeof value.reviewed_at !== 'string' || Number.isNaN(Date.parse(value.reviewed_at))))
+  if (
+    value.reviewed_at !== undefined &&
+    (typeof value.reviewed_at !== 'string' || Number.isNaN(Date.parse(value.reviewed_at)))
+  )
     throw new ArtifactValidationError(`${source}.reviewed_at must be ISO.`);
   return {
     schema_version: 1,
@@ -214,7 +221,11 @@ function parseLegacyReview(value: Record<string, unknown>, expectedWorkItem: str
 }
 
 function parseWorkItem(value: unknown, expectedWorkItem: string | null, source: string): WorkItemId {
-  if (typeof value !== 'string' || !WORK_ITEM_ID.test(value) || (expectedWorkItem !== null && value !== expectedWorkItem))
+  if (
+    typeof value !== 'string' ||
+    !WORK_ITEM_ID.test(value) ||
+    (expectedWorkItem !== null && value !== expectedWorkItem)
+  )
     throw new ArtifactValidationError(`${source} has an invalid work_item.`);
   return value as WorkItemId;
 }
@@ -248,11 +259,17 @@ function parseActivePass(value: unknown, source: string, workItem: WorkItemId): 
     scope,
     ...(item.inspected !== undefined ? { inspected: stringArray(item.inspected, `${source}.inspected`) } : {}),
     ...(item.parecer !== undefined ? { parecer: nonEmptyString(item.parecer, `${source}.parecer`) } : {}),
-    ...(item.disposition !== undefined ? { disposition: passDisposition(item.disposition, `${source}.disposition`) } : {}),
+    ...(item.disposition !== undefined
+      ? { disposition: passDisposition(item.disposition, `${source}.disposition`) }
+      : {}),
     ...(item.findings !== undefined ? { findings: parseFindings(item.findings, `${source}.findings`) } : {}),
     ...(item.actions !== undefined ? { actions: parseActions(item.actions, `${source}.actions`) } : {}),
-    ...(item.resolutions !== undefined ? { resolutions: parseResolutions(item.resolutions, `${source}.resolutions`) } : {}),
-    ...(item.residual_risk !== undefined ? { residual_risk: stringArray(item.residual_risk, `${source}.residual_risk`) } : {})
+    ...(item.resolutions !== undefined
+      ? { resolutions: parseResolutions(item.resolutions, `${source}.resolutions`) }
+      : {}),
+    ...(item.residual_risk !== undefined
+      ? { residual_risk: stringArray(item.residual_risk, `${source}.residual_risk`) }
+      : {})
   };
 }
 
@@ -261,7 +278,8 @@ function parseScope(value: unknown, source: string, workItem: WorkItemId): Revie
   if (item.kind !== 'work_item' && item.kind !== 'task')
     throw new ArtifactValidationError(`${source}.kind must be work_item or task.`);
   const ref = nonEmptyString(item.ref, `${source}.ref`);
-  if (item.kind === 'work_item' && ref !== workItem) throw new ArtifactValidationError(`${source}.ref must match ${workItem}.`);
+  if (item.kind === 'work_item' && ref !== workItem)
+    throw new ArtifactValidationError(`${source}.ref must match ${workItem}.`);
   if (item.kind === 'task' && !new RegExp(`^${workItem}-T\\d{3,}$`).test(ref))
     throw new ArtifactValidationError(`${source}.ref must reference a task in ${workItem}.`);
   return { kind: item.kind, ref };
@@ -273,10 +291,13 @@ function parseFindings(value: unknown, source: string): ReviewFinding[] {
     const item = record(entry, `${source}[${index}]`);
     const id = nonEmptyString(item.id, `${source}[${index}].id`);
     if (!/^F\d{3,}$/.test(id)) throw new ArtifactValidationError(`${source}[${index}].id must match F###.`);
-    if (typeof item.blocking !== 'boolean') throw new ArtifactValidationError(`${source}[${index}].blocking must be boolean.`);
+    if (typeof item.blocking !== 'boolean')
+      throw new ArtifactValidationError(`${source}[${index}].blocking must be boolean.`);
     const cause = nonEmptyString(item.cause, `${source}[${index}].cause`);
     if (!REVIEW_FINDING_CAUSES.includes(cause as ReviewFindingCause))
-      throw new ArtifactValidationError(`${source}[${index}].cause must be one of ${REVIEW_FINDING_CAUSES.join(', ')}.`);
+      throw new ArtifactValidationError(
+        `${source}[${index}].cause must be one of ${REVIEW_FINDING_CAUSES.join(', ')}.`
+      );
     return {
       id,
       blocking: item.blocking,
@@ -292,9 +313,12 @@ function parseActions(value: unknown, source: string): ReviewAction[] {
   return value.map((entry, index) => {
     const item = record(entry, `${source}[${index}]`);
     if (item.type !== 'repair_task_created' && item.type !== 'repair_task_reopened')
-      throw new ArtifactValidationError(`${source}[${index}].type must be repair_task_created or repair_task_reopened.`);
+      throw new ArtifactValidationError(
+        `${source}[${index}].type must be repair_task_created or repair_task_reopened.`
+      );
     const task = nonEmptyString(item.task, `${source}[${index}].task`);
-    if (!/^W\d{3,}-T\d{3,}$/.test(task)) throw new ArtifactValidationError(`${source}[${index}].task must match W###-T###.`);
+    if (!/^W\d{3,}-T\d{3,}$/.test(task))
+      throw new ArtifactValidationError(`${source}[${index}].task must match W###-T###.`);
     return { type: item.type, finding: nonEmptyString(item.finding, `${source}[${index}].finding`), task };
   });
 }
@@ -305,9 +329,12 @@ function parseResolutions(value: unknown, source: string): ReviewResolution[] {
     const item = record(entry, `${source}[${index}]`);
     const state = nonEmptyString(item.state, `${source}[${index}].state`);
     if (!REVIEW_FINDING_STATES.includes(state as ReviewFindingState) || state === 'open')
-      throw new ArtifactValidationError(`${source}[${index}].state must be resolved, reopened, superseded, or accepted_residual_risk.`);
+      throw new ArtifactValidationError(
+        `${source}[${index}].state must be resolved, reopened, superseded, or accepted_residual_risk.`
+      );
     const task = optionalString(item.task, `${source}[${index}].task`);
-    if (task && !/^W\d{3,}-T\d{3,}$/.test(task)) throw new ArtifactValidationError(`${source}[${index}].task must match W###-T###.`);
+    if (task && !/^W\d{3,}-T\d{3,}$/.test(task))
+      throw new ArtifactValidationError(`${source}[${index}].task must match W###-T###.`);
     return {
       finding: nonEmptyString(item.finding, `${source}[${index}].finding`),
       state: state as Exclude<ReviewFindingState, 'open'>,
@@ -334,7 +361,15 @@ function parseWorkerRuns(value: unknown, source: string, workItem: WorkItemId): 
     return {
       id,
       ...(task ? { task } : {}),
-      ...optionalFields(item, source, index, ['runtime', 'runtime_version', 'surface', 'model', 'effort', 'context_mode', 'workspace_isolation']),
+      ...optionalFields(item, source, index, [
+        'runtime',
+        'runtime_version',
+        'surface',
+        'model',
+        'effort',
+        'context_mode',
+        'workspace_isolation'
+      ]),
       ...(usage ? { usage } : {})
     };
   });
@@ -350,13 +385,20 @@ function parseUsage(value: unknown, source: string): WorkerRunEvidence['usage'] 
       throw new ArtifactValidationError(`${source}.${fieldName} must be a non-negative integer when known.`);
     usage[fieldName] = count as number;
   }
-  if (!Object.keys(usage).length) throw new ArtifactValidationError(`${source} must contain known usage telemetry or be omitted.`);
+  if (!Object.keys(usage).length)
+    throw new ArtifactValidationError(`${source} must contain known usage telemetry or be omitted.`);
   return usage;
 }
 
-function optionalFields(item: Record<string, unknown>, source: string, index: number, names: readonly string[]): Record<string, string> {
+function optionalFields(
+  item: Record<string, unknown>,
+  source: string,
+  index: number,
+  names: readonly string[]
+): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const name of names) if (item[name] !== undefined) result[name] = nonEmptyString(item[name], `${source}[${index}].${name}`);
+  for (const name of names)
+    if (item[name] !== undefined) result[name] = nonEmptyString(item[name], `${source}[${index}].${name}`);
   return result;
 }
 
@@ -372,38 +414,54 @@ function validateReviewHistory(review: WorkItemReviewV2, source: string): void {
     const resolutions = new Set<string>();
     for (const resolution of pass.resolutions) {
       if (!findings.has(resolution.finding))
-        throw new ArtifactValidationError(`${source} pass ${pass.id} resolves unknown or same-pass finding '${resolution.finding}'.`);
+        throw new ArtifactValidationError(
+          `${source} pass ${pass.id} resolves unknown or same-pass finding '${resolution.finding}'.`
+        );
       if (resolutions.has(resolution.finding))
-        throw new ArtifactValidationError(`${source} pass ${pass.id} contains multiple resolutions for '${resolution.finding}'.`);
+        throw new ArtifactValidationError(
+          `${source} pass ${pass.id} contains multiple resolutions for '${resolution.finding}'.`
+        );
       resolutions.add(resolution.finding);
     }
 
     for (const finding of pass.findings) {
       if (findings.has(finding.id))
-        throw new ArtifactValidationError(`${source} finding '${finding.id}' was already introduced by ${origins.get(finding.id)}.`);
+        throw new ArtifactValidationError(
+          `${source} finding '${finding.id}' was already introduced by ${origins.get(finding.id)}.`
+        );
       findings.set(finding.id, finding);
       origins.set(finding.id, pass.id);
     }
 
     for (const action of pass.actions) {
       if (!findings.has(action.finding))
-        throw new ArtifactValidationError(`${source} pass ${pass.id} action references unknown finding '${action.finding}'.`);
+        throw new ArtifactValidationError(
+          `${source} pass ${pass.id} action references unknown finding '${action.finding}'.`
+        );
       if (!action.task.startsWith(`${review.work_item}-`))
-        throw new ArtifactValidationError(`${source} pass ${pass.id} repair task '${action.task}' belongs to another work item.`);
+        throw new ArtifactValidationError(
+          `${source} pass ${pass.id} repair task '${action.task}' belongs to another work item.`
+        );
     }
   }
 
   if (review.active_pass && passIds.has(review.active_pass.id))
-    throw new ArtifactValidationError(`${source}.active_pass '${review.active_pass.id}' collides with finalized pass history.`);
+    throw new ArtifactValidationError(
+      `${source}.active_pass '${review.active_pass.id}' collides with finalized pass history.`
+    );
 
   const expectedDisposition = review.passes.at(-1)?.disposition ?? 'pending';
   if (review.disposition !== expectedDisposition)
-    throw new ArtifactValidationError(`${source}.disposition must equal the latest finalized pass disposition '${expectedDisposition}'.`);
+    throw new ArtifactValidationError(
+      `${source}.disposition must equal the latest finalized pass disposition '${expectedDisposition}'.`
+    );
 
   if (review.disposition === 'approved') {
     const unresolved = unresolvedBlockingFindings(review);
     if (unresolved.length)
-      throw new ArtifactValidationError(`${source} cannot be approved with unresolved blocking findings: ${unresolved.map(({ finding }) => finding.id).join(', ')}.`);
+      throw new ArtifactValidationError(
+        `${source} cannot be approved with unresolved blocking findings: ${unresolved.map(({ finding }) => finding.id).join(', ')}.`
+      );
   }
 }
 
@@ -419,7 +477,8 @@ function stringArray(value: unknown, source: string): string[] {
 }
 
 function nonEmptyString(value: unknown, source: string): string {
-  if (typeof value !== 'string' || !value.trim()) throw new ArtifactValidationError(`${source} must be non-empty text.`);
+  if (typeof value !== 'string' || !value.trim())
+    throw new ArtifactValidationError(`${source} must be non-empty text.`);
   return value;
 }
 

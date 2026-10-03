@@ -41,7 +41,8 @@ const workItemCommands: Record<string, WorkItemCommandHandler> = {
 export const command: CommandDefinition = {
   name: 'work-item',
   description: 'Create or deterministically update backlog work-items.',
-  usage: 'flow work-item <create|set|priority|dependencies|blocker-add|blocker-resolve|promote|review-pass|review-complete> ...',
+  usage:
+    'flow work-item <create|set|priority|dependencies|blocker-add|blocker-resolve|promote|review-pass|review-complete> ...',
   arguments: [{ name: 'operation', required: true }],
   flags: [
     projectPathOption,
