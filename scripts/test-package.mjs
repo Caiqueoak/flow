@@ -26,8 +26,15 @@ try {
   assertCommand(cli, ['schemas'], 'Generated Flow JSON Schemas.');
   assertBin(installedManifest, consumerRoot);
 
-  for (const required of ['dist/entry.js', 'schemas/backlog.schema.json', 'skills/flow/SKILL.md'])
+  for (const required of [
+    'dist/entry.js',
+    'schemas/backlog.schema.json',
+    'skills/flow/SKILL.md',
+    'skills/flow/core/orchestration.md'
+  ])
     if (!fs.existsSync(path.join(installedRoot, required))) throw new Error(`Package content missing ${required}.`);
+
+  assertW6OrchestrationContract(installedRoot);
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });
 }
@@ -62,4 +69,58 @@ function runNpm(args, cwd) {
   const npmCli = process.env.npm_execpath;
   if (!npmCli) throw new Error('npm_execpath is unavailable on Windows.');
   return execFileSync(process.execPath, [npmCli, ...args], { cwd, encoding: 'utf8' });
+}
+
+
+function assertW6OrchestrationContract(installedRoot) {
+  const orchestration = fs.readFileSync(path.join(installedRoot, 'skills/flow/core/orchestration.md'), 'utf8');
+
+  const requiredFragments = [
+    'genuinely simple and bounded',
+    'non-simple implementation must block/defer',
+    'Never silently implement non-simple work directly',
+    'Objective — one observable outcome sentence',
+    'Repository state — exact repository plus work-item/task state',
+    'Ownership — task/work-item ID and owned change surface',
+    'Read-first references',
+    'Scope/non-goals',
+    'Relevant constraints',
+    'Acceptance criteria',
+    'Verification',
+    'Stop/escalate conditions',
+    'Output contract',
+    'completed | blocked | needs_escalation',
+    'durable handoff reference',
+    'cheapest historically capable runtime-resolved option',
+    'missing_context',
+    'worker_quality',
+    'integration_conflict',
+    'scope_leak',
+    'verification_gap',
+    'orchestration_error',
+    'there is no fixed worker count',
+    'no one-worker-per-task rule',
+    'Use W5 review passes/findings/resolutions as empirical feedback'
+  ];
+
+  for (const fragment of requiredFragments) {
+    if (!orchestration.includes(fragment)) throw new Error(`W6 orchestration contract missing ${JSON.stringify(fragment)}.`);
+  }
+
+  for (const capability of [
+    'spawnWorkers',
+    'workerModelOverride',
+    'workerEffortOverride',
+    'contextModes',
+    'workspaceIsolation',
+    'concurrency',
+    'usageTelemetry',
+    'runtimeVersion',
+    'surface'
+  ]) {
+    if (!orchestration.includes(`\`${capability}\``)) throw new Error(`W6 capability contract missing ${capability}.`);
+  }
+
+  if (/\b(?:claude|codex|gpt|gemini)\b/i.test(orchestration))
+    throw new Error('W6 orchestration skill must not hard-code vendor or model policy.');
 }
