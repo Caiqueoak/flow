@@ -224,3 +224,39 @@ test('malformed or inconsistent history is rejected', () => {
     /unresolved blocking findings/
   );
 });
+
+test('inconsistent active pass is rejected before interruption recovery can resume it', () => {
+  assert.throws(
+    () =>
+      parseReview(
+        stringify({
+          schema_version: 2,
+          work_item: 'W001',
+          disposition: 'changes_required',
+          active_pass: {
+            id: 'R002',
+            scope: { kind: 'work_item', ref: 'W001' },
+            resolutions: [{ finding: 'F999', state: 'resolved', evidence: ['src/a.ts'] }]
+          },
+          worker_runs: [],
+          passes: [
+            {
+              id: 'R001',
+              scope: { kind: 'work_item', ref: 'W001' },
+              inspected: ['src/a.ts'],
+              parecer: 'Repair required.',
+              disposition: 'changes_required',
+              findings: [
+                { id: 'F001', blocking: true, claim: 'Known defect.', evidence: ['src/a.ts'], cause: 'worker_quality' }
+              ],
+              actions: [],
+              resolutions: [],
+              residual_risk: [],
+              finalized_at: '2026-10-03T17:00:00Z'
+            }
+          ]
+        })
+      ),
+    /active_pass resolves unknown or same-pass finding 'F999'/
+  );
+});
