@@ -24,11 +24,17 @@ export type TaskId = `T${number}`;
 export type QualifiedTaskId = `W${number}-T${number}`;
 export type LifecycleState = (typeof LIFECYCLE_STATES)[number];
 
+export interface TaskMutation {
+  surfaces?: string[];
+  resources?: string[];
+}
+
 export interface Task {
   id: TaskId;
   title: string;
   state: LifecycleState;
   depends_on: TaskId[];
+  mutation?: TaskMutation;
   provenance?: 'legacy_migration';
   legacy_commit?: string;
 }
