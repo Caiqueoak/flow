@@ -152,6 +152,8 @@ test('approved spec routes directly through task creation and start without a pl
   const base = ready(root);
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
   assert.equal(fs.existsSync(path.join(base, 'implementation-plan.md')), false);
+  const focused = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.equal(focused.active.work_item, 'W101');
   fs.appendFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), 'changed\n');
   const rejected = run(root, ['task', 'start', 'W101-T001']);
   assert.notEqual(rejected.status, 0);
@@ -452,6 +454,81 @@ test('packaged workflow instructions use the canonical task and review commands'
   assert.match(readme, /flow task commit W015-T001 --message "feat\(search\): add customer query \[W015-T001\]"/);
 });
 
+test('W4 task decomposition establishes and respects active work-item focus', () => {
+  const root = project();
+  ready(root, 'W101');
+  const otherBase = ready(root, 'W102');
+  const otherTasksFile = path.join(otherBase, 'tasks.yaml');
+  const otherTasks = parse(fs.readFileSync(otherTasksFile, 'utf8'));
+  otherTasks.tasks.push({ id: 'T001', title: 'Existing other task', state: 'pending', depends_on: [] });
+  fs.writeFileSync(otherTasksFile, stringify(otherTasks));
+
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Focused task']).status, 0);
+  let state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.equal(state.active.work_item, 'W101');
+  assert.equal(run(root, ['task', 'set', 'W101-T001', '--title', 'Focused task updated']).status, 0);
+
+  const crossCreate = run(root, ['task', 'create', 'W102', '--title', 'Wrong work item']);
+  assert.notEqual(crossCreate.status, 0);
+  assert.match(crossCreate.stderr, /state\.active\.work_item is W101/);
+
+  const crossSet = run(root, ['task', 'set', 'W102-T001', '--title', 'Wrong focus update']);
+  assert.notEqual(crossSet.status, 0);
+  assert.match(crossSet.stderr, /state\.active\.work_item is W101/);
+
+  state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.equal(state.active.work_item, 'W101');
+});
+
+test('W4 preserves the persisted workspace strategy for additional concurrent writers', () => {
+  const root = project();
+  ready(root);
+  for (const [title, surface, resource] of [
+    ['Implement A', 'src/a', 'resource-a'],
+    ['Implement B', 'src/b', 'resource-b'],
+    ['Implement C', 'src/c', 'resource-c']
+  ]) {
+    assert.equal(
+      run(root, [
+        'task',
+        'create',
+        'W101',
+        '--title',
+        title,
+        '--mutation-surfaces',
+        surface,
+        '--mutation-resources',
+        resource
+      ]).status,
+      0
+    );
+  }
+
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'shared']).status, 0);
+
+  const changedWorkspace = run(root, [
+    'task',
+    'start',
+    'W101-T003',
+    '--concurrent',
+    '--workspace',
+    'isolated'
+  ]);
+  assert.notEqual(changedWorkspace.status, 0);
+  assert.match(changedWorkspace.stderr, /already uses workspace 'shared'/);
+
+  let state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.deepEqual(state.active.concurrency, { tasks: ['W101-T001', 'W101-T002'], workspace: 'shared' });
+
+  assert.equal(run(root, ['task', 'start', 'W101-T003', '--concurrent', '--workspace', 'shared']).status, 0);
+  state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.deepEqual(state.active.concurrency, {
+    tasks: ['W101-T001', 'W101-T002', 'W101-T003'],
+    workspace: 'shared'
+  });
+});
+
 test('W4 starts independent same-work-item tasks concurrently and routes through active work-item focus', () => {
   const root = project();
   ready(root);
@@ -501,10 +578,14 @@ test('W4 starts independent same-work-item tasks concurrently and routes through
 test('W4 blocks second writers without claims and cross-work-item execution', () => {
   const root = project();
   ready(root, 'W101');
-  ready(root, 'W102');
+  const otherBase = ready(root, 'W102');
+  const otherTasksFile = path.join(otherBase, 'tasks.yaml');
+  const otherTasks = parse(fs.readFileSync(otherTasksFile, 'utf8'));
+  otherTasks.tasks.push({ id: 'T001', title: 'Other item task', state: 'pending', depends_on: [] });
+  fs.writeFileSync(otherTasksFile, stringify(otherTasks));
+
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Legacy single task']).status, 0);
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Second task']).status, 0);
-  assert.equal(run(root, ['task', 'create', 'W102', '--title', 'Other item task']).status, 0);
 
   assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
   const missingIntent = run(root, ['task', 'start', 'W101-T002']);
