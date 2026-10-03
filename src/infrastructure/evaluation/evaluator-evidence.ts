@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Task } from '../../domain/task/task.js';
 import { foldFindingState, parseReview, type WorkItemReviewV2 } from '../../domain/work-item/review.mjs';
 import { inspectRecovery } from '../../application/recovery/recovery.mjs';
 import { routeProject } from '../../application/route/operations/route.mjs';
@@ -229,8 +230,8 @@ function writerEventsComplete(events: EvaluatorEvent[]): boolean {
 }
 
 function conflictingWritersOverlapped(workspace: string, events: EvaluatorEvent[]): boolean {
-  const tasks = new Map(
-    loadWorkItems(workspace).flatMap((item) => item.tasks.tasks.map((task) => [`${item.id}-${task.id}`, task] as const))
+  const tasks = new Map<string, Task>(
+    loadWorkItems(workspace).flatMap((item) => item.tasks.tasks.map((task) => [`${item.id}-${task.id}`, task]))
   );
   const active = new Set<string>();
   for (const event of events) {
