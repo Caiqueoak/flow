@@ -291,8 +291,21 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
   });
 
   await t.test('approves, executes and commits one task with exact evidence', async () => {
+    const target = '_flow/work-items/W101-source-workflow/spec.md';
+    const checkpoint = JSON.stringify({
+      phase: 'specification',
+      step: 'await_approval',
+      target: { kind: 'work_item_spec', ref: target, revision: null },
+      inputs: [],
+      dimensions: [{ id: 'D001', state: 'resolved', summary: 'Specification is complete.' }],
+      assumptions: [],
+      latest_authorized_direction: 'Present this exact revision for approval.',
+      next_frontier: []
+    });
+    await flow(root, ['checkpoint', 'begin', '--data', checkpoint]);
+    await flow(root, ['checkpoint', 'ready']);
     assert.match(
-      await flow(root, ['approval', 'record', '_flow/work-items/W101-source-workflow/spec.md', '--at', '2026-01-01']),
+      await flow(root, ['approval', 'record', target, '--at', '2026-01-01']),
       /specification approved/
     );
     await flow(root, ['task', 'create', 'W101', '--title', 'Implement source workflow']);
