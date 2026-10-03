@@ -116,6 +116,25 @@ test('exact-approved target with matching stale approval-ready checkpoint is saf
   assert.equal(after.checkpoint, null);
 });
 
+test('Doctor clears only a proven-safe stale approval-ready checkpoint', (t) => {
+  const root = project(t);
+  const approved = approveProjectDocument(PRD, '2026-10-02T21:00:00Z');
+  fs.writeFileSync(path.join(root, '_flow', 'docs', 'prd.md'), approved.text);
+  setCheckpoint(
+    root,
+    baseCheckpoint({
+      status: 'approval_ready',
+      target: { kind: 'project_document', ref: '_flow/docs/prd.md', revision: approved.revision }
+    })
+  );
+
+  const doctor = diagnoseProject(root, { quick: true, version: 'test', packageRoot: root });
+  const recovery = doctor.checks.find((check) => check.id === 'recovery');
+  assert.equal(recovery?.status, 'pass');
+  assert.match(recovery?.message ?? '', /Cleared stale approval-ready checkpoint/);
+  assert.equal(inspectRecovery(root).checkpoint, null);
+});
+
 test('revision-mismatching approval-ready checkpoint is never auto-cleared', (t) => {
   const root = project(t);
   const approved = approveProjectDocument(PRD, '2026-10-02T21:00:00Z');
