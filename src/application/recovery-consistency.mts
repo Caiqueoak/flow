@@ -1,9 +1,6 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import {
-  documentRevision,
-  isProjectDocumentApproved
-} from '../domain/project/document.mjs';
+import { documentRevision, isProjectDocumentApproved } from '../domain/project/document.mjs';
 import { SPEC_FILE } from '../domain/project/project.js';
 import {
   isWorkItemSpecApproved,
@@ -15,10 +12,7 @@ import type { WorkflowCheckpoint } from '../domain/workflow/checkpoint.mjs';
 import { fileExists, readText } from '../infrastructure/filesystem/index.js';
 import { loadExecutionState } from '../infrastructure/persistence/execution-state.mjs';
 import { loadWorkItems } from '../infrastructure/persistence/work-items.mjs';
-import {
-  canonicalProjectDocumentKind,
-  validateProjectDocument
-} from './project-contracts.mjs';
+import { canonicalProjectDocumentKind, validateProjectDocument } from './project-contracts.mjs';
 
 export type RecoveryClassification = 'resumable' | 'safely_repairable' | 'requires_reconciliation';
 
@@ -470,7 +464,11 @@ function missingIdentity(): RevisionIdentity {
   return { exists: false, valid: false, revision: null, approved: false };
 }
 
-function reconciliation(code: string, message: string, checkpoint: WorkflowCheckpoint | null = null): RecoveryInspection {
+function reconciliation(
+  code: string,
+  message: string,
+  checkpoint: WorkflowCheckpoint | null = null
+): RecoveryInspection {
   return {
     classification: 'requires_reconciliation',
     checkpoint,

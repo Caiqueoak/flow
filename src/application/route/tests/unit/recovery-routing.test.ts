@@ -6,10 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { stringify } from 'yaml';
 import { approveProjectDocument, documentRevision } from '../../../../domain/project/document.mjs';
-import {
-  serializeWorkItemSpec,
-  specificationRevision
-} from '../../../../domain/work-item/specification.mjs';
+import { serializeWorkItemSpec, specificationRevision } from '../../../../domain/work-item/specification.mjs';
 import { parseCheckpoint } from '../../../../domain/workflow/checkpoint.mjs';
 import type { WorkItemId, WorkItemSpecMetadata } from '../../../../domain/work-item/work-item.js';
 import { emptyState } from '../../../../domain/workflow/execution-state.mjs';
@@ -79,8 +76,12 @@ schema_version: 2
 status: draft
 ${metadata}---
 
-${headings.map((heading) => `${heading}
-Concrete contract.`).join('\n\n')}
+${headings
+  .map(
+    (heading) => `${heading}
+Concrete contract.`
+  )
+  .join('\n\n')}
 `;
   fs.writeFileSync(path.join(root, '_flow', 'docs', name), text);
   return text;
@@ -354,7 +355,6 @@ test('fresh route calls derive the same continuation from persisted repository s
 
   assert.deepEqual(routeProject(root), routeProject(root));
 });
-
 
 test('invalid persisted state is reported as a deterministic recovery conflict', (t) => {
   const root = project(t);
