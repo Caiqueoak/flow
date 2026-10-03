@@ -21,16 +21,17 @@ export function validateProject(
 ): ValidationFinding[] {
   const findings: ValidationFinding[] = [],
     error = (code: string, message: string) => findings.push({ level: 'error', code, message });
+  const recovery = inspectRecovery(root);
+  if (recovery.classification === 'requires_reconciliation') {
+    for (const finding of recovery.findings) error(finding.code, finding.message);
+  }
+
   let items;
   try {
     items = loadWorkItems(root);
   } catch (e: unknown) {
     error('WORK_ITEMS', errorMessage(e));
     return findings;
-  }
-  const recovery = inspectRecovery(root);
-  if (recovery.classification === 'requires_reconciliation') {
-    for (const finding of recovery.findings) error(finding.code, finding.message);
   }
 
   const by = new Map(items.map((i) => [i.id, i]));
