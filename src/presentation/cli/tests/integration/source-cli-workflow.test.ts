@@ -46,6 +46,24 @@ async function flow(root: string, args: string[]) {
   return output.join('\n');
 }
 
+async function approveReview(root: string, id = 'W101') {
+  const data = JSON.stringify({
+    pass: {
+      id: 'R001',
+      scope: { kind: 'work_item', ref: id },
+      inspected: [id],
+      parecer: 'Acceptance and verification passed.',
+      disposition: 'approved',
+      findings: [],
+      actions: [],
+      resolutions: [],
+      residual_risk: []
+    }
+  });
+  await flow(root, ['work-item', 'review-pass', id, '--mode', 'checkpoint', '--data', data]);
+  await flow(root, ['work-item', 'review-pass', id, '--mode', 'finalize']);
+}
+
 function project(t: test.TestContext) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-source-cli-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -321,6 +339,7 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
     assert.equal(trace.tasks[0].task, 'W101-T001');
     assert.deepEqual(JSON.parse(await flow(root, ['gates', 'list', '--json'])), []);
     const canonicalBeforeReview = fs.readFileSync(path.join(base, 'tasks.yaml'), 'utf8');
+    await approveReview(root, 'W101');
     assert.match(await flow(root, ['work-item', 'review-complete', 'W101', '--domain', 'flow']), /review completed/);
     assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), { action: 'stop', reason: 'finished' });
     const plan = JSON.parse(await flow(root, ['migrate', '--plan', '--json']));
