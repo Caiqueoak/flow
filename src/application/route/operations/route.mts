@@ -8,6 +8,7 @@ import { inspectProjectContract } from '../../project-contracts.mjs';
 import { isWorkItemSpecApproved } from '../../../domain/work-item/specification.mjs';
 import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
+import { inspectRecovery } from '../../recovery/recovery.mjs';
 
 interface RouteResult {
   action: 'continue' | 'stop';
@@ -16,6 +17,7 @@ interface RouteResult {
   reason?: string;
   work_item?: string;
   task?: string;
+  details?: string[];
 }
 
 const step = (phase: string, instruction: string, extra: Partial<RouteResult> = {}): RouteResult => ({
@@ -92,6 +94,31 @@ function engineeringBootstrapRoute(root: string): RouteResult | null {
 export function routeProject(root: string): RouteResult {
   const migration = migrationRoute(root);
   if (migration) return migration;
+
+  const recovery = inspectRecovery(root);
+  if (recovery.classification === 'requires_reconciliation') {
+    return {
+      action: 'continue',
+      phase: 'reconcile',
+      instruction: 'reconcile/step-01-reconcile.md',
+      reason: 'recovery_conflict',
+      details: recovery.findings.map((finding) => `${finding.code}: ${finding.message}`)
+    };
+  }
+  if (recovery.checkpoint && recovery.classification === 'resumable' && recovery.continuation) {
+    const continuation = recovery.continuation;
+    return continuation.approval_required
+      ? {
+          action: 'stop',
+          reason: 'consequential_decision',
+          phase: continuation.phase,
+          instruction: continuation.instruction,
+          ...(continuation.work_item ? { work_item: continuation.work_item } : {})
+        }
+      : step(continuation.phase, continuation.instruction, {
+          ...(continuation.work_item ? { work_item: continuation.work_item } : {})
+        });
+  }
 
   const product = productBootstrapRoute(root);
   if (product) return product;
