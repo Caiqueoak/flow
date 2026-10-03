@@ -32,7 +32,6 @@ export function lifecycle(item: LoadedWorkItem, byId: ReadonlyMap<WorkItemId, Lo
   return { status: 'eligible', reasons: [] };
 }
 
-
 export function assertWorkItemHistoryMutable(
   item: LoadedWorkItem,
   byId: ReadonlyMap<WorkItemId, LoadedWorkItem>
