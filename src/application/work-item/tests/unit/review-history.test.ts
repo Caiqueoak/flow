@@ -152,3 +152,70 @@ test('legacy completed review remains valid without invented findings', () => {
   assert.equal(legacy.schema_version, 1);
   assert.equal(reviewReadyForCompletion(legacy), true);
 });
+
+
+test('superseded and accepted residual risk close blocking findings in folded state', (t) => {
+  for (const state of ['superseded', 'accepted_residual_risk'] as const) {
+    const file = tempReview(t, pending());
+    checkpointReviewPass(file, 'W001', {
+      pass: {
+        id: 'R001',
+        scope: { kind: 'work_item', ref: 'W001' },
+        inspected: ['src/a.ts'],
+        parecer: 'Finding raised.',
+        disposition: 'changes_required',
+        findings: [{ id: 'F001', blocking: true, claim: 'Concern.', evidence: ['src/a.ts'], cause: 'worker_quality' }],
+        actions: [],
+        resolutions: [],
+        residual_risk: []
+      }
+    });
+    finalizeReviewPass(file, 'W001', '2026-10-03T17:00:00Z');
+    checkpointReviewPass(file, 'W001', {
+      pass: {
+        id: 'R002',
+        scope: { kind: 'work_item', ref: 'W001' },
+        inspected: ['src/a.ts'],
+        parecer: 'Follow-up complete.',
+        disposition: 'approved',
+        findings: [],
+        actions: [],
+        resolutions: [{ finding: 'F001', state, evidence: ['src/a.ts'] }],
+        residual_risk: state === 'accepted_residual_risk' ? ['Bounded known risk remains.'] : []
+      }
+    });
+    const final = finalizeReviewPass(file, 'W001', '2026-10-03T18:00:00Z');
+    assert.equal(foldFindingState(final).get('F001')?.state, state);
+    assert.equal(reviewReadyForCompletion(final), true);
+  }
+});
+
+test('malformed or inconsistent history is rejected', () => {
+  assert.throws(
+    () =>
+      parseReview(
+        stringify({
+          schema_version: 2,
+          work_item: 'W001',
+          disposition: 'approved',
+          active_pass: null,
+          worker_runs: [],
+          passes: [
+            {
+              id: 'R001',
+              scope: { kind: 'work_item', ref: 'W001' },
+              inspected: [],
+              parecer: 'Invalid.',
+              disposition: 'approved',
+              findings: [{ id: 'F001', blocking: true, claim: 'Still open.', evidence: ['src/a.ts'], cause: 'verification_gap' }],
+              actions: [],
+              resolutions: [],
+              residual_risk: [],
+              finalized_at: '2026-10-03T17:00:00Z'
+            }
+          ]
+        })
+      ),
+    /unresolved blocking findings/
+  );
+});
