@@ -8,6 +8,7 @@ import { inspectProjectContract } from '../../project-contracts.mjs';
 import { isWorkItemSpecApproved } from '../../../domain/work-item/specification.mjs';
 import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
+import { inspectRecoveryState } from '../../recovery-consistency.mjs';
 
 interface RouteResult {
   action: 'continue' | 'stop';
@@ -32,6 +33,42 @@ function migrationRoute(root: string): RouteResult | null {
   return state.migration.status === 'pending_reconciliation'
     ? step('reconcile', 'migration/step-01-reconcile.md')
     : null;
+}
+
+function recoveryRoute(root: string): RouteResult | null {
+  const recovery = inspectRecoveryState(root);
+
+  if (recovery.classification === 'requires_reconciliation') {
+    return step('reconcile', 'reconcile/step-01-reconcile.md', {
+      reason: recovery.findings[0]?.code ?? 'recovery_inconsistent'
+    });
+  }
+
+  if (recovery.classification === 'safely_repairable') {
+    return {
+      action: 'stop',
+      reason: 'safe_repair',
+      phase: 'recovery',
+      instruction: 'flow doctor'
+    };
+  }
+
+  const continuation = recovery.continuation;
+  if (!continuation) return null;
+
+  if (continuation.approval_required) {
+    return {
+      action: 'stop',
+      reason: 'consequential_decision',
+      phase: continuation.phase,
+      instruction: continuation.instruction,
+      ...(continuation.work_item ? { work_item: continuation.work_item } : {})
+    };
+  }
+
+  return step(continuation.phase, continuation.instruction, {
+    ...(continuation.work_item ? { work_item: continuation.work_item } : {})
+  });
 }
 
 function projectContractRoute(
@@ -92,6 +129,9 @@ function engineeringBootstrapRoute(root: string): RouteResult | null {
 export function routeProject(root: string): RouteResult {
   const migration = migrationRoute(root);
   if (migration) return migration;
+
+  const recovery = recoveryRoute(root);
+  if (recovery) return recovery;
 
   const product = productBootstrapRoute(root);
   if (product) return product;
