@@ -111,3 +111,24 @@ test('unsafe run paths cannot escape the configured fixture workspace root', (t)
     /child/
   );
 });
+
+test('unavailable telemetry cannot be encoded as zero-valued telemetry', (t) => {
+  const runs = tempRuns(t);
+  const runRoot = prepareRun(repoRoot, runs, 'B11-r1', {
+    benchmark_id: 'B11',
+    flow_revision: 'abc123',
+    runtime: null,
+    model: null,
+    config: null,
+    repeat: 1
+  });
+  fs.writeFileSync(
+    path.join(runRoot, 'observation.json'),
+    JSON.stringify({
+      facts: { invented_telemetry: false },
+      telemetry: { status: 'unavailable', total_tokens: 0 }
+    })
+  );
+
+  assert.throws(() => evaluateRun(repoRoot, runRoot), /distinct from zero/);
+});
