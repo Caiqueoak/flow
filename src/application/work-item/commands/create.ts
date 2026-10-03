@@ -127,9 +127,12 @@ function writeWorkItemShells(directory: string, input: CreateWorkItemInput): voi
     tasks: []
   });
   writeYaml(path.join(directory, REVIEW_FILE), {
-    schema_version: 1,
+    schema_version: 2,
     work_item: input.id,
-    status: 'pending'
+    disposition: 'pending',
+    active_pass: null,
+    worker_runs: [],
+    passes: []
   });
 }
 
