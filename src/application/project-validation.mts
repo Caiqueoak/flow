@@ -7,6 +7,7 @@ import { validateSpec } from '../domain/work-item/specification.mjs';
 import { generateGraphMarkdown } from '../infrastructure/projections/graph.mjs';
 import { fileExists, readText } from '../infrastructure/filesystem/index.js';
 import { stagedFiles } from '../infrastructure/git/index.js';
+import { inspectRecoveryState } from './recovery-consistency.mjs';
 
 export interface ValidationFinding {
   level: 'error';
@@ -20,6 +21,11 @@ export function validateProject(
 ): ValidationFinding[] {
   const findings: ValidationFinding[] = [],
     error = (code: string, message: string) => findings.push({ level: 'error', code, message });
+
+  const recovery = inspectRecoveryState(root);
+  if (recovery.classification !== 'resumable') {
+    for (const finding of recovery.findings) error(finding.code, finding.message);
+  }
   let items;
   try {
     items = loadWorkItems(root);
