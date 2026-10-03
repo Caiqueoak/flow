@@ -250,7 +250,6 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
       ]),
       'W101 created.'
     );
-    await flow(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']);
     await flow(root, ['work-item', 'priority', 'W101', '--priority', '2']);
     await flow(root, [
       'work-item',
@@ -264,6 +263,7 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
       'Awaiting input'
     ]);
     await flow(root, ['work-item', 'blocker-resolve', 'W101', '--id', 'B001']);
+    await flow(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']);
     const spec = path.join(base, 'spec.md');
     assert.match(fs.readFileSync(spec, 'utf8'), /priority: 2[\s\S]*status: resolved/);
     fs.appendFileSync(spec, `\n${headings.map((heading) => `${heading}\nText.`).join('\n\n')}\n`);
