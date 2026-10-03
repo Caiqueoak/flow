@@ -58,7 +58,7 @@ Non-goals.
 
   if (experienceRequired) {
     const experience = approveProjectDocument(
-      '---\\nschema_version: 2\\nstatus: draft\\n---\\n\\n# Experience\\n\\nConcrete experience contract.\\n',
+      '---\nschema_version: 2\nstatus: draft\n---\n\n# Experience\n\nConcrete experience contract.\n',
       '2026-10-02T20:05:00Z'
     );
     fs.writeFileSync(path.join(root, '_flow', 'docs', 'experience.md'), experience.text);
@@ -73,7 +73,7 @@ baseline:
   existing_code_policy: not_applicable
 ---
 
-${ENGINEERING_HEADINGS.map((heading) => `${heading}\\nConcrete contract.`).join('\\n\\n')}
+${ENGINEERING_HEADINGS.map((heading) => `${heading}\nConcrete contract.`).join('\n\n')}
 `,
     '2026-10-02T20:10:00Z'
   );
