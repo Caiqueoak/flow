@@ -255,6 +255,7 @@ test('stale engineering approval cannot authorize task mutation', (t) => {
   approveWithCheckpoint(root, '_flow/docs/engineering.md', 'engineering');
 
   const spec = writeReadySpec(root);
+  assert.equal(run(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']).status, 0);
   const target = path.relative(root, spec).replaceAll('\\\\', '/');
   approveWithCheckpoint(root, target, 'specification', 'work_item_spec');
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
