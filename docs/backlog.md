@@ -4,7 +4,7 @@ Working notes and implementation status for Flow vNext. This file is a concise e
 
 ## Implementation status
 
-The accepted Flow vNext technical design is `docs/research/flow-vnext-technical-design.md`. It is authoritative for W1–W7 scope and dependencies; this backlog only summarizes delivery status.
+The accepted Flow vNext technical design is `docs/research/flow-vnext-technical-design.md`. It is authoritative for W1–W8 scope and dependencies; this backlog only summarizes delivery status.
 
 Status entries track delivery state, while detailed implementation evidence and exact reviewed heads remain in the corresponding pull requests.
 
@@ -13,8 +13,9 @@ Status entries track delivery state, while detailed implementation evidence and 
 - **W3 — Fresh chats recover the correct next safe action:** completed and merged via PR #59; main commit `5300028a3330d48fe82e78af61fc7d2964169daa`.
 - **W4 — One active work item can execute independent tasks safely in parallel:** completed and merged via PR #61; main commit `c08d8c8d422ec1c51d769e9b37ed5483c5b5d1e4`.
 - **W5 — Review and repair history survives interruption and remains traceable:** completed and merged via PR #64; main commit `9b688ccfbaeefc6b35eb063449d004bbeccfa4c6`.
-- **W6 — Non-simple execution delegates efficiently using runtime capabilities and minimum-sufficient context:** in progress via draft PR #66 on the dedicated W6 implementation branch; W3/W4/W5 prerequisites are merged.
-- **W7:** not started; dependencies remain as defined by the technical design.
+- **W6 — Non-simple execution delegates efficiently using runtime capabilities and minimum-sufficient context:** completed and merged via PR #66; main commit `0e9cad9155cd87691e38d1b281baaccdb8a769e0`.
+- **W7 — Existing projects can adopt vNext and traverse the complete lifecycle safely:** not started; W2–W6 prerequisites are merged and W7 is ready to start.
+- **W8 — vNext behavior can be regression and benchmark tested:** not started; depends on W3–W7 and becomes ready after W7.
 
 ## Direction
 
