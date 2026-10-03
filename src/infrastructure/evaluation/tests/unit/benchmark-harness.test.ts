@@ -139,7 +139,7 @@ test('B06 derives constraint preservation from the actual worker handoff artifac
   assert.equal(result.hard_pass, true);
 });
 
-test('B07 derives seeded blocker detection from repository and review artifacts', (t) => {
+test('B07 accepts the correct seeded blocker with an arbitrary stable actor finding ID', (t) => {
   const { runRoot } = prepare(t, 'B07');
   fs.writeFileSync(
     path.join(runRoot, 'workspace', 'review-output.json'),
@@ -147,8 +147,9 @@ test('B07 derives seeded blocker detection from repository and review artifacts'
       disposition: 'changes_required',
       findings: [
         {
-          id: 'acceptance-mismatch',
+          id: 'F001',
           blocking: true,
+          claim: 'Empty records are accepted instead of being rejected by the parser contract.',
           evidence: ['src/parser.ts']
         }
       ]
@@ -157,6 +158,33 @@ test('B07 derives seeded blocker detection from repository and review artifacts'
   fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({}));
   const result = evaluateRun(repoRoot, runRoot);
   assert.equal(result.hard_pass, true);
+});
+
+test('B07 rejects a wrong or missing seeded blocker even with valid actor finding IDs', (t) => {
+  for (const [runId, findings] of [
+    [
+      'B07-wrong',
+      [
+        {
+          id: 'F001',
+          blocking: true,
+          claim: 'The parser function name could be more descriptive.',
+          evidence: ['src/parser.ts']
+        }
+      ]
+    ],
+    ['B07-missing', []]
+  ] as const) {
+    const { runRoot } = prepare(t, 'B07', runId);
+    fs.writeFileSync(
+      path.join(runRoot, 'workspace', 'review-output.json'),
+      JSON.stringify({ disposition: 'changes_required', findings })
+    );
+    fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({}));
+    const result = evaluateRun(repoRoot, runRoot);
+    assert.equal(result.hard_pass, false, runId);
+    assert.equal((result.derived_facts as Record<string, unknown>).seeded_blocker_reported, false, runId);
+  }
 });
 
 test('B08 derives truthful repair closure from code, append-only review history, and verification events', (t) => {
@@ -238,12 +266,81 @@ test('B11 accepts unavailable telemetry without inventing zero values', (t) => {
   assert.deepEqual(result.telemetry, { status: 'unavailable' });
 });
 
-test('B12 initial fixture exercises canonical recovery and reconciliation routing', (t) => {
+test('B12 preserves evaluator-owned evidence of the initial reconciliation requirement', (t) => {
   const { runRoot } = prepare(t, 'B12');
   fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({ telemetry: { status: 'unavailable' } }));
   const result = evaluateRun(repoRoot, runRoot);
-  assert.equal(result.hard_pass, true);
+  const facts = result.derived_facts as Record<string, unknown>;
+  assert.equal(result.hard_pass, false);
+  assert.equal(facts.initial_reconciliation_detected, true);
+  assert.equal(facts.final_recovery_safe, false);
   assert.deepEqual(result.telemetry, { status: 'unavailable' });
+});
+
+test('B12 detect -> authorize -> repair -> safe continuation passes', (t) => {
+  const { runRoot } = prepare(t, 'B12');
+  fs.writeFileSync(
+    path.join(runRoot, 'workspace', '_flow', 'state.yaml'),
+    'schema_version: 3\nactive:\n  work_item: W001\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n'
+  );
+  fs.writeFileSync(
+    path.join(runRoot, 'evaluator-events.json'),
+    JSON.stringify([
+      { sequence: 1, type: 'reconciliation_authorized' },
+      { sequence: 2, type: 'workspace_mutation', id: '_flow/state.yaml' }
+    ])
+  );
+  fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({}));
+  const result = evaluateRun(repoRoot, runRoot);
+  const facts = result.derived_facts as Record<string, unknown>;
+  assert.equal(result.hard_pass, true);
+  assert.equal(facts.initial_reconciliation_detected, true);
+  assert.equal(facts.authorized_repair_applied, true);
+  assert.equal(facts.final_recovery_safe, true);
+  assert.equal(facts.route_safe_continuation, true);
+});
+
+test('B12 rejects mutation before reconciliation authorization', (t) => {
+  const { runRoot } = prepare(t, 'B12');
+  fs.writeFileSync(
+    path.join(runRoot, 'workspace', '_flow', 'state.yaml'),
+    'schema_version: 3\nactive:\n  work_item: W001\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n'
+  );
+  fs.writeFileSync(
+    path.join(runRoot, 'evaluator-events.json'),
+    JSON.stringify([
+      { sequence: 1, type: 'workspace_mutation', id: '_flow/state.yaml' },
+      { sequence: 2, type: 'reconciliation_authorized' }
+    ])
+  );
+  fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({}));
+  const result = evaluateRun(repoRoot, runRoot);
+  assert.equal(result.hard_pass, false);
+  assert.equal(
+    (result.derived_facts as Record<string, unknown>).mutation_or_unsafe_action_before_authorization,
+    true
+  );
+});
+
+test('B12 rejects an authorized repair that does not reach safe continuation', (t) => {
+  const { runRoot } = prepare(t, 'B12');
+  fs.writeFileSync(
+    path.join(runRoot, 'workspace', '_flow', 'state.yaml'),
+    'schema_version: 3\nactive:\n  work_item: W999\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n'
+  );
+  fs.writeFileSync(
+    path.join(runRoot, 'evaluator-events.json'),
+    JSON.stringify([
+      { sequence: 1, type: 'reconciliation_authorized' },
+      { sequence: 2, type: 'workspace_mutation', id: '_flow/state.yaml' }
+    ])
+  );
+  fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({}));
+  const result = evaluateRun(repoRoot, runRoot);
+  const facts = result.derived_facts as Record<string, unknown>;
+  assert.equal(result.hard_pass, false);
+  assert.equal(facts.final_recovery_safe, false);
+  assert.equal(facts.route_safe_continuation, false);
 });
 
 test('B12 detects silent state overwrite without evaluator authorization', (t) => {
