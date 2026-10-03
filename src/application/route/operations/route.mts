@@ -30,7 +30,12 @@ const step = (phase: string, instruction: string, extra: Partial<RouteResult> = 
 function migrationRoute(root: string): RouteResult | null {
   const file = path.join(root, '_flow', 'state.yaml');
   if (!fileExists(file)) return null;
-  const state = parseState(readText(file));
+  let state;
+  try {
+    state = parseState(readText(file));
+  } catch {
+    return null;
+  }
   return state.migration.status === 'pending_reconciliation'
     ? step('reconcile', 'migration/step-01-reconcile.md')
     : null;
@@ -103,6 +108,14 @@ export function routeProject(root: string): RouteResult {
       instruction: 'reconcile/step-01-reconcile.md',
       reason: 'recovery_conflict',
       details: recovery.findings.map((finding) => `${finding.code}: ${finding.message}`)
+    };
+  }
+  if (recovery.classification === 'safely_repairable') {
+    return {
+      action: 'stop',
+      phase: 'recovery',
+      reason: 'safe_repair',
+      instruction: 'Run `flow doctor --quick` to apply the deterministic recovery repair before routing continues.'
     };
   }
   if (recovery.checkpoint && recovery.classification === 'resumable' && recovery.continuation) {
