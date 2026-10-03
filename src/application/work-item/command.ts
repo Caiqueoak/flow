@@ -76,7 +76,11 @@ export function runWorkItem({ args }: { args: string[] }): void {
 
   const execute = resolveSubcommand(workItemCommands, action, `Unknown work-item operation '${action}'.`);
 
-  if (action !== 'create') assertWorkItemHistoryMutable(root, target ?? '');
+  if (action !== 'create') {
+    assertWorkItemHistoryMutable(root, target ?? '', {
+      allowActiveReview: action === 'review-pass' || action === 'review-complete'
+    });
+  }
 
   if (['create', 'set', 'priority', 'dependencies', 'promote', 'review-pass', 'review-complete'].includes(action)) {
     assertProjectContractsAuthorized(root);
