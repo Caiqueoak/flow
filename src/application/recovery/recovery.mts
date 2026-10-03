@@ -22,10 +22,12 @@ export interface RecoveryFinding {
     | 'RECOVERY_TARGET_MISSING'
     | 'RECOVERY_TARGET_INVALID'
     | 'RECOVERY_TARGET_REVISION_MISMATCH'
+    | 'RECOVERY_TARGET_PHASE_MISMATCH'
     | 'RECOVERY_INPUT_MISSING'
     | 'RECOVERY_INPUT_INVALID'
     | 'RECOVERY_INPUT_REVISION_MISMATCH'
-    | 'RECOVERY_PLANNING_TARGET_INVALID';
+    | 'RECOVERY_PLANNING_TARGET_INVALID'
+    | 'RECOVERY_PLANNING_STATE_CONFLICT';
   message: string;
 }
 
@@ -93,6 +95,7 @@ export function inspectRecovery(root: string): RecoveryAssessment {
   }
 
   validateCheckpointTarget(root, checkpoint, items, findings);
+  validateCheckpointPhaseTarget(checkpoint, items, findings);
   validateCheckpointInputs(root, checkpoint, items, findings);
   validatePlanningShape(checkpoint, state.active.work_item, items, findings);
 
@@ -183,6 +186,40 @@ function validateCheckpointTarget(
   }
 }
 
+function validateCheckpointPhaseTarget(
+  checkpoint: WorkflowCheckpoint,
+  items: ReturnType<typeof loadWorkItems>,
+  findings: RecoveryFinding[]
+): void {
+  const normalized = normalizeRef(checkpoint.target.ref);
+  const projectKind = canonicalProjectDocumentKind(normalized);
+  const expectedProjectKind =
+    checkpoint.phase === 'discovery'
+      ? 'prd'
+      : checkpoint.phase === 'experience'
+        ? 'experience'
+        : checkpoint.phase === 'engineering'
+          ? 'engineering'
+          : null;
+
+  if (expectedProjectKind && projectKind !== expectedProjectKind) {
+    findings.push({
+      code: 'RECOVERY_TARGET_PHASE_MISMATCH',
+      message: `Checkpoint phase '${checkpoint.phase}' must target the canonical ${expectedProjectKind} document, not '${checkpoint.target.ref}'.`
+    });
+  }
+
+  if (
+    checkpoint.phase === 'specification' &&
+    (checkpoint.target.kind !== 'work_item_spec' || !findWorkItem(normalized, items))
+  ) {
+    findings.push({
+      code: 'RECOVERY_TARGET_PHASE_MISMATCH',
+      message: `Specification checkpoint must target a canonical work-item specification, not '${checkpoint.target.ref}'.`
+    });
+  }
+}
+
 function validateCheckpointInputs(
   root: string,
   checkpoint: WorkflowCheckpoint,
@@ -234,6 +271,11 @@ function validatePlanningShape(
         code: 'RECOVERY_PLANNING_TARGET_INVALID',
         message: `Task-planning checkpoint references unknown work item '${checkpoint.target.ref}'.`
       });
+    } else if (item.tasks.tasks.some((task) => task.state !== 'pending')) {
+      findings.push({
+        code: 'RECOVERY_PLANNING_STATE_CONFLICT',
+        message: `Task-planning checkpoint for ${item.id} conflicts with task execution/completion already recorded in tasks.yaml.`
+      });
     }
   }
 
@@ -243,6 +285,11 @@ function validatePlanningShape(
       findings.push({
         code: 'RECOVERY_PLANNING_TARGET_INVALID',
         message: `Specification checkpoint references unknown work item '${checkpoint.target.ref}'.`
+      });
+    } else if (item.tasks.tasks.length > 0) {
+      findings.push({
+        code: 'RECOVERY_PLANNING_STATE_CONFLICT',
+        message: `Specification checkpoint for ${item.id} conflicts with task decomposition already recorded in tasks.yaml.`
       });
     }
   }
