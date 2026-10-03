@@ -15,7 +15,10 @@ export type RecoveryClassification = 'resumable' | 'safely_repairable' | 'requir
 
 export interface RecoveryFinding {
   code:
+    | 'RECOVERY_STATE_INVALID'
+    | 'RECOVERY_WORK_ITEMS_INVALID'
     | 'RECOVERY_ACTIVE_WORK_ITEM_MISSING'
+    | 'RECOVERY_ACTIVE_WORK_ITEM_CONFLICT'
     | 'RECOVERY_TARGET_MISSING'
     | 'RECOVERY_TARGET_INVALID'
     | 'RECOVERY_TARGET_REVISION_MISMATCH'
@@ -55,9 +58,21 @@ interface ResolvedRevision {
 }
 
 export function inspectRecovery(root: string): RecoveryAssessment {
-  const state = loadExecutionState(root);
   const findings: RecoveryFinding[] = [];
-  const items = loadWorkItems(root);
+  let state;
+  try {
+    state = loadExecutionState(root);
+  } catch (error) {
+    return reconciliation('RECOVERY_STATE_INVALID', errorMessage(error));
+  }
+
+  let items;
+  try {
+    items = loadWorkItems(root);
+  } catch (error) {
+    return reconciliation('RECOVERY_WORK_ITEMS_INVALID', errorMessage(error));
+  }
+
   const checkpoint = state.checkpoint;
 
   if (state.active.work_item && !items.some((item) => item.id === state.active.work_item)) {
@@ -79,7 +94,7 @@ export function inspectRecovery(root: string): RecoveryAssessment {
 
   validateCheckpointTarget(root, checkpoint, items, findings);
   validateCheckpointInputs(root, checkpoint, items, findings);
-  validatePlanningShape(checkpoint, items, findings);
+  validatePlanningShape(checkpoint, state.active.work_item, items, findings);
 
   if (findings.length) {
     return {
@@ -149,6 +164,13 @@ function validateCheckpointTarget(
     });
     return;
   }
+  if (checkpoint.target.revision !== null && resolved.revision === null) {
+    findings.push({
+      code: 'RECOVERY_TARGET_INVALID',
+      message: `Checkpoint target '${checkpoint.target.ref}' cannot prove revision coherence.`
+    });
+    return;
+  }
   if (
     checkpoint.target.revision !== null &&
     resolved.revision !== null &&
@@ -194,6 +216,7 @@ function validateCheckpointInputs(
 
 function validatePlanningShape(
   checkpoint: WorkflowCheckpoint,
+  activeWorkItem: string | null,
   items: ReturnType<typeof loadWorkItems>,
   findings: RecoveryFinding[]
 ): void {
@@ -222,6 +245,14 @@ function validatePlanningShape(
         message: `Specification checkpoint references unknown work item '${checkpoint.target.ref}'.`
       });
     }
+  }
+
+  const checkpointWorkItemId = checkpointWorkItem(checkpoint);
+  if (activeWorkItem && checkpointWorkItemId && activeWorkItem !== checkpointWorkItemId) {
+    findings.push({
+      code: 'RECOVERY_ACTIVE_WORK_ITEM_CONFLICT',
+      message: `Checkpoint references ${checkpointWorkItemId} while state.active.work_item is ${activeWorkItem}.`
+    });
   }
 }
 
@@ -372,4 +403,18 @@ function checkpointWorkItem(checkpoint: WorkflowCheckpoint): string | undefined 
 
 function normalizeRef(ref: string): string {
   return ref.replaceAll('\\', '/').replace(/^\.\//, '');
+}
+
+function reconciliation(code: RecoveryFinding['code'], message: string): RecoveryAssessment {
+  return {
+    classification: 'requires_reconciliation',
+    checkpoint: null,
+    continuation: null,
+    findings: [{ code, message }],
+    repair: null
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
