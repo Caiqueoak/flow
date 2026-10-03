@@ -3,6 +3,7 @@ import {
   parseReview,
   stringifyReview,
   upgradePendingLegacyReview,
+  validateReviewTaskReferences,
   type ActiveReviewPass,
   type SerializedWorkItemReview,
   type WorkerRunEvidence,
@@ -10,6 +11,8 @@ import {
 } from '../../../domain/work-item/review.mjs';
 import type { WorkItemId } from '../../../domain/work-item/work-item.js';
 import { atomicWriteText, readText } from '../../../infrastructure/filesystem/index.js';
+import { loadExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
+import { inspectRecovery } from '../../recovery/recovery.mjs';
 
 export interface ReviewCheckpointInput {
   pass: ActiveReviewPass;
@@ -19,7 +22,8 @@ export interface ReviewCheckpointInput {
 export function checkpointReviewPass(
   reviewFile: string,
   workItem: WorkItemId,
-  input: ReviewCheckpointInput
+  input: ReviewCheckpointInput,
+  canonicalTaskRefs: ReadonlySet<string> | null = null
 ): WorkItemReviewV2 {
   const current = upgradePendingLegacyReview(readReview(reviewFile, workItem));
   if (current.passes.some((pass) => pass.id === input.pass.id)) {
@@ -43,14 +47,15 @@ export function checkpointReviewPass(
     active_pass: input.pass,
     worker_runs: [...current.worker_runs, ...workerRuns]
   };
-  writeReview(reviewFile, workItem, next);
+  writeReview(reviewFile, workItem, next, canonicalTaskRefs);
   return next;
 }
 
 export function finalizeReviewPass(
   reviewFile: string,
   workItem: WorkItemId,
-  finalizedAt = new Date().toISOString()
+  finalizedAt = new Date().toISOString(),
+  canonicalTaskRefs: ReadonlySet<string> | null = null
 ): WorkItemReviewV2 {
   const current = upgradePendingLegacyReview(readReview(reviewFile, workItem));
   if (!current.active_pass) throw new Error(`${workItem} has no active review pass to finalize.`);
@@ -64,17 +69,37 @@ export function finalizeReviewPass(
     active_pass: null,
     passes: [...current.passes, finalized]
   };
-  writeReview(reviewFile, workItem, next);
+  writeReview(reviewFile, workItem, next, canonicalTaskRefs);
   return next;
+}
+
+export function assertReviewMutationAllowed(root: string, workItem: WorkItemId): void {
+  const recovery = inspectRecovery(root);
+  if (recovery.classification !== 'resumable' || recovery.checkpoint)
+    throw new Error('Review mutation is blocked until the active recovery/checkpoint state is resolved.');
+
+  const activeWorkItem = loadExecutionState(root).active.work_item;
+  if (activeWorkItem !== workItem)
+    throw new Error(
+      `Cannot mutate ${workItem} review while state.active.work_item is ${activeWorkItem ?? 'null'}.`
+    );
 }
 
 function readReview(reviewFile: string, workItem: WorkItemId): SerializedWorkItemReview {
   return parseReview(readText(reviewFile), { expectedWorkItem: workItem });
 }
 
-function writeReview(reviewFile: string, workItem: WorkItemId, review: WorkItemReviewV2): void {
+function writeReview(
+  reviewFile: string,
+  workItem: WorkItemId,
+  review: WorkItemReviewV2,
+  canonicalTaskRefs: ReadonlySet<string> | null
+): void {
   const content = stringifyReview(review);
   atomicWriteText(reviewFile, content, {
-    validate: (candidate) => parseReview(candidate, { expectedWorkItem: workItem })
+    validate: (candidate) => {
+      const parsed = parseReview(candidate, { expectedWorkItem: workItem });
+      if (canonicalTaskRefs) validateReviewTaskReferences(parsed, canonicalTaskRefs);
+    }
   });
 }
