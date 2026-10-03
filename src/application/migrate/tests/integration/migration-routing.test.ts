@@ -32,3 +32,33 @@ test('compiled CLI prioritizes pending migration reconciliation over work-item r
     instruction: 'migration/step-01-reconcile.md'
   });
 });
+
+test('compiled CLI requires reconciliation after canonical structural migration before normal routing', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-canonical-migration-route-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const flow = path.join(root, '_flow');
+  fs.mkdirSync(path.join(flow, 'work-items'), { recursive: true });
+  fs.writeFileSync(
+    path.join(flow, 'config.yaml'),
+    'schema_version: 4\nflow_version: 0.7.0\nruntimes: []\nengineering:\n  profile: flow/readability-first@2\n  existing_code_policy: not_applicable\n'
+  );
+  fs.writeFileSync(path.join(flow, 'gates.yaml'), 'schema_version: 2\ngates: []\n');
+
+  const migration = run(root, ['migrate', '--apply']);
+  assert.equal(migration.status, 0, migration.stderr);
+
+  let route = run(root, ['route', '--json']);
+  assert.equal(route.status, 0, route.stderr);
+  assert.deepEqual(JSON.parse(route.stdout), {
+    action: 'continue',
+    phase: 'reconcile',
+    instruction: 'migration/step-01-reconcile.md'
+  });
+
+  const completed = run(root, ['migrate', '--complete-reconciliation']);
+  assert.equal(completed.status, 0, completed.stderr);
+
+  route = run(root, ['route', '--json']);
+  assert.equal(route.status, 0, route.stderr);
+  assert.equal(JSON.parse(route.stdout).phase, 'discovery');
+});
