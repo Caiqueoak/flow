@@ -374,7 +374,7 @@ test('upgrades v2 state without trusting its dormant execution cursor', (t) => {
   assert.equal(state.schema_version, 3);
   assert.deepEqual(state.active, { work_item: null, concurrency: null });
   assert.equal(state.checkpoint, null);
-  assert.equal(state.migration.status, 'completed');
+  assert.equal(state.migration.status, 'pending_reconciliation');
   assert.equal(state.execution, undefined);
   assert.equal(state.stop_reason, undefined);
 });
@@ -405,7 +405,7 @@ test('reconstructs active work-item focus from canonical task state without revi
   assert.equal(result.unchanged, false);
   assert.deepEqual(state.active, { work_item: 'W101', concurrency: null });
   assert.equal(state.checkpoint, null);
-  assert.equal(state.migration.status, 'completed');
+  assert.equal(state.migration.status, 'pending_reconciliation');
 });
 
 test('adopts existing approved project documents with exact revisions', (t) => {
