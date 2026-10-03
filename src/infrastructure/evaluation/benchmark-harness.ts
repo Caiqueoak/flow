@@ -1,5 +1,11 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import {
+  deriveEvaluatorFacts,
+  validatePreparedFixture,
+  workspaceBaselineHashes
+} from './evaluator-evidence.js';
 
 export type Telemetry =
   | { status: 'unavailable' }
@@ -69,7 +75,7 @@ export function validateBenchmarkDefinitions(root: string): string[] {
     path.join(root, 'benchmarks', 'evaluator-truth.json')
   );
   const issues: string[] = [];
-  if (fixtures.schema_version !== 1 || truths.schema_version !== 1) issues.push('Benchmark schema_version must be 1.');
+  if (fixtures.schema_version !== 2 || truths.schema_version !== 2) issues.push('Benchmark schema_version must be 2.');
   const fixtureIds = fixtures.benchmarks.map((item) => item.id);
   const truthIds = truths.benchmarks.map((item) => item.id);
   if (new Set(fixtureIds).size !== fixtureIds.length) issues.push('Fixture benchmark IDs must be unique.');
@@ -77,13 +83,29 @@ export function validateBenchmarkDefinitions(root: string): string[] {
   if (fixtureIds.join(',') !== truthIds.join(',')) issues.push('Fixture and evaluator benchmark IDs/order must match.');
   for (const truth of truths.benchmarks) {
     if (truth.hard_assertions.length === 0) issues.push(`${truth.id} must define at least one hard assertion.`);
+    for (const assertion of truth.hard_assertions)
+      if (!assertion.path.startsWith('derived.'))
+        issues.push(`${truth.id} hard assertion '${assertion.path}' must use evaluator-derived facts.`);
     for (const item of truth.rubric) {
       if (!Number.isInteger(item.max_score) || item.max_score <= 0)
         issues.push(`${truth.id} rubric max_score is invalid.`);
     }
   }
+  for (const fixture of fixtures.benchmarks) {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), `flow-benchmark-${fixture.id}-`));
+    try {
+      materializeWorkspace(tempRoot, fixture);
+      issues.push(...validatePreparedFixture(tempRoot, fixture.id).map((issue) => `${fixture.id}: ${issue}`));
+    } catch (error) {
+      issues.push(`${fixture.id}: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
   return issues;
 }
+
+export { validatePreparedFixture };
 
 export function prepareRun(repoRoot: string, runsRoot: string, runId: string, identity: RunIdentity): string {
   const { fixture } = loadBenchmark(repoRoot, identity.benchmark_id);
@@ -98,22 +120,24 @@ export function prepareRun(repoRoot: string, runsRoot: string, runId: string, id
     path.join(workspace, 'agent-context.json'),
     JSON.stringify({ id: fixture.id, title: fixture.title, agent_context: fixture.agent_context }, null, 2) + '\n'
   );
-  for (const [relativePath, content] of Object.entries(fixture.workspace_files ?? {})) {
-    const destination = path.resolve(workspace, relativePath);
-    assertChildPath(workspace, destination);
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.writeFileSync(destination, content);
+  materializeWorkspace(workspace, fixture);
+  const fixtureIssues = validatePreparedFixture(workspace, fixture.id);
+  if (fixtureIssues.length) {
+    fs.rmSync(runRoot, { recursive: true, force: true });
+    throw new Error(`Malformed benchmark fixture: ${fixtureIssues.join(' ')}`);
   }
+  const baselineHashes = workspaceBaselineHashes(workspace, Object.keys(fixture.workspace_files ?? {}));
   fs.writeFileSync(
     path.join(runRoot, 'manifest.json'),
     JSON.stringify(
       {
-        schema_version: 1,
+        schema_version: 2,
         run_id: runId,
         ...identity,
         fixture: { id: fixture.id, title: fixture.title },
         result_status: 'pending',
-        telemetry: { status: 'unavailable' }
+        telemetry: { status: 'unavailable' },
+        baseline_hashes: baselineHashes
       },
       null,
       2
@@ -128,14 +152,26 @@ export function evaluateRun(repoRoot: string, runRoot: string): Record<string, u
   const { truth } = loadBenchmark(repoRoot, benchmarkId);
   const observation = readCollection<BenchmarkObservation>(path.join(runRoot, 'observation.json'));
   validateTelemetry(observation.telemetry);
+  const baselineHashes =
+    manifest.baseline_hashes && typeof manifest.baseline_hashes === 'object'
+      ? (manifest.baseline_hashes as Record<string, string>)
+      : {};
+  const derived = deriveEvaluatorFacts({
+    repoRoot,
+    runRoot,
+    benchmarkId,
+    seededTruth: truth.seeded_truth ?? {},
+    baselineHashes,
+    telemetry: observation.telemetry ?? { status: 'unavailable' }
+  });
   const hard_assertions = truth.hard_assertions.map((assertion) => {
-    const actual = readPath(observation, assertion.path);
+    const actual = readPath({ derived }, assertion.path);
     const passed = Object.is(actual, assertion.expected);
     return { ...assertion, actual, passed };
   });
   const rubric_scores = validateRubricScores(truth.rubric, observation.rubric_scores);
   const result = {
-    schema_version: 1,
+    schema_version: 2,
     run_id: manifest.run_id,
     benchmark_id: benchmarkId,
     flow_revision: manifest.flow_revision,
@@ -145,12 +181,12 @@ export function evaluateRun(repoRoot: string, runRoot: string): Record<string, u
     repeat: manifest.repeat,
     hard_pass: hard_assertions.every((item) => item.passed),
     hard_assertions,
+    derived_facts: derived,
     rubric: truth.rubric.map((item) => ({
       ...item,
       score: rubric_scores?.[item.id] ?? null,
       status: rubric_scores?.[item.id] === undefined ? 'pending' : 'scored'
     })),
-    observation_facts: observation.facts,
     metrics: {
       user_interventions: observation.metrics?.user_interventions ?? null,
       delegation_decision: observation.metrics?.delegation_decision ?? null,
@@ -169,6 +205,15 @@ export function evaluateRun(repoRoot: string, runRoot: string): Record<string, u
     throw new Error('result.json already exists; repeated runs must use a new run directory.');
   fs.writeFileSync(resultFile, JSON.stringify(result, null, 2) + '\n');
   return result;
+}
+
+function materializeWorkspace(workspace: string, fixture: Fixture): void {
+  for (const [relativePath, content] of Object.entries(fixture.workspace_files ?? {})) {
+    const destination = path.resolve(workspace, relativePath);
+    assertChildPath(workspace, destination);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.writeFileSync(destination, content);
+  }
 }
 
 function validateTelemetry(telemetry: Telemetry | undefined): void {
