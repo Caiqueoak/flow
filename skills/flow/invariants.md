@@ -17,3 +17,5 @@
 15. Active-work defects become tasks in the same work-item. Completed-work corrections become new maintenance work-items; completed history is immutable.
 16. Repository and Git state are the recovery source of truth. Preserve unrelated user changes and never replay uncertain mutations blindly.
 17. Progress, phase transitions, planning, successful checks and completed tasks are not terminal stops. Route and continue until completion or a legitimate human stop.
+18. Non-simple implementation must delegate through an actually available worker/subagent mechanism using `core/orchestration.md`. Direct implementation is reserved for genuinely simple bounded changes and ordinary orchestrator responsibilities. If delegation is required but no worker mechanism exists, block/defer and surface the capability limitation; never silently fall back to direct implementation.
+19. Worker/model/effort/context/isolation choices are runtime-resolved and evidence-driven, never hard-coded to vendor/model names or fixed worker counts. Reuse W4 structural concurrency safety and W5 review history when tuning handoffs and escalation.
