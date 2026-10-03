@@ -80,10 +80,11 @@ export function runWorkItem({ args }: { args: string[] }): void {
   if (action !== 'create') {
     const items = loadProjectWorkItems(root);
     const item = findWorkItem(root, target);
-    const allowReviewCompletionTransition =
-      action === 'review-complete' && loadExecutionState(root).active.work_item === item.id;
+    const state = loadExecutionState(root);
+    const allowOpenReviewCompletion =
+      ['review-pass', 'review-complete'].includes(action) && state.active.work_item === item.id;
     assertWorkItemHistoryMutable(item, new Map(items.map((candidate) => [candidate.id, candidate])), {
-      allowReviewCompletionTransition
+      allowOpenReviewCompletion
     });
   }
 
