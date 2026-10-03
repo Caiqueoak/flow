@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { parse, stringify } from 'yaml';
+import { stringify } from 'yaml';
 import {
   approveProjectDocument,
   documentRevision,
@@ -17,7 +17,11 @@ import { diagnoseProject } from '../../../doctor/operations/doctor.mjs';
 import { routeProject } from '../../../route/operations/route.mjs';
 import { inspectRecovery, repairRecovery } from '../../recovery.mjs';
 import { writeExecutionState } from '../../../../infrastructure/persistence/execution-state.mjs';
-import { serializeWorkItemSpec, specificationRevision } from '../../../../domain/work-item/specification.mjs';
+import {
+  parseWorkItemSpec,
+  serializeWorkItemSpec,
+  specificationRevision
+} from '../../../../domain/work-item/specification.mjs';
 import type { WorkItemId, WorkItemSpecMetadata } from '../../../../domain/work-item/work-item.js';
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
 
@@ -69,7 +73,7 @@ function writeAuthorizedProjectContracts(
   let experienceRevision: string | undefined;
   if (experienceRequired) {
     const experience = approveProjectDocument(
-      '---\\nschema_version: 2\\nstatus: draft\\n---\\n\\n# Experience\\n\\nConcrete experience contract.\\n',
+      '---\nschema_version: 2\nstatus: draft\n---\n\n# Experience\n\nConcrete experience contract.\n',
       '2026-10-02T20:05:00Z'
     );
     experienceRevision = experience.revision;
@@ -84,7 +88,7 @@ baseline:
   existing_code_policy: not_applicable
 ---
 
-${ENGINEERING_HEADINGS.map((heading) => `${heading}\\nConcrete contract.`).join('\\n\\n')}
+${ENGINEERING_HEADINGS.map((heading) => `${heading}\nConcrete contract.`).join('\n\n')}
 `;
   const engineering = approveProjectDocument(engineeringDraft, '2026-10-02T20:10:00Z');
   fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), engineering.text);
@@ -124,13 +128,6 @@ function baseCheckpoint(overrides: Record<string, unknown>) {
     updated_at: '2026-10-02T22:00:00Z',
     ...overrides
   };
-}
-
-function parseWorkItemSpecForTest(text: string): { metadata: WorkItemSpecMetadata; body: string } {
-  const match = text.match(/^---\\r?\\n([\\s\\S]*?)\\r?\\n---\\r?\\n?([\\s\\S]*)$/);
-  assert.ok(match);
-  const parsed = YAML.parse(match[1] ?? '') as WorkItemSpecMetadata;
-  return { metadata: parsed, body: match[2] ?? '' };
 }
 
 function writeWorkItem(root: string, id: WorkItemId = 'W001', approved = false): string {
@@ -525,7 +522,7 @@ test('task-planning recovery rejects a SPEC that loses approval without changing
   );
 
   const specFile = path.join(root, '_flow', 'work-items', 'W001-sample', 'spec.md');
-  const parsed = parseWorkItemSpecForTest(fs.readFileSync(specFile, 'utf8'));
+  const parsed = parseWorkItemSpec(fs.readFileSync(specFile, 'utf8'), { expectedWorkItem: 'W001' });
   delete parsed.metadata.approval;
   const unapproved = serializeWorkItemSpec(parsed.metadata, parsed.body);
   fs.writeFileSync(specFile, unapproved);
