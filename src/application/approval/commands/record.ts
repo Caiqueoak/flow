@@ -77,10 +77,21 @@ function recordProjectDocumentApproval(
 
 function assertApprovalReadyRevision(root: string, targetRef: string, targetRevision: string): void {
   const checkpoint = loadExecutionState(root).checkpoint;
-  if (checkpoint?.status !== 'approval_ready' || normalizeTargetRef(checkpoint.target.ref) !== targetRef) {
-    return;
+  if (!checkpoint) {
+    throw new UserInputError(
+      `Cannot approve ${targetRef}: a matching approval-ready checkpoint is required for the exact canonical revision.`
+    );
   }
-
+  if (checkpoint.status !== 'approval_ready') {
+    throw new UserInputError(
+      `Cannot approve ${targetRef}: checkpoint for '${checkpoint.target.ref}' is not approval-ready.`
+    );
+  }
+  if (normalizeTargetRef(checkpoint.target.ref) !== targetRef) {
+    throw new UserInputError(
+      `Cannot approve ${targetRef}: approval-ready checkpoint targets '${checkpoint.target.ref}'.`
+    );
+  }
   if (checkpoint.target.revision !== targetRevision) {
     throw new UserInputError(
       `Cannot approve ${targetRef}: current revision ${targetRevision} does not match approval-ready checkpoint revision ${checkpoint.target.revision}.`
