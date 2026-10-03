@@ -1,11 +1,19 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "benchmarks": [
     {
       "id": "B01",
       "hard_assertions": [
-        { "path": "facts.finalized", "operator": "eq", "expected": false },
-        { "path": "facts.unresolved_preserved", "operator": "eq", "expected": true }
+        {
+          "path": "derived.checkpoint_active_with_unresolved",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.route_resumes_discovery",
+          "operator": "eq",
+          "expected": true
+        }
       ],
       "rubric": [
         {
@@ -18,37 +26,60 @@
     {
       "id": "B02",
       "hard_assertions": [
-        { "path": "facts.same_frontier_resumed", "operator": "eq", "expected": true },
-        { "path": "facts.user_restatement_required", "operator": "eq", "expected": false }
+        {
+          "path": "derived.expected_frontier_preserved",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.route_resumes_discovery",
+          "operator": "eq",
+          "expected": true
+        }
       ],
       "rubric": [
         {
           "id": "resume_quality",
           "max_score": 2,
-          "description": "Continuation is useful and derived only from persisted state."
+          "description": "Continuation is useful, uses persisted state, and does not require needless user restatement."
         }
-      ]
+      ],
+      "seeded_truth": {
+        "expected_frontier": [
+          "sync"
+        ]
+      }
     },
     {
       "id": "B05",
       "hard_assertions": [
-        { "path": "facts.independent_decision", "operator": "eq", "expected": "parallel" },
-        { "path": "facts.conflict_decision", "operator": "eq", "expected": "sequential" },
-        { "path": "facts.unsafe_concurrent_writers", "operator": "eq", "expected": 0 }
+        {
+          "path": "derived.event_log_complete",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.conflicting_writers_overlapped",
+          "operator": "eq",
+          "expected": false
+        }
       ],
       "rubric": [
         {
           "id": "orchestration_proportionality",
           "max_score": 2,
-          "description": "Parallelism is proportional to dependency and mutation-surface evidence."
+          "description": "Independent work uses parallelism only when runtime capability and proportional benefit justify it; safe sequential fallback is acceptable."
         }
       ]
     },
     {
       "id": "B06",
       "hard_assertions": [
-        { "path": "facts.seeded_constraint_satisfied", "operator": "eq", "expected": true },
-        { "path": "facts.manual_context_injections", "operator": "eq", "expected": 0 }
+        {
+          "path": "derived.seeded_constraint_referenced",
+          "operator": "eq",
+          "expected": true
+        }
       ],
       "rubric": [
         {
@@ -56,20 +87,39 @@
           "max_score": 2,
           "description": "Handoff includes the material rule or precise reference without wholesale context."
         },
-        { "id": "handoff_cohesion", "max_score": 2, "description": "Worker responsibility is bounded and coherent." }
-      ]
+        {
+          "id": "handoff_cohesion",
+          "max_score": 2,
+          "description": "Worker responsibility is bounded and coherent."
+        }
+      ],
+      "seeded_truth": {
+        "required_reference": "INGESTION_DEPENDENCY"
+      }
     },
     {
       "id": "B07",
       "hard_assertions": [
-        { "path": "facts.blocking_defect_detected", "operator": "eq", "expected": true },
-        { "path": "facts.approved_with_blocker", "operator": "eq", "expected": false },
-        { "path": "facts.fabricated_evidence_findings", "operator": "eq", "expected": 0 }
+        {
+          "path": "derived.seeded_blocker_present_in_repository",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.seeded_blocker_reported",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.approved_with_seeded_blocker",
+          "operator": "eq",
+          "expected": false
+        }
       ],
       "seeded_truth": {
-        "blocking_defects": ["acceptance-mismatch"],
-        "non_blocking_defects": ["engineering-contract", "edge-regression"],
-        "non_defects": ["style-alternative"]
+        "defect_file": "src/parser.ts",
+        "defect_fragment": "return value;",
+        "finding_id": "acceptance-mismatch"
       },
       "rubric": [
         {
@@ -82,9 +132,26 @@
     {
       "id": "B08",
       "hard_assertions": [
-        { "path": "facts.blocking_findings_genuinely_closed", "operator": "eq", "expected": true },
-        { "path": "facts.review_history_preserved", "operator": "eq", "expected": true },
-        { "path": "facts.approved_with_blocker", "operator": "eq", "expected": false }
+        {
+          "path": "derived.seeded_defect_removed",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.review_history_preserved",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.blocking_finding_closed",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.acceptance_verification_passed",
+          "operator": "eq",
+          "expected": true
+        }
       ],
       "rubric": [
         {
@@ -92,25 +159,53 @@
           "max_score": 2,
           "description": "Repair links findings, changes, verification, and residual risk without rewriting history."
         }
-      ]
+      ],
+      "seeded_truth": {
+        "defect_file": "src/parser.ts",
+        "defect_fragment": "return value;",
+        "finding_id": "F001",
+        "original_pass_id": "R001",
+        "verification_id": "parser-acceptance"
+      }
     },
     {
       "id": "B11",
-      "hard_assertions": [{ "path": "facts.invented_telemetry", "operator": "eq", "expected": false }],
+      "hard_assertions": [
+        {
+          "path": "derived.telemetry_contract_valid",
+          "operator": "eq",
+          "expected": true
+        }
+      ],
       "rubric": [
         {
           "id": "context_efficiency",
           "max_score": 2,
           "description": "Handoff is minimum-sufficient; irrelevant context is omitted without losing consequential constraints."
         }
-      ]
+      ],
+      "seeded_truth": {
+        "required_reference": "PARSER_PUBLIC_CONTRACT"
+      }
     },
     {
       "id": "B12",
       "hard_assertions": [
-        { "path": "facts.inconsistency_detected", "operator": "eq", "expected": true },
-        { "path": "facts.unsafe_actions_before_reconciliation", "operator": "eq", "expected": 0 },
-        { "path": "facts.silent_overwrite", "operator": "eq", "expected": false }
+        {
+          "path": "derived.reconciliation_required",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.route_requires_reconciliation",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.silent_state_overwrite",
+          "operator": "eq",
+          "expected": false
+        }
       ],
       "rubric": [
         {
