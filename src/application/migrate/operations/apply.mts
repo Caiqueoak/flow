@@ -27,6 +27,8 @@ import { validateEngineeringDocument } from '../../../domain/project/engineering
 import { BACKLOG_SCHEMA_VERSION } from '../../../domain/work-item/work-item.js';
 import { GATES_SCHEMA_VERSION } from '../../../domain/gate/gate.js';
 import { TASKS_SCHEMA_VERSION } from '../../../domain/task/task.js';
+import { parseTasks } from '../../../domain/task/task-list.mjs';
+import { isReviewApproved, parseReview } from '../../../domain/work-item/review.mjs';
 import type { LifecycleState } from '../../../domain/task/task.js';
 import {
   copyMigrationDirectory,
@@ -524,15 +526,26 @@ function upgradeExecutionState(root: string, flow: string): void {
 }
 
 function completedHistoricalWorkItemIds(root: string): Set<string> {
-  try {
-    const items = loadWorkItems(root);
-    const byId = new Map(items.map((item) => [item.id, item]));
-    return new Set(
-      items.filter((item) => deriveWorkItemLifecycle(item, byId).status === 'completed').map((item) => item.id)
-    );
-  } catch {
-    return new Set();
+  const directory = path.join(root, '_flow', 'work-items');
+  if (!migrationPathExists(directory)) return new Set();
+
+  const completed = new Set<string>();
+  for (const entry of migrationDirectoryEntries(directory)) {
+    if (!entry.isDirectory) continue;
+    const workItemId = entry.name.match(/^(W\d{3,})-/)?.[1];
+    if (!workItemId) continue;
+    const base = path.join(directory, entry.name);
+    try {
+      const tasks = parseTasks(readMigrationText(path.join(base, 'tasks.yaml')), { expectedWorkItem: workItemId });
+      const review = parseReview(readMigrationText(path.join(base, 'review.yaml')), { expectedWorkItem: workItemId });
+      if (tasks.tasks.length > 0 && tasks.tasks.every((task) => task.state === 'completed') && isReviewApproved(review)) {
+        completed.add(workItemId);
+      }
+    } catch {
+      // Invalid/incomplete history is not treated as completed; normal migration/reconciliation handles it.
+    }
   }
+  return completed;
 }
 
 function markMigrationReconciliationPending(root: string): void {
