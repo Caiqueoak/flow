@@ -6,6 +6,8 @@ Use this guidance whenever Flow routes implementation work. The orchestrator own
 
 Build an in-memory capability profile from what the active runtime actually exposes. Do not branch policy on vendor, product, agent, or model names.
 
+Capability detection is per invocation and remains in memory; do not persist runtime-vendor capability tables as Flow policy.
+
 Record only capabilities that are observable now:
 
 - `spawnWorkers`: a child worker/subagent mechanism can be launched;
