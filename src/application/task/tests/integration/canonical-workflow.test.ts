@@ -765,7 +765,6 @@ test('W4 rejects invalid and traversing mutation surfaces before persistence', (
   }
 });
 
-
 test('W5 routes an approved review back to review while a later pass is active', () => {
   const root = project();
   ready(root);
@@ -796,10 +795,7 @@ test('W5 routes an approved review back to review while a later pass is active',
       parecer: 'Interrupted follow-up review.'
     }
   });
-  assert.equal(
-    run(root, ['work-item', 'review-pass', 'W101', '--mode', 'checkpoint', '--data', followUp]).status,
-    0
-  );
+  assert.equal(run(root, ['work-item', 'review-pass', 'W101', '--mode', 'checkpoint', '--data', followUp]).status, 0);
 
   const route = JSON.parse(run(root, ['route', '--json']).stdout);
   assert.equal(route.phase, 'review');

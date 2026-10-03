@@ -267,7 +267,6 @@ test('inconsistent active pass is rejected before interruption recovery can resu
   );
 });
 
-
 test('approved v2 review remains incomplete while a later pass is active', () => {
   const review = parseReview(
     stringify({
@@ -349,31 +348,19 @@ test('review task references must resolve to canonical tasks', () => {
 
   const invalidScope = JSON.parse(JSON.stringify(review));
   invalidScope.active_pass.scope.ref = 'W001-T999';
-  assert.throws(
-    () => validateReviewTaskReferences(invalidScope, canonical),
-    /unknown canonical task 'W001-T999'/
-  );
+  assert.throws(() => validateReviewTaskReferences(invalidScope, canonical), /unknown canonical task 'W001-T999'/);
 
   const invalidAction = JSON.parse(JSON.stringify(review));
   invalidAction.passes[0].actions[0].task = 'W001-T999';
-  assert.throws(
-    () => validateReviewTaskReferences(invalidAction, canonical),
-    /unknown canonical task 'W001-T999'/
-  );
+  assert.throws(() => validateReviewTaskReferences(invalidAction, canonical), /unknown canonical task 'W001-T999'/);
 
   const invalidResolution = JSON.parse(JSON.stringify(review));
   invalidResolution.active_pass.resolutions[0].task = 'W001-T999';
-  assert.throws(
-    () => validateReviewTaskReferences(invalidResolution, canonical),
-    /unknown canonical task 'W001-T999'/
-  );
+  assert.throws(() => validateReviewTaskReferences(invalidResolution, canonical), /unknown canonical task 'W001-T999'/);
 
   const invalidWorkerRun = JSON.parse(JSON.stringify(review));
   invalidWorkerRun.worker_runs[0].task = 'W001-T999';
-  assert.throws(
-    () => validateReviewTaskReferences(invalidWorkerRun, canonical),
-    /unknown canonical task 'W001-T999'/
-  );
+  assert.throws(() => validateReviewTaskReferences(invalidWorkerRun, canonical), /unknown canonical task 'W001-T999'/);
 
   const wrongWorkItem = JSON.parse(JSON.stringify(review));
   wrongWorkItem.passes[0].actions[0].task = 'W002-T001';

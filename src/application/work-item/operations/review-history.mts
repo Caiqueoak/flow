@@ -80,9 +80,7 @@ export function assertReviewMutationAllowed(root: string, workItem: WorkItemId):
 
   const activeWorkItem = loadExecutionState(root).active.work_item;
   if (activeWorkItem !== workItem)
-    throw new Error(
-      `Cannot mutate ${workItem} review while state.active.work_item is ${activeWorkItem ?? 'null'}.`
-    );
+    throw new Error(`Cannot mutate ${workItem} review while state.active.work_item is ${activeWorkItem ?? 'null'}.`);
 }
 
 function readReview(reviewFile: string, workItem: WorkItemId): SerializedWorkItemReview {

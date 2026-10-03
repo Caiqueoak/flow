@@ -28,11 +28,7 @@ export function loadWorkItems(root: string): LoadedWorkItem[] {
       const spec = parseWorkItemSpec(read(path.join(base, 'spec.md')), { expectedWorkItem: id });
       const tasks = parseTasks(read(path.join(base, 'tasks.yaml')), { expectedWorkItem: id });
       const review = parseReview(read(path.join(base, 'review.yaml')), { expectedWorkItem: id });
-      validateReviewTaskReferences(
-        review,
-        new Set(tasks.tasks.map((task) => `${id}-${task.id}`)),
-        `${id} review.yaml`
-      );
+      validateReviewTaskReferences(review, new Set(tasks.tasks.map((task) => `${id}-${task.id}`)), `${id} review.yaml`);
       return { ...spec.metadata, id, folder: entry.name, specBody: spec.body, tasks, review, base };
     })
     .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
