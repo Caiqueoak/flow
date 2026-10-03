@@ -71,9 +71,17 @@ export function validateConcurrentTaskState(
       .filter((task) => task.state === 'in_progress')
       .map((task) => ({ workItem: item.id, task, tasks: item.tasks.tasks }))
   );
-  if (!active.length) return [];
-
   const issues: ConcurrencyIssue[] = [];
+  if (!active.length) {
+    if (concurrency) {
+      issues.push({
+        code: 'CONCURRENCY_STATE_CONFLICT',
+        message: 'state.active.concurrency must be null when fewer than two tasks are in progress.'
+      });
+    }
+    return issues;
+  }
+
   const activeWorkItems = new Set(active.map((entry) => entry.workItem));
 
   if (activeWorkItems.size > 1) {
