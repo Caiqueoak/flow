@@ -164,6 +164,7 @@ test('greenfield bootstrap routes discovery, approvals, engineering, then backlo
     '--outcome',
     'User can complete the first MVP outcome.'
   ]);
+  await flow(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']);
   assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
     action: 'continue',
     phase: 'specification',
@@ -249,6 +250,7 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
       ]),
       'W101 created.'
     );
+    await flow(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']);
     await flow(root, ['work-item', 'priority', 'W101', '--priority', '2']);
     await flow(root, [
       'work-item',
