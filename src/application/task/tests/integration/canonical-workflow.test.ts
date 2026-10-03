@@ -95,6 +95,10 @@ function ready(root: string, id = 'W101') {
     ]).status,
     0
   );
+  const state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  if (state.checkpoint?.target?.ref === '_flow/work-items') {
+    assert.equal(run(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']).status, 0);
+  }
   const base = path.join(root, '_flow', 'work-items', `${id}-canonical-item`);
   const spec = path.join(base, 'spec.md');
   const original = fs.readFileSync(spec, 'utf8');

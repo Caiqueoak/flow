@@ -47,6 +47,15 @@ test('checkpoint CLI persists resumable state without hand-editing state.yaml', 
   assert.equal(await flow(root, ['checkpoint', 'begin', '--data', data('unresolved')]), 'Checkpoint started.');
   assert.deepEqual(parse(fs.readFileSync(stateFile, 'utf8')).checkpoint.next_frontier, ['D001']);
 
+  const firstRoute = JSON.parse(await flow(root, ['route', '--json']));
+  const freshRoute = JSON.parse(await flow(root, ['route', '--json']));
+  assert.deepEqual(freshRoute, firstRoute);
+  assert.deepEqual(freshRoute, {
+    action: 'continue',
+    phase: 'discovery',
+    instruction: 'discovery/step-01-project.md'
+  });
+
   assert.equal(await flow(root, ['checkpoint', 'update', '--data', data('resolved')]), 'Checkpoint updated.');
   assert.equal(
     await flow(root, ['checkpoint', 'ready', '--target-revision', 'prd-rev-1']),

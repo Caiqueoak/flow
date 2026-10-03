@@ -164,6 +164,7 @@ test('greenfield bootstrap routes discovery, approvals, engineering, then backlo
     '--outcome',
     'User can complete the first MVP outcome.'
   ]);
+  await flow(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']);
   assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
     action: 'continue',
     phase: 'specification',
@@ -262,6 +263,7 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
       'Awaiting input'
     ]);
     await flow(root, ['work-item', 'blocker-resolve', 'W101', '--id', 'B001']);
+    await flow(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']);
     const spec = path.join(base, 'spec.md');
     assert.match(fs.readFileSync(spec, 'utf8'), /priority: 2[\s\S]*status: resolved/);
     fs.appendFileSync(spec, `\n${headings.map((heading) => `${heading}\nText.`).join('\n\n')}\n`);
