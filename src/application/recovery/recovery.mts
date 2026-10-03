@@ -9,7 +9,11 @@ import type { WorkflowCheckpoint } from '../../domain/workflow/checkpoint.mjs';
 import { fileExists, readText } from '../../infrastructure/filesystem/index.js';
 import { loadExecutionState, writeExecutionState } from '../../infrastructure/persistence/execution-state.mjs';
 import { loadWorkItems } from '../../infrastructure/persistence/work-items.mjs';
-import { canonicalProjectDocumentKind, inspectProjectContract } from '../project-contracts.mjs';
+import {
+  canonicalProjectDocumentKind,
+  inspectProjectContract,
+  requiredProjectContracts
+} from '../project-contracts.mjs';
 
 export type RecoveryClassification = 'resumable' | 'safely_repairable' | 'requires_reconciliation';
 
@@ -27,6 +31,8 @@ export interface RecoveryFinding {
     | 'RECOVERY_INPUT_MISSING'
     | 'RECOVERY_INPUT_INVALID'
     | 'RECOVERY_INPUT_REVISION_MISMATCH'
+    | 'RECOVERY_UPSTREAM_UNAUTHORIZED'
+    | 'RECOVERY_SPEC_UNAUTHORIZED'
     | 'RECOVERY_PLANNING_TARGET_INVALID'
     | 'RECOVERY_PLANNING_STATE_CONFLICT';
   message: string;
@@ -97,6 +103,7 @@ export function inspectRecovery(root: string): RecoveryAssessment {
   validateCheckpointTarget(root, checkpoint, items, findings);
   validateCheckpointPhaseTarget(checkpoint, items, findings);
   validateCheckpointInputs(root, checkpoint, items, findings);
+  validateCheckpointAuthorization(root, checkpoint, items, findings);
   validatePlanningShape(checkpoint, state.active.work_item, items, findings);
 
   if (findings.length) {
@@ -274,6 +281,66 @@ function validateCheckpointInputs(
         message: `Checkpoint input '${input.ref}' expects revision ${input.revision}, current revision is ${resolved.revision}.`
       });
     }
+  }
+}
+
+function validateCheckpointAuthorization(
+  root: string,
+  checkpoint: WorkflowCheckpoint,
+  items: ReturnType<typeof loadWorkItems>,
+  findings: RecoveryFinding[]
+): void {
+  if (checkpoint.phase === 'discovery') return;
+
+  if (checkpoint.phase === 'experience') {
+    const prd = inspectProjectContract(root, 'prd');
+    if (!prd.approved || prd.experience !== 'required') {
+      findings.push({
+        code: 'RECOVERY_UPSTREAM_UNAUTHORIZED',
+        message:
+          "Experience recovery requires the current exact-approved PRD to authorize experience with 'experience: required'."
+      });
+    }
+    return;
+  }
+
+  if (checkpoint.phase === 'engineering') {
+    const prd = inspectProjectContract(root, 'prd');
+    if (!prd.approved) {
+      findings.push({
+        code: 'RECOVERY_UPSTREAM_UNAUTHORIZED',
+        message: 'Engineering recovery requires the current PRD to be exact-approved.'
+      });
+      return;
+    }
+    if (prd.experience === 'required' && !inspectProjectContract(root, 'experience').approved) {
+      findings.push({
+        code: 'RECOVERY_UPSTREAM_UNAUTHORIZED',
+        message: 'Engineering recovery requires the current required experience contract to be exact-approved.'
+      });
+    }
+    return;
+  }
+
+  if (checkpoint.phase !== 'planning' && checkpoint.phase !== 'specification') return;
+
+  const unauthorized = requiredProjectContracts(root).find((contract) => !contract.approved);
+  if (unauthorized) {
+    findings.push({
+      code: 'RECOVERY_UPSTREAM_UNAUTHORIZED',
+      message: `Downstream recovery requires current exact-approved project contracts; '${unauthorized.ref}' is not authorized.`
+    });
+  }
+
+  if (checkpoint.target.kind !== 'task_plan') return;
+  const item = findWorkItem(checkpoint.target.ref, items);
+  if (!item) return;
+  const spec = resolveReference(root, checkpoint.target.ref, items);
+  if (!spec.valid || !spec.approved) {
+    findings.push({
+      code: 'RECOVERY_SPEC_UNAUTHORIZED',
+      message: `Task-planning recovery for ${item.id} requires its current structurally valid SPEC revision to be exact-approved.`
+    });
   }
 }
 
