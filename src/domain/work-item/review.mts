@@ -445,10 +445,45 @@ function validateReviewHistory(review: WorkItemReviewV2, source: string): void {
     }
   }
 
-  if (review.active_pass && passIds.has(review.active_pass.id))
-    throw new ArtifactValidationError(
-      `${source}.active_pass '${review.active_pass.id}' collides with finalized pass history.`
-    );
+  if (review.active_pass) {
+    if (passIds.has(review.active_pass.id))
+      throw new ArtifactValidationError(
+        `${source}.active_pass '${review.active_pass.id}' collides with finalized pass history.`
+      );
+
+    const activeFindings = new Set<string>();
+    for (const finding of review.active_pass.findings ?? []) {
+      if (findings.has(finding.id) || activeFindings.has(finding.id))
+        throw new ArtifactValidationError(
+          `${source}.active_pass finding '${finding.id}' already exists in review history.`
+        );
+      activeFindings.add(finding.id);
+    }
+
+    const activeResolutions = new Set<string>();
+    for (const resolution of review.active_pass.resolutions ?? []) {
+      if (!findings.has(resolution.finding))
+        throw new ArtifactValidationError(
+          `${source}.active_pass resolves unknown or same-pass finding '${resolution.finding}'.`
+        );
+      if (activeResolutions.has(resolution.finding))
+        throw new ArtifactValidationError(
+          `${source}.active_pass contains multiple resolutions for '${resolution.finding}'.`
+        );
+      activeResolutions.add(resolution.finding);
+    }
+
+    for (const action of review.active_pass.actions ?? []) {
+      if (!findings.has(action.finding) && !activeFindings.has(action.finding))
+        throw new ArtifactValidationError(
+          `${source}.active_pass action references unknown finding '${action.finding}'.`
+        );
+      if (!action.task.startsWith(`${review.work_item}-`))
+        throw new ArtifactValidationError(
+          `${source}.active_pass repair task '${action.task}' belongs to another work item.`
+        );
+    }
+  }
 
   const expectedDisposition = review.passes.at(-1)?.disposition ?? 'pending';
   if (review.disposition !== expectedDisposition)
