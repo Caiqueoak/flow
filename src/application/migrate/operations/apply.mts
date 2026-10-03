@@ -233,6 +233,19 @@ function migrateStaged(root: string, targetVersion: string): void {
 function hasLegacyBacklog(flow: string): boolean {
   return migrationPathExists(path.join(flow, 'BACKLOG.yaml')) || migrationPathExists(path.join(flow, 'backlog.yaml'));
 }
+
+function completedWorkItemFolders(root: string): Set<string> {
+  try {
+    const items = loadWorkItems(root);
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return new Set(
+      items.filter((item) => deriveWorkItemLifecycle(item, byId).status === 'completed').map((item) => item.folder)
+    );
+  } catch {
+    return new Set();
+  }
+}
+
 function inspectCurrent(root: string, targetVersion: string): string[] {
   const flow = path.join(root, '_flow');
   const changes: string[] = [];
@@ -244,10 +257,11 @@ function inspectCurrent(root: string, targetVersion: string): string[] {
     changes.push('upgrade config.yaml');
   }
   const workItems = path.join(flow, 'work-items');
+  const completedFolders = completedWorkItemFolders(root);
   if (!migrationPathExists(workItems)) changes.push('restore work-items directory');
   else
     for (const entry of migrationDirectoryEntries(workItems)) {
-      if (!entry.isDirectory) continue;
+      if (!entry.isDirectory || completedFolders.has(entry.name)) continue;
       const tasks = path.join(workItems, entry.name, 'tasks.yaml');
       if (!migrationPathExists(tasks)) {
         changes.push(`restore work-items/${entry.name}/tasks.yaml`);
@@ -439,13 +453,15 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
   }
   const source = config?.flow_version ?? 'legacy';
   const incompatibilities = migrationIncompatibilities(source, targetVersion);
+  const semanticReconciliationRequired =
+    usesLegacyDirectory || hasLegacyBacklog(flow) || legacy.length > 0 || unreadableConfig;
   return {
     from_version: source,
     to_version: targetVersion,
     changes,
     files_affected: [...legacy, 'config.yaml', 'backlog.yaml', 'state.yaml', 'gates.yaml'],
     incompatibilities,
-    human_decisions: changes.length
+    human_decisions: semanticReconciliationRequired
       ? ['Reconcile preserved product, engineering, spec and traceability semantics before implementation.']
       : [],
     can_apply: incompatibilities.length === 0
@@ -455,9 +471,10 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
 function upgradeCanonicalStaged(root: string, targetVersion: string): void {
   const flow = path.join(root, '_flow');
   const workItems = path.join(flow, 'work-items');
+  const completedFolders = completedWorkItemFolders(root);
   if (migrationPathExists(workItems))
     for (const entry of migrationDirectoryEntries(workItems)) {
-      if (!entry.isDirectory) continue;
+      if (!entry.isDirectory || completedFolders.has(entry.name)) continue;
       const taskPath = path.join(workItems, entry.name, 'tasks.yaml');
       if (!migrationPathExists(taskPath)) continue;
       const value = asRecord(parse(readMigrationText(taskPath)));
@@ -605,6 +622,11 @@ export function migrateProject(
     try {
       if (usesLegacyDirectory || hasLegacyBacklog(staged)) migrateStaged(staging, targetVersion);
       else upgradeCanonicalStaged(staging, targetVersion);
+      if (plan.human_decisions.length) {
+        const state = loadExecutionState(staging);
+        state.migration.status = 'pending_reconciliation';
+        writeExecutionState(staging, state);
+      }
       syncProject(staging);
       const findings = validateProject(staging);
       if (findings.length)
@@ -618,6 +640,8 @@ export function migrateProject(
       if (findings.length)
         throw new Error(`Migration rescue staging validation failed: ${findings.map((x) => x.code).join(', ')}.`);
     }
+    const pendingReconciliation =
+      loadExecutionState(staging).migration.status === 'pending_reconciliation';
     renameMigrationPath(sourceFlow, backup);
     try {
       renameMigrationPath(staged, targetFlow);
@@ -630,7 +654,7 @@ export function migrateProject(
     const backupTarget = path.join(backupRoot, `migration-${Date.now()}`);
     renameMigrationPath(backup, backupTarget);
     return {
-      unresolved: ['semantic reconciliation'],
+      unresolved: pendingReconciliation ? ['semantic reconciliation'] : [],
       unchanged: false,
       backup: backupTarget,
       rescued,
