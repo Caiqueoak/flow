@@ -6,6 +6,7 @@ import {
 } from '../../project-contracts.mjs';
 import { clearCheckpoint } from '../../checkpoint/operations/checkpoint.mjs';
 import { UserInputError } from '../../../domain/errors.js';
+import { assertWorkItemHistoryMutable } from '../../../domain/work-item/lifecycle.js';
 import { loadExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mjs';
 import { SPEC_FILE } from '../../../domain/project/project.js';
@@ -38,10 +39,12 @@ export function recordApproval({
   assertProjectContractsAuthorized(root);
   const file = path.resolve(root, target);
   const item = findWorkItemBySpec(root, file);
+  const items = loadWorkItems(root) as LoadedWorkItem[];
+  assertWorkItemHistoryMutable(item, new Map(items.map((candidate) => [candidate.id, candidate])));
   const spec = parseWorkItemSpec(readText(file), { expectedWorkItem: item.id });
   const revision = specificationRevision(spec.metadata, spec.body);
   const targetRef = normalizeTargetRef(target);
-  assertApprovalReadyRevision(root, targetRef, revision);
+  assertApprovalReadyRevision(root, 'work_item_spec', targetRef, revision);
 
   spec.metadata.approval = { at: approvedAt, revision };
   writeText(file, serializeWorkItemSpec(spec.metadata, spec.body));
@@ -62,7 +65,7 @@ function recordProjectDocumentApproval(
 
   const targetRef = normalizeTargetRef(target);
   const revision = documentRevision(current);
-  assertApprovalReadyRevision(root, targetRef, revision);
+  assertApprovalReadyRevision(root, 'project_document', targetRef, revision);
 
   const approved = approveProjectDocument(current, approvedAt);
   const approvedErrors = validateProjectDocument(kind, approved.text);
@@ -75,12 +78,24 @@ function recordProjectDocumentApproval(
   return { label: targetRef, revision: approved.revision };
 }
 
-function assertApprovalReadyRevision(root: string, targetRef: string, targetRevision: string): void {
+function assertApprovalReadyRevision(
+  root: string,
+  targetKind: 'project_document' | 'work_item_spec',
+  targetRef: string,
+  targetRevision: string
+): void {
   const checkpoint = loadExecutionState(root).checkpoint;
-  if (checkpoint?.status !== 'approval_ready' || normalizeTargetRef(checkpoint.target.ref) !== targetRef) {
-    return;
+  if (!checkpoint) {
+    throw new UserInputError(`Cannot approve ${targetRef}: a matching approval_ready checkpoint is required.`);
   }
-
+  if (checkpoint.status !== 'approval_ready') {
+    throw new UserInputError(`Cannot approve ${targetRef}: checkpoint is active, not approval_ready.`);
+  }
+  if (checkpoint.target.kind !== targetKind || normalizeTargetRef(checkpoint.target.ref) !== targetRef) {
+    throw new UserInputError(
+      `Cannot approve ${targetRef}: approval-ready checkpoint targets ${checkpoint.target.kind} ${normalizeTargetRef(checkpoint.target.ref)}.`
+    );
+  }
   if (checkpoint.target.revision !== targetRevision) {
     throw new UserInputError(
       `Cannot approve ${targetRef}: current revision ${targetRevision} does not match approval-ready checkpoint revision ${checkpoint.target.revision}.`
