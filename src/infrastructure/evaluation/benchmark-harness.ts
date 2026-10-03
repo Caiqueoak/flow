@@ -13,7 +13,12 @@ export type Telemetry =
 
 type Assertion = { path: string; operator: 'eq'; expected: unknown };
 type RubricItem = { id: string; max_score: number; description: string };
-type Fixture = { id: string; title: string; agent_context: Record<string, unknown> };
+type Fixture = {
+  id: string;
+  title: string;
+  agent_context: Record<string, unknown>;
+  workspace_files?: Record<string, string>;
+};
 type Truth = {
   id: string;
   hard_assertions: Assertion[];
@@ -32,6 +37,16 @@ export type RunIdentity = {
 
 export type BenchmarkObservation = {
   facts: Record<string, unknown>;
+  metrics?: {
+    user_interventions?: number;
+    delegation_decision?: string;
+    parallelism_decision?: string;
+    worker_count?: number;
+    seeded_defects_found?: string[];
+    seeded_defects_missed?: string[];
+    false_findings?: number;
+    repair_passes?: number;
+  };
   telemetry?: Telemetry;
   rubric_scores?: Record<string, number>;
   evaluator_notes?: string;
@@ -83,7 +98,16 @@ export function prepareRun(
   fs.mkdirSync(runRoot, { recursive: false });
   const workspace = path.join(runRoot, 'workspace');
   fs.mkdirSync(workspace);
-  fs.writeFileSync(path.join(workspace, 'agent-context.json'), JSON.stringify(fixture, null, 2) + '\n');
+  fs.writeFileSync(
+    path.join(workspace, 'agent-context.json'),
+    JSON.stringify({ id: fixture.id, title: fixture.title, agent_context: fixture.agent_context }, null, 2) + '\n'
+  );
+  for (const [relativePath, content] of Object.entries(fixture.workspace_files ?? {})) {
+    const destination = path.resolve(workspace, relativePath);
+    assertChildPath(workspace, destination);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.writeFileSync(destination, content);
+  }
   fs.writeFileSync(
     path.join(runRoot, 'manifest.json'),
     JSON.stringify(
@@ -130,6 +154,17 @@ export function evaluateRun(repoRoot: string, runRoot: string): Record<string, u
       score: rubric_scores?.[item.id] ?? null,
       status: rubric_scores?.[item.id] === undefined ? 'pending' : 'scored'
     })),
+    observation_facts: observation.facts,
+    metrics: {
+      user_interventions: observation.metrics?.user_interventions ?? null,
+      delegation_decision: observation.metrics?.delegation_decision ?? null,
+      parallelism_decision: observation.metrics?.parallelism_decision ?? null,
+      worker_count: observation.metrics?.worker_count ?? null,
+      seeded_defects_found: observation.metrics?.seeded_defects_found ?? null,
+      seeded_defects_missed: observation.metrics?.seeded_defects_missed ?? null,
+      false_findings: observation.metrics?.false_findings ?? null,
+      repair_passes: observation.metrics?.repair_passes ?? null
+    },
     telemetry: observation.telemetry ?? { status: 'unavailable' },
     evaluator_notes: observation.evaluator_notes ?? null
   };
