@@ -2,6 +2,11 @@ import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { projectRoot, recordOutput as info } from '../../command-runtime.js';
 import { emptyState, parseState, stringifyState } from '../../../domain/workflow/execution-state.mjs';
+import { UserInputError } from '../../../domain/errors.js';
+import {
+  loadExecutionState,
+  writeExecutionState
+} from '../../../infrastructure/persistence/execution-state.mjs';
 import { parseBacklog } from '../../../domain/work-item/backlog.mjs';
 import { parseGates } from '../../../domain/gate/gate-definition.mjs';
 import { syncProject } from '../../../infrastructure/projections/project.mjs';
@@ -646,8 +651,31 @@ export function migrateProject(
       removeMigrationPath(staging);
   }
 }
+export function completeMigrationReconciliation(root: string): void {
+  const state = loadExecutionState(root);
+  if (state.migration.status !== 'pending_reconciliation')
+    throw new UserInputError('Migration reconciliation is not pending.');
+
+  const findings = validateProject(root);
+  if (findings.length)
+    throw new UserInputError(
+      `Migration reconciliation remains pending: ${findings.map((finding) => `${finding.code}: ${finding.message}`).join(' ')}`
+    );
+
+  state.migration.status = 'completed';
+  writeExecutionState(root, state);
+}
+
 export function runMigrate({ args, version }: { args: string[]; version: string }): void {
   const root = projectRoot(args);
+  if (args.includes('--complete-reconciliation')) {
+    completeMigrationReconciliation(root);
+    return info(
+      args.includes('--json')
+        ? JSON.stringify({ migration: { status: 'completed' } }, null, 2)
+        : 'Migration reconciliation completed. Normal routing may continue.'
+    );
+  }
   if (args.includes('--plan')) {
     const plan = migrationPlan(root, version);
     const changes = plan.changes.length

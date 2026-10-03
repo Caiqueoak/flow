@@ -6,7 +6,13 @@ import test from 'node:test';
 import { parse } from 'yaml';
 import { captureCommandOutcome } from '../../../command-runtime.js';
 import { emptyState, stringifyState } from '../../../../domain/workflow/execution-state.mjs';
-import { migrateProject, migrationPlan, runMigrate } from '../../operations/apply.mjs';
+import {
+  completeMigrationReconciliation,
+  migrateProject,
+  migrationPlan,
+  runMigrate
+} from '../../operations/apply.mjs';
+import { routeProject } from '../../../route/operations/route.mjs';
 import { documentMetadata, isProjectDocumentApproved } from '../../../../domain/project/document.mjs';
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
 
@@ -484,4 +490,34 @@ test('rolls the source directory back when the final staged swap fails', (t) => 
     fs.readdirSync(root).filter((name) => name.startsWith('_flow-migration-')),
     []
   );
+});
+
+
+test('completes pending migration reconciliation through a supported transition and resumes normal routing', (t) => {
+  const root = legacyProject(t, [legacyItem]);
+  migrateProject(root, { targetVersion: '0.8.0' });
+
+  completeMigrationReconciliation(root);
+
+  assert.equal(
+    parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status,
+    'completed'
+  );
+  assert.deepEqual(routeProject(root), {
+    action: 'continue',
+    phase: 'discovery',
+    instruction: 'discovery/step-01-project.md'
+  });
+});
+
+test('rejects unsafe migration reconciliation completion without mutating pending state', (t) => {
+  const root = legacyProject(t, [legacyItem]);
+  migrateProject(root, { targetVersion: '0.8.0' });
+  const stateFile = path.join(root, '_flow', 'state.yaml');
+  const before = fs.readFileSync(stateFile, 'utf8');
+  fs.writeFileSync(path.join(root, '_flow', 'generated', 'graph.md'), '# stale projection\n');
+
+  assert.throws(() => completeMigrationReconciliation(root), /Migration reconciliation remains pending/);
+  assert.equal(fs.readFileSync(stateFile, 'utf8'), before);
+  assert.equal(parse(fs.readFileSync(stateFile, 'utf8')).migration.status, 'pending_reconciliation');
 });

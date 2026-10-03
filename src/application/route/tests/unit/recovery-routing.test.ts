@@ -12,6 +12,7 @@ import type { WorkItemId, WorkItemSpecMetadata } from '../../../../domain/work-i
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
 import { approveProjectDocument } from '../../../../domain/project/document.mjs';
 import { routeProject } from '../../operations/route.mjs';
+import { beginCheckpoint } from '../../../checkpoint/operations/checkpoint.mjs';
 
 function project(t: test.TestContext): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-route-w3-'));
@@ -316,4 +317,55 @@ test('stale checkpoint input routes to reconciliation with a stable recovery cod
   assert.equal(result.phase, 'reconcile');
   assert.equal(result.reason, 'recovery_conflict');
   assert.match(result.details?.[0] ?? '', /^RECOVERY_INPUT_REVISION_MISMATCH:/);
+});
+
+
+test('finished project with substantive new scope resumes its PRD discovery checkpoint in a fresh route', (t) => {
+  const root = project(t);
+  authorizeProjectContracts(root);
+  writeWorkItem(
+    root,
+    'W001',
+    [{ id: 'T001', title: 'Delivered', state: 'completed', depends_on: [] }],
+    true
+  );
+  fs.writeFileSync(
+    path.join(root, '_flow', 'work-items', 'W001-sample', 'review.yaml'),
+    stringify({ schema_version: 1, work_item: 'W001', status: 'approved' })
+  );
+
+  assert.equal(routeProject(root).reason, 'finished');
+
+  beginCheckpoint(root, {
+    phase: 'discovery',
+    step: 'project',
+    target: { kind: 'project_document', ref: '_flow/docs/prd.md', revision: null },
+    inputs: [],
+    dimensions: [
+      {
+        id: 'product_scope',
+        state: 'resolved',
+        summary: 'The new request extends the existing bounded product scope.'
+      },
+      {
+        id: 'experience_relevance',
+        state: 'unresolved',
+        summary: 'Assess whether the changed scope requires consequential experience definition.'
+      },
+      {
+        id: 'engineering_impact',
+        state: 'unresolved',
+        summary: 'Assess whether the changed scope invalidates engineering assumptions.'
+      }
+    ],
+    assumptions: [],
+    latest_authorized_direction: 'Evaluate only the newly requested scope.',
+    next_frontier: ['experience_relevance', 'engineering_impact']
+  });
+
+  assert.deepEqual(routeProject(root), {
+    action: 'continue',
+    phase: 'discovery',
+    instruction: 'discovery/step-01-project.md'
+  });
 });
