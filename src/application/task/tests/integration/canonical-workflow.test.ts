@@ -394,7 +394,6 @@ test('failed task commits preserve the real index and task state', () => {
   fs.writeFileSync(path.join(root, 'implementation.txt'), 'done\n');
   execFileSync('git', ['add', 'implementation.txt'], { cwd: root });
   assert.equal(run(root, ['sync']).status, 0);
-  approveReview(root, 'W101');
   const hook = path.join(root, '.git', 'hooks', 'pre-commit');
   fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n');
   fs.chmodSync(hook, 0o755);
