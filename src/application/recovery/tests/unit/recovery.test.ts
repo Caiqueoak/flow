@@ -3,8 +3,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { stringify } from 'yaml';
-import { approveProjectDocument, documentRevision } from '../../../../domain/project/document.mjs';
+import { parse, stringify } from 'yaml';
+import {
+  approveProjectDocument,
+  documentRevision,
+  parseProjectDocument,
+  serializeProjectDocument
+} from '../../../../domain/project/document.mjs';
 import { parseCheckpoint } from '../../../../domain/workflow/checkpoint.mjs';
 import { emptyState } from '../../../../domain/workflow/execution-state.mjs';
 import { validateProject } from '../../../project-validation.mjs';
@@ -14,6 +19,7 @@ import { inspectRecovery, repairRecovery } from '../../recovery.mjs';
 import { writeExecutionState } from '../../../../infrastructure/persistence/execution-state.mjs';
 import { serializeWorkItemSpec, specificationRevision } from '../../../../domain/work-item/specification.mjs';
 import type { WorkItemId, WorkItemSpecMetadata } from '../../../../domain/work-item/work-item.js';
+import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
 
 const PRD = `---
 schema_version: 2
@@ -52,6 +58,52 @@ function project(t: test.TestContext): string {
   return root;
 }
 
+function writeAuthorizedProjectContracts(
+  root: string,
+  { experienceRequired = false }: { experienceRequired?: boolean } = {}
+): { prdRevision: string; experienceRevision?: string; engineeringRevision: string } {
+  const prdDraft = PRD.replace('experience: not_required', `experience: ${experienceRequired ? 'required' : 'not_required'}`);
+  const prd = approveProjectDocument(prdDraft, '2026-10-02T20:00:00Z');
+  fs.writeFileSync(path.join(root, '_flow', 'docs', 'prd.md'), prd.text);
+
+  let experienceRevision: string | undefined;
+  if (experienceRequired) {
+    const experience = approveProjectDocument(
+      '---\\nschema_version: 2\\nstatus: draft\\n---\\n\\n# Experience\\n\\nConcrete experience contract.\\n',
+      '2026-10-02T20:05:00Z'
+    );
+    experienceRevision = experience.revision;
+    fs.writeFileSync(path.join(root, '_flow', 'docs', 'experience.md'), experience.text);
+  }
+
+  const engineeringDraft = `---
+schema_version: 2
+status: draft
+baseline:
+  profile: flow/readability-first@2
+  existing_code_policy: not_applicable
+---
+
+${ENGINEERING_HEADINGS.map((heading) => `${heading}\\nConcrete contract.`).join('\\n\\n')}
+`;
+  const engineering = approveProjectDocument(engineeringDraft, '2026-10-02T20:10:00Z');
+  fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), engineering.text);
+
+  return {
+    prdRevision: prd.revision,
+    ...(experienceRevision ? { experienceRevision } : {}),
+    engineeringRevision: engineering.revision
+  };
+}
+
+function removeProjectApproval(text: string): string {
+  const parsed = parseProjectDocument(text);
+  const metadata = { ...parsed.metadata, status: 'draft' };
+  delete metadata.approval;
+  delete metadata.approved_at;
+  return serializeProjectDocument(metadata, parsed.body);
+}
+
 function setCheckpoint(root: string, value: Parameters<typeof parseCheckpoint>[0]): void {
   const state = emptyState();
   state.checkpoint = parseCheckpoint(value);
@@ -74,7 +126,14 @@ function baseCheckpoint(overrides: Record<string, unknown>) {
   };
 }
 
-function writeWorkItem(root: string, id: WorkItemId = 'W001'): string {
+function parseWorkItemSpecForTest(text: string): { metadata: WorkItemSpecMetadata; body: string } {
+  const match = text.match(/^---\\r?\\n([\\s\\S]*?)\\r?\\n---\\r?\\n?([\\s\\S]*)$/);
+  assert.ok(match);
+  const parsed = YAML.parse(match[1] ?? '') as WorkItemSpecMetadata;
+  return { metadata: parsed, body: match[2] ?? '' };
+}
+
+function writeWorkItem(root: string, id: WorkItemId = 'W001', approved = false): string {
   const folder = path.join(root, '_flow', 'work-items', `${id}-sample`);
   fs.mkdirSync(folder, { recursive: true });
   const metadata: WorkItemSpecMetadata = {
@@ -89,13 +148,17 @@ function writeWorkItem(root: string, id: WorkItemId = 'W001'): string {
     maturity: 'outlined'
   };
   const body = '# Work Item Specification\n\n## Outcome\n\nSample.\n';
-  fs.writeFileSync(path.join(folder, 'spec.md'), serializeWorkItemSpec(metadata, body));
+  const revision = specificationRevision(metadata, body);
+  const persistedMetadata = approved
+    ? { ...metadata, approval: { at: '2026-10-02T20:15:00Z', revision } }
+    : metadata;
+  fs.writeFileSync(path.join(folder, 'spec.md'), serializeWorkItemSpec(persistedMetadata, body));
   fs.writeFileSync(path.join(folder, 'tasks.yaml'), stringify({ schema_version: 3, work_item: id, tasks: [] }));
   fs.writeFileSync(
     path.join(folder, 'review.yaml'),
     stringify({ schema_version: 1, work_item: id, status: 'pending' })
   );
-  return specificationRevision(metadata, body);
+  return revision;
 }
 
 test('malformed persisted execution state is consistent across route, validate and Doctor', (t) => {
@@ -243,6 +306,7 @@ test('fresh route calls derive the same continuation from repository state only'
 
 test('approved spec can also prove an exact stale approval-ready checkpoint repair', (t) => {
   const root = project(t);
+  writeAuthorizedProjectContracts(root);
   const revision = writeWorkItem(root);
   const spec = path.join(root, '_flow', 'work-items', 'W001-sample', 'spec.md');
   const text = fs.readFileSync(spec, 'utf8');
@@ -327,26 +391,35 @@ test('approval-ready planning checkpoint requires reconciliation', (t) => {
   assert.equal(assessment.continuation, null);
 });
 
-test('supported W3 checkpoint combinations remain resumable', (t) => {
-  const documentCases = [
-    ['discovery', '_flow/docs/prd.md'],
-    ['experience', '_flow/docs/experience.md'],
-    ['engineering', '_flow/docs/engineering.md']
-  ] as const;
+test('supported W3 checkpoint combinations remain resumable with required authorization', (t) => {
+  const discoveryRoot = project(t);
+  setCheckpoint(discoveryRoot, baseCheckpoint({}));
+  assert.equal(inspectRecovery(discoveryRoot).classification, 'resumable');
 
-  for (const [phase, ref] of documentCases) {
-    const root = project(t);
-    setCheckpoint(
-      root,
-      baseCheckpoint({
-        phase,
-        target: { kind: 'project_document', ref, revision: null }
-      })
-    );
-    assert.equal(inspectRecovery(root).classification, 'resumable');
-  }
+  const experienceRoot = project(t);
+  writeAuthorizedProjectContracts(experienceRoot, { experienceRequired: true });
+  setCheckpoint(
+    experienceRoot,
+    baseCheckpoint({
+      phase: 'experience',
+      target: { kind: 'project_document', ref: '_flow/docs/experience.md', revision: null }
+    })
+  );
+  assert.equal(inspectRecovery(experienceRoot).classification, 'resumable');
+
+  const engineeringRoot = project(t);
+  writeAuthorizedProjectContracts(engineeringRoot, { experienceRequired: true });
+  setCheckpoint(
+    engineeringRoot,
+    baseCheckpoint({
+      phase: 'engineering',
+      target: { kind: 'project_document', ref: '_flow/docs/engineering.md', revision: null }
+    })
+  );
+  assert.equal(inspectRecovery(engineeringRoot).classification, 'resumable');
 
   const planningRoot = project(t);
+  writeAuthorizedProjectContracts(planningRoot);
   setCheckpoint(
     planningRoot,
     baseCheckpoint({
@@ -357,7 +430,8 @@ test('supported W3 checkpoint combinations remain resumable', (t) => {
   assert.equal(inspectRecovery(planningRoot).classification, 'resumable');
 
   const workItemRoot = project(t);
-  const revision = writeWorkItem(workItemRoot);
+  writeAuthorizedProjectContracts(workItemRoot);
+  const revision = writeWorkItem(workItemRoot, 'W001', true);
   setCheckpoint(
     workItemRoot,
     baseCheckpoint({
@@ -376,6 +450,126 @@ test('supported W3 checkpoint combinations remain resumable', (t) => {
     })
   );
   assert.equal(inspectRecovery(workItemRoot).classification, 'resumable');
+});
+
+test('engineering recovery rejects a PRD that loses approval without changing revision', (t) => {
+  const root = project(t);
+  const { prdRevision } = writeAuthorizedProjectContracts(root);
+  setCheckpoint(
+    root,
+    baseCheckpoint({
+      phase: 'engineering',
+      target: { kind: 'project_document', ref: '_flow/docs/engineering.md', revision: null },
+      inputs: [{ ref: '_flow/docs/prd.md', revision: prdRevision }]
+    })
+  );
+
+  const prdFile = path.join(root, '_flow', 'docs', 'prd.md');
+  const before = fs.readFileSync(prdFile, 'utf8');
+  const unapproved = removeProjectApproval(before);
+  fs.writeFileSync(prdFile, unapproved);
+  assert.equal(documentRevision(unapproved), prdRevision);
+
+  const assessment = inspectRecovery(root);
+  assert.equal(assessment.classification, 'requires_reconciliation');
+  assert.ok(assessment.findings.some((finding) => finding.code === 'RECOVERY_UPSTREAM_UNAUTHORIZED'));
+
+  const route = routeProject(root);
+  assert.equal(route.phase, 'reconcile');
+  assert.match(route.details?.join(' ') ?? '', /RECOVERY_UPSTREAM_UNAUTHORIZED/);
+
+  const validation = validateProject(root);
+  assert.ok(validation.some((finding) => finding.code === 'RECOVERY_UPSTREAM_UNAUTHORIZED'));
+
+  const doctor = diagnoseProject(root, { quick: true, version: 'test', packageRoot: root });
+  const recovery = doctor.checks.find((check) => check.id === 'recovery');
+  assert.equal(recovery?.status, 'fail');
+  assert.match(recovery?.message ?? '', /RECOVERY_UPSTREAM_UNAUTHORIZED/);
+});
+
+test('experience recovery rejects a PRD that loses approval without changing revision', (t) => {
+  const root = project(t);
+  const { prdRevision } = writeAuthorizedProjectContracts(root, { experienceRequired: true });
+  setCheckpoint(
+    root,
+    baseCheckpoint({
+      phase: 'experience',
+      target: { kind: 'project_document', ref: '_flow/docs/experience.md', revision: null },
+      inputs: [{ ref: '_flow/docs/prd.md', revision: prdRevision }]
+    })
+  );
+
+  const prdFile = path.join(root, '_flow', 'docs', 'prd.md');
+  const unapproved = removeProjectApproval(fs.readFileSync(prdFile, 'utf8'));
+  fs.writeFileSync(prdFile, unapproved);
+  assert.equal(documentRevision(unapproved), prdRevision);
+
+  const assessment = inspectRecovery(root);
+  assert.equal(assessment.classification, 'requires_reconciliation');
+  assert.ok(assessment.findings.some((finding) => finding.code === 'RECOVERY_UPSTREAM_UNAUTHORIZED'));
+  assert.equal(routeProject(root).phase, 'reconcile');
+});
+
+test('task-planning recovery rejects a SPEC that loses approval without changing revision', (t) => {
+  const root = project(t);
+  writeAuthorizedProjectContracts(root);
+  const revision = writeWorkItem(root, 'W001', true);
+  setCheckpoint(
+    root,
+    baseCheckpoint({
+      phase: 'planning',
+      step: 'create_tasks',
+      target: { kind: 'task_plan', ref: 'W001', revision: null },
+      inputs: [{ ref: 'W001', revision }]
+    })
+  );
+
+  const specFile = path.join(root, '_flow', 'work-items', 'W001-sample', 'spec.md');
+  const parsed = parseWorkItemSpecForTest(fs.readFileSync(specFile, 'utf8'));
+  delete parsed.metadata.approval;
+  const unapproved = serializeWorkItemSpec(parsed.metadata, parsed.body);
+  fs.writeFileSync(specFile, unapproved);
+  assert.equal(specificationRevision(parsed.metadata, parsed.body), revision);
+
+  const assessment = inspectRecovery(root);
+  assert.equal(assessment.classification, 'requires_reconciliation');
+  assert.ok(assessment.findings.some((finding) => finding.code === 'RECOVERY_SPEC_UNAUTHORIZED'));
+
+  const route = routeProject(root);
+  assert.equal(route.phase, 'reconcile');
+  assert.match(route.details?.join(' ') ?? '', /RECOVERY_SPEC_UNAUTHORIZED/);
+
+  const validation = validateProject(root);
+  assert.ok(validation.some((finding) => finding.code === 'RECOVERY_SPEC_UNAUTHORIZED'));
+
+  const doctor = diagnoseProject(root, { quick: true, version: 'test', packageRoot: root });
+  const recovery = doctor.checks.find((check) => check.id === 'recovery');
+  assert.equal(recovery?.status, 'fail');
+  assert.match(recovery?.message ?? '', /RECOVERY_SPEC_UNAUTHORIZED/);
+});
+
+test('backlog-mapping recovery rejects project contracts that lose authorization at the same revision', (t) => {
+  const root = project(t);
+  const { engineeringRevision } = writeAuthorizedProjectContracts(root);
+  setCheckpoint(
+    root,
+    baseCheckpoint({
+      phase: 'planning',
+      step: 'map_work_items',
+      target: { kind: 'work_item_map', ref: '_flow/work-items', revision: null },
+      inputs: [{ ref: '_flow/docs/engineering.md', revision: engineeringRevision }]
+    })
+  );
+
+  const engineeringFile = path.join(root, '_flow', 'docs', 'engineering.md');
+  const unapproved = removeProjectApproval(fs.readFileSync(engineeringFile, 'utf8'));
+  fs.writeFileSync(engineeringFile, unapproved);
+  assert.equal(documentRevision(unapproved), engineeringRevision);
+
+  const assessment = inspectRecovery(root);
+  assert.equal(assessment.classification, 'requires_reconciliation');
+  assert.ok(assessment.findings.some((finding) => finding.code === 'RECOVERY_UPSTREAM_UNAUTHORIZED'));
+  assert.equal(routeProject(root).phase, 'reconcile');
 });
 
 test('document revision helper used by recovery matches approved content identity', () => {
