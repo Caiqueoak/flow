@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -368,7 +369,6 @@ test('generic checkpoint inputs use exact file-content revisions', (t) => {
   const root = project(t);
   const input = path.join(root, '_flow', 'decision-input.txt');
   fs.writeFileSync(input, 'stable input\n');
-  const { createHash } = require('node:crypto');
   const revision = createHash('sha256').update('stable input\n').digest('hex');
 
   checkpoint(root, {
