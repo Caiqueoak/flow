@@ -124,6 +124,7 @@ function approveReview(root: string, id = 'W101') {
   });
   assert.equal(run(root, ['work-item', 'review-pass', id, '--mode', 'checkpoint', '--data', data]).status, 0);
   assert.equal(run(root, ['work-item', 'review-pass', id, '--mode', 'finalize']).status, 0);
+  assert.equal(run(root, ['sync']).status, 0);
 }
 
 test('compiled CLI creates canonical shells and sync never mutates them', () => {
