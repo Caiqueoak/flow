@@ -232,10 +232,7 @@ test('B08 derives truthful repair closure from code, append-only review history,
 
 test('B11 accepts unavailable telemetry without inventing zero values', (t) => {
   const { runRoot } = prepare(t, 'B11');
-  fs.writeFileSync(
-    path.join(runRoot, 'observation.json'),
-    JSON.stringify({ telemetry: { status: 'unavailable' } })
-  );
+  fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({ telemetry: { status: 'unavailable' } }));
   const result = evaluateRun(repoRoot, runRoot);
   assert.equal(result.hard_pass, true);
   assert.deepEqual(result.telemetry, { status: 'unavailable' });

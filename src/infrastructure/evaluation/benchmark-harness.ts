@@ -1,11 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {
-  deriveEvaluatorFacts,
-  validatePreparedFixture,
-  workspaceBaselineHashes
-} from './evaluator-evidence.js';
+import { deriveEvaluatorFacts, validatePreparedFixture, workspaceBaselineHashes } from './evaluator-evidence.js';
 
 export type Telemetry =
   | { status: 'unavailable' }

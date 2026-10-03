@@ -45,9 +45,7 @@
         }
       ],
       "seeded_truth": {
-        "expected_frontier": [
-          "sync"
-        ]
+        "expected_frontier": ["sync"]
       }
     },
     {

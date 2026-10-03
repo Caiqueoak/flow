@@ -41,17 +41,11 @@
         "cases": [
           {
             "name": "independent",
-            "tasks": [
-              "W001-T001",
-              "W001-T002"
-            ]
+            "tasks": ["W001-T001", "W001-T002"]
           },
           {
             "name": "conflict",
-            "tasks": [
-              "W001-T003",
-              "W001-T004"
-            ]
+            "tasks": ["W001-T003", "W001-T004"]
           }
         ],
         "instructions": [
@@ -73,10 +67,7 @@
       "agent_context": {
         "objective": "Delegate a bounded implementation using minimum-sufficient context.",
         "task": "Add a parser under the ingestion application slice.",
-        "project_references": [
-          "AGENTS.md",
-          "task.md"
-        ],
+        "project_references": ["AGENTS.md", "task.md"],
         "instructions": [
           "Write the actual worker handoff to workspace/handoff.json.",
           "Include only relevant context or precise references.",

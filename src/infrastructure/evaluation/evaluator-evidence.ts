@@ -43,8 +43,7 @@ export function validatePreparedFixture(workspace: string, benchmarkId: string):
   }
 
   if (benchmarkId === 'B12') {
-    if (recovery.classification !== 'requires_reconciliation')
-      issues.push('B12 must require reconciliation.');
+    if (recovery.classification !== 'requires_reconciliation') issues.push('B12 must require reconciliation.');
     if (route.phase !== 'reconcile' || route.reason !== 'recovery_conflict')
       issues.push('B12 must route through canonical reconciliation.');
   }
@@ -53,7 +52,9 @@ export function validatePreparedFixture(workspace: string, benchmarkId: string):
 }
 
 export function workspaceBaselineHashes(workspace: string, paths: string[]): Record<string, string> {
-  return Object.fromEntries(paths.map((relativePath) => [normalize(relativePath), hashFile(path.join(workspace, relativePath))]));
+  return Object.fromEntries(
+    paths.map((relativePath) => [normalize(relativePath), hashFile(path.join(workspace, relativePath))])
+  );
 }
 
 export function deriveEvaluatorFacts({
@@ -91,8 +92,7 @@ export function deriveEvaluatorFacts({
     const expected = Array.isArray(seededTruth.expected_frontier) ? seededTruth.expected_frontier : [];
     return {
       expected_frontier_preserved:
-        state.checkpoint !== null &&
-        JSON.stringify(state.checkpoint.next_frontier) === JSON.stringify(expected),
+        state.checkpoint !== null && JSON.stringify(state.checkpoint.next_frontier) === JSON.stringify(expected),
       route_resumes_discovery: route.phase === 'discovery' && route.instruction === 'discovery/step-01-project.md'
     };
   }
@@ -155,8 +155,9 @@ export function deriveEvaluatorFacts({
       ),
       review_history_preserved:
         Boolean(currentPass && baselinePass) && JSON.stringify(currentPass) === JSON.stringify(baselinePass),
-      blocking_finding_closed:
-        Boolean(folded && !['open', 'reopened'].includes(folded.state) && v2 && v2.passes.length > 1),
+      blocking_finding_closed: Boolean(
+        folded && !['open', 'reopened'].includes(folded.state) && v2 && v2.passes.length > 1
+      ),
       acceptance_verification_passed: Boolean(
         events?.some(
           (event) =>
