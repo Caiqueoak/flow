@@ -224,7 +224,6 @@ function checkQuickStructure(root: string, flow: string, add: AddCheck): void {
   } catch (error) {
     add('work-items', false, errorMessage(error), 'Repair the canonical work-item artifacts or run migration.');
   }
-
 }
 
 function checkMigrationState(flow: string, add: AddCheck): void {
