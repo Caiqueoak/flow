@@ -2,7 +2,7 @@
 
 Read the exact-approved product contract, required exact-approved experience contract when applicable, engineering contract and selected outlined work-item. Deepen only this work-item.
 
-Before consequential specification decisions, resume a matching W1 checkpoint for this work item or begin one through `flow checkpoint begin --data <json>` with `phase: specification`, a stable step, target `kind: work_item_spec`, `ref: W###`, and exact upstream contract revisions as inputs. Persist meaningful decision batches and the next frontier through `flow checkpoint update --data <json>`. Keep the checkpoint compact; do not copy SPEC prose into state and never reconstruct unresolved decisions from chat history.
+Before consequential specification decisions, resume a matching W1 checkpoint for this work item or begin one through `flow checkpoint begin --data <json>` with `phase: specification`, a stable step, target `kind: work_item_spec`, `ref: _flow/work-items/W###-slug/spec.md`, and exact upstream contract revisions as inputs. Persist meaningful decision batches and the next frontier through `flow checkpoint update --data <json>`. Keep the checkpoint compact; do not copy SPEC prose into state and never reconstruct unresolved decisions from chat history.
 
 The SPEC defines the bounded implementation outcome. Include:
 
