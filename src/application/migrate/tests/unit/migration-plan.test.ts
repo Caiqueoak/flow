@@ -351,7 +351,7 @@ test('upgrades v2 state without trusting its dormant execution cursor', (t) => {
 
   assert.equal(result.unchanged, false);
   assert.equal(state.schema_version, 3);
-  assert.deepEqual(state.active, { work_item: null });
+  assert.deepEqual(state.active, { work_item: null, concurrency: null });
   assert.equal(state.checkpoint, null);
   assert.equal(state.migration.status, 'completed');
   assert.equal(state.execution, undefined);
