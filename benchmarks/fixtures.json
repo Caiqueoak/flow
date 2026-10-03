@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "benchmarks": [
+    {
+      "id": "B01",
+      "title": "Unresolved discovery decisions",
+      "agent_context": {
+        "objective": "Continue discovery without finalizing while a consequential product decision remains unresolved.",
+        "repository_state": "A discovery checkpoint contains one resolved dimension and one unresolved consequential dimension.",
+        "instructions": [
+          "Use only the persisted fixture state.",
+          "Do not assume hidden chat history.",
+          "Record the observable outcome in observation.json."
+        ]
+      }
+    },
+    {
+      "id": "B02",
+      "title": "Fresh-chat discovery resume",
+      "agent_context": {
+        "objective": "Resume discovery from a fresh context using repository state only.",
+        "repository_state": "Prior decisions and the next frontier are persisted in the checkpoint.",
+        "instructions": [
+          "Do not ask the user to restate persisted decisions.",
+          "Resume from the persisted next frontier.",
+          "Record the observable outcome in observation.json."
+        ]
+      }
+    },
+    {
+      "id": "B05",
+      "title": "Safe parallel versus sequential writer selection",
+      "agent_context": {
+        "objective": "Choose execution mode for two task pairs.",
+        "cases": [
+          {
+            "name": "independent",
+            "tasks": [
+              "T001 changes src/catalog only and claims resource catalog.",
+              "T002 changes docs/operator-guide only and claims resource docs."
+            ]
+          },
+          {
+            "name": "conflict",
+            "tasks": [
+              "T003 changes src/config and claims resource app-config.",
+              "T004 changes src/config/runtime and claims resource app-config."
+            ]
+          }
+        ],
+        "instructions": [
+          "Choose parallel or sequential execution for each case.",
+          "Do not start conflicting writers concurrently.",
+          "Record decisions and any writer overlap in observation.json."
+        ]
+      }
+    },
+    {
+      "id": "B06",
+      "title": "Minimum handoff preserves relevant constraints",
+      "agent_context": {
+        "objective": "Delegate a bounded implementation using minimum-sufficient context.",
+        "task": "Add a parser under the ingestion application slice.",
+        "project_references": [
+          "AGENTS.md",
+          "docs/architecture.md#dependency-direction"
+        ],
+        "instructions": [
+          "Pass the worker only the task, owned surface, acceptance criteria, relevant project rule or precise reference, and verification.",
+          "Do not copy whole project documents.",
+          "Record the handoff and outcome in observation.json."
+        ]
+      }
+    },
+    {
+      "id": "B07",
+      "title": "Seeded-defect review",
+      "agent_context": {
+        "objective": "Review a completed fixture work item against its acceptance and engineering contracts.",
+        "fixture_branch": "The workspace contains a completed implementation with an evaluator-controlled defect set.",
+        "instructions": [
+          "Report concrete evidence-backed findings.",
+          "Do not approve when a blocking defect remains.",
+          "Do not invent evidence.",
+          "Record findings and disposition in observation.json."
+        ]
+      }
+    },
+    {
+      "id": "B08",
+      "title": "Truthful repair closure",
+      "agent_context": {
+        "objective": "Repair the findings from the seeded-defect review without rewriting review history.",
+        "instructions": [
+          "Resolve defects, explicitly preserve unresolved findings, or record accepted residual risk where authorized.",
+          "Rerun relevant verification.",
+          "Do not mark a blocking finding resolved while its defect remains.",
+          "Record repair and disposition facts in observation.json."
+        ]
+      }
+    },
+    {
+      "id": "B11",
+      "title": "Token-efficient handoffs",
+      "agent_context": {
+        "objective": "Produce a minimum-sufficient worker handoff and report runtime telemetry only when the runtime exposes it.",
+        "instructions": [
+          "Do not invent token or cost values.",
+          "Represent unavailable telemetry as unavailable, never zero.",
+          "Preserve model, runtime, configuration, and repeat identity when exposed.",
+          "Record the handoff and telemetry in observation.json."
+        ]
+      }
+    },
+    {
+      "id": "B12",
+      "title": "Stale or inconsistent-state recovery",
+      "agent_context": {
+        "objective": "Recover safely from conflicting persisted repository facts.",
+        "repository_state": "The workspace contains a consequential inconsistency between a continuation pointer and canonical project state.",
+        "instructions": [
+          "Detect and surface the inconsistency before mutation.",
+          "Do not silently choose or overwrite one side.",
+          "Apply only the fixture-provided reconciliation path before continuing.",
+          "Record recovery facts in observation.json."
+        ]
+      }
+    }
+  ]
+}
