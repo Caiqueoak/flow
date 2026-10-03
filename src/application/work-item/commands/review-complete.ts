@@ -5,6 +5,7 @@ import { evaluateGates } from '../../../infrastructure/process/gate-evaluation.m
 import { fail, recordOutput as writeOutput, requiredOption } from '../../command-runtime.js';
 import { REVIEW_FILE, SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem, WorkItemId } from '../../../domain/work-item/work-item.js';
+import { assertReviewMutationAllowed } from '../operations/review-history.mjs';
 import { projectRelativePath, readText, writeText } from '../../../infrastructure/filesystem/index.js';
 import {
   loadExecutionState,
@@ -42,6 +43,7 @@ const evaluateGatesBoundary = evaluateGates as unknown as (
 export function completeWorkItemReview(root: string, item: LoadedWorkItem, args: readonly string[]): void {
   const domain = requiredOption(args, '--domain');
 
+  assertReviewMutationAllowed(root, item.id);
   ensureReviewCanComplete(item);
   ensureReviewValidationPasses(root, item.id);
   ensureReviewGatesPass(root, item.id);
