@@ -87,6 +87,9 @@ export function parseTasks(
       ...(task.legacy_commit ? { legacy_commit: task.legacy_commit as string } : {})
     };
   });
+  if (legacySchema && (tasks.length === 0 || tasks.some((task) => task.state !== 'completed')))
+    fail(`${source} schema_version 2 is supported only for immutable completed task history.`);
+
   const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of tasks)
     for (const dependency of task.depends_on)
