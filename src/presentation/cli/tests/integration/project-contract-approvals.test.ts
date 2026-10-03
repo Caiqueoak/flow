@@ -121,6 +121,24 @@ test('approval rejects a missing approval-ready checkpoint without mutation', (t
   assert.equal(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'), stateBefore);
 });
 
+test('SPEC approval also rejects a missing approval-ready checkpoint', (t) => {
+  const root = project(t);
+  writePrd(root, 'not_required');
+  writeEngineering(root);
+  approveTarget(root, '_flow/docs/prd.md');
+  approveTarget(root, '_flow/docs/engineering.md', { phase: 'engineering' });
+  const spec = writeReadySpec(root);
+  assert.equal(run(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']).status, 0);
+  const target = path.relative(root, spec).replaceAll('\\', '/');
+  const specBefore = fs.readFileSync(spec, 'utf8');
+
+  const approved = run(root, ['approval', 'record', target]);
+
+  assert.notEqual(approved.status, 0);
+  assert.match(approved.stderr, /matching approval_ready checkpoint is required/);
+  assert.equal(fs.readFileSync(spec, 'utf8'), specBefore);
+});
+
 test('approval rejects an active checkpoint without mutation', (t) => {
   const root = project(t);
   writePrd(root, 'not_required');
