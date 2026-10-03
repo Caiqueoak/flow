@@ -117,6 +117,130 @@ test('B05 rejects conflicting concurrent writers from evaluator-owned events', (
   assert.equal(result.hard_pass, false);
 });
 
+test('B02 derives fresh-chat resume evidence from the canonical checkpoint', (t) => {
+  const { runRoot } = prepare(t, 'B02');
+  fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({}));
+  const result = evaluateRun(repoRoot, runRoot);
+  assert.equal(result.hard_pass, true);
+});
+
+test('B06 derives constraint preservation from the actual worker handoff artifact', (t) => {
+  const { runRoot } = prepare(t, 'B06');
+  fs.writeFileSync(
+    path.join(runRoot, 'workspace', 'handoff.json'),
+    JSON.stringify({
+      objective: 'Implement the bounded parser change.',
+      references: ['AGENTS.md#INGESTION_DEPENDENCY'],
+      owned_surface: 'src/application/ingestion'
+    })
+  );
+  fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({}));
+  const result = evaluateRun(repoRoot, runRoot);
+  assert.equal(result.hard_pass, true);
+});
+
+test('B07 derives seeded blocker detection from repository and review artifacts', (t) => {
+  const { runRoot } = prepare(t, 'B07');
+  fs.writeFileSync(
+    path.join(runRoot, 'workspace', 'review-output.json'),
+    JSON.stringify({
+      disposition: 'changes_required',
+      findings: [
+        {
+          id: 'acceptance-mismatch',
+          blocking: true,
+          evidence: ['src/parser.ts']
+        }
+      ]
+    })
+  );
+  fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({}));
+  const result = evaluateRun(repoRoot, runRoot);
+  assert.equal(result.hard_pass, true);
+});
+
+test('B08 derives truthful repair closure from code, append-only review history, and verification events', (t) => {
+  const { runRoot } = prepare(t, 'B08');
+  fs.writeFileSync(
+    path.join(runRoot, 'workspace', 'src', 'parser.ts'),
+    [
+      'export function parseRecord(value: string): string {',
+      '  const normalized = value.trim();',
+      "  if (!normalized) throw new Error('record is empty');",
+      '  return normalized;',
+      '}',
+      ''
+    ].join('\n')
+  );
+  fs.writeFileSync(
+    path.join(runRoot, 'workspace', '_flow', 'work-items', 'W001-benchmark', 'review.yaml'),
+    [
+      'schema_version: 2',
+      'work_item: W001',
+      'disposition: approved',
+      'active_pass: null',
+      'worker_runs: []',
+      'passes:',
+      '  - id: R001',
+      '    scope:',
+      '      kind: work_item',
+      '      ref: W001',
+      '    inspected:',
+      '      - src/parser.ts',
+      '    parecer: Empty-record handling violates acceptance.',
+      '    disposition: changes_required',
+      '    findings:',
+      '      - id: F001',
+      '        blocking: true',
+      '        claim: Empty records are accepted.',
+      '        evidence:',
+      '          - src/parser.ts',
+      '        cause: verification_gap',
+      '    actions: []',
+      '    resolutions: []',
+      '    residual_risk: []',
+      '    finalized_at: 2026-10-03T12:00:00.000Z',
+      '  - id: R002',
+      '    scope:',
+      '      kind: work_item',
+      '      ref: W001',
+      '    inspected:',
+      '      - src/parser.ts',
+      '    parecer: F001 is repaired and acceptance verification passed.',
+      '    disposition: approved',
+      '    findings: []',
+      '    actions: []',
+      '    resolutions:',
+      '      - finding: F001',
+      '        state: resolved',
+      '        evidence:',
+      '          - src/parser.ts',
+      '          - parser-acceptance',
+      '    residual_risk: []',
+      '    finalized_at: 2026-10-03T12:05:00.000Z',
+      ''
+    ].join('\n')
+  );
+  fs.writeFileSync(
+    path.join(runRoot, 'evaluator-events.json'),
+    JSON.stringify([{ sequence: 1, type: 'verification', id: 'parser-acceptance', status: 'passed' }])
+  );
+  fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({}));
+  const result = evaluateRun(repoRoot, runRoot);
+  assert.equal(result.hard_pass, true);
+});
+
+test('B11 accepts unavailable telemetry without inventing zero values', (t) => {
+  const { runRoot } = prepare(t, 'B11');
+  fs.writeFileSync(
+    path.join(runRoot, 'observation.json'),
+    JSON.stringify({ telemetry: { status: 'unavailable' } })
+  );
+  const result = evaluateRun(repoRoot, runRoot);
+  assert.equal(result.hard_pass, true);
+  assert.deepEqual(result.telemetry, { status: 'unavailable' });
+});
+
 test('B12 initial fixture exercises canonical recovery and reconciliation routing', (t) => {
   const { runRoot } = prepare(t, 'B12');
   fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({ telemetry: { status: 'unavailable' } }));
