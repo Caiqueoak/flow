@@ -353,3 +353,35 @@ test('fresh route calls derive the same continuation from persisted repository s
 
   assert.deepEqual(routeProject(root), routeProject(root));
 });
+
+
+test('invalid persisted state is reported as a deterministic recovery conflict', (t) => {
+  const root = project(t);
+  fs.writeFileSync(path.join(root, '_flow', 'state.yaml'), 'schema_version: [broken');
+  const recovery = inspectRecoveryState(root);
+  assert.equal(recovery.classification, 'requires_reconciliation');
+  assert.equal(recovery.findings[0]?.code, 'RECOVERY_STATE_INVALID');
+  assert.equal(routeProject(root).phase, 'reconcile');
+});
+
+test('generic checkpoint inputs use exact file-content revisions', (t) => {
+  const root = project(t);
+  const input = path.join(root, '_flow', 'decision-input.txt');
+  fs.writeFileSync(input, 'stable input\n');
+  const { createHash } = require('node:crypto');
+  const revision = createHash('sha256').update('stable input\n').digest('hex');
+
+  checkpoint(root, {
+    phase: 'discovery',
+    step: 'explore_product',
+    kind: 'project_document',
+    ref: '_flow/docs/prd.md',
+    inputs: [{ ref: '_flow/decision-input.txt', revision }]
+  });
+
+  assert.equal(inspectRecoveryState(root).classification, 'resumable');
+  fs.writeFileSync(input, 'changed input\n');
+  const stale = inspectRecoveryState(root);
+  assert.equal(stale.classification, 'requires_reconciliation');
+  assert.equal(stale.findings[0]?.code, 'RECOVERY_CHECKPOINT_INPUT_REVISION_MISMATCH');
+});
