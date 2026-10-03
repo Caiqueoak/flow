@@ -15,7 +15,7 @@ Status entries track delivery state, while detailed implementation evidence and 
 - **W5 — Review and repair history survives interruption and remains traceable:** completed and merged via PR #64; main commit `9b688ccfbaeefc6b35eb063449d004bbeccfa4c6`.
 - **W6 — Non-simple execution delegates efficiently using runtime capabilities and minimum-sufficient context:** completed and merged via PR #66; main commit `0e9cad9155cd87691e38d1b281baaccdb8a769e0`.
 - **W7 — Existing projects can adopt vNext and traverse the complete lifecycle safely:** completed and merged via PR #68; main commit `b9ed81f0dc210b4a84f378ae3b54e48a75376e3a`.
-- **W8 — vNext behavior can be regression and benchmark tested:** not started; W3–W7 prerequisites are merged and W8 is ready to start.
+- **W8 — vNext behavior can be regression and benchmark tested:** in progress on the dedicated W8 evaluation branch; B01/B02/B05/B06/B07/B08/B11/B12 now use canonical executable fixtures, evaluator-owned hard evidence, capability-aware B05 evaluation, and focused regressions while live runtime execution remains external.
 
 ## Direction
 

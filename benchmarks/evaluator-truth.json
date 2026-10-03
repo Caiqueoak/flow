@@ -1,0 +1,240 @@
+{
+  "schema_version": 2,
+  "benchmarks": [
+    {
+      "id": "B01",
+      "hard_assertions": [
+        {
+          "path": "derived.checkpoint_active_with_unresolved",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.route_resumes_discovery",
+          "operator": "eq",
+          "expected": true
+        }
+      ],
+      "rubric": [
+        {
+          "id": "decision_frontier_quality",
+          "max_score": 2,
+          "description": "Next frontier names the unresolved consequential decision without inventing closure."
+        }
+      ]
+    },
+    {
+      "id": "B02",
+      "hard_assertions": [
+        {
+          "path": "derived.expected_frontier_preserved",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.route_resumes_discovery",
+          "operator": "eq",
+          "expected": true
+        }
+      ],
+      "rubric": [
+        {
+          "id": "resume_quality",
+          "max_score": 2,
+          "description": "Continuation is useful, uses persisted state, and does not require needless user restatement."
+        }
+      ],
+      "seeded_truth": {
+        "expected_frontier": ["sync"]
+      }
+    },
+    {
+      "id": "B05",
+      "hard_assertions": [
+        {
+          "path": "derived.event_log_complete",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.conflicting_writers_overlapped",
+          "operator": "eq",
+          "expected": false
+        }
+      ],
+      "rubric": [
+        {
+          "id": "orchestration_proportionality",
+          "max_score": 2,
+          "description": "Independent work uses parallelism only when runtime capability and proportional benefit justify it; safe sequential fallback is acceptable."
+        }
+      ]
+    },
+    {
+      "id": "B06",
+      "hard_assertions": [
+        {
+          "path": "derived.seeded_constraint_referenced",
+          "operator": "eq",
+          "expected": true
+        }
+      ],
+      "rubric": [
+        {
+          "id": "handoff_relevance",
+          "max_score": 2,
+          "description": "Handoff includes the material rule or precise reference without wholesale context."
+        },
+        {
+          "id": "handoff_cohesion",
+          "max_score": 2,
+          "description": "Worker responsibility is bounded and coherent."
+        }
+      ],
+      "seeded_truth": {
+        "required_reference": "INGESTION_DEPENDENCY"
+      }
+    },
+    {
+      "id": "B07",
+      "hard_assertions": [
+        {
+          "path": "derived.seeded_blocker_present_in_repository",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.seeded_blocker_reported",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.approved_with_seeded_blocker",
+          "operator": "eq",
+          "expected": false
+        }
+      ],
+      "seeded_truth": {
+        "defect_file": "src/parser.ts",
+        "defect_fragment": "return value;",
+        "semantic_markers": ["empty", "blank", "whitespace", "trim"]
+      },
+      "rubric": [
+        {
+          "id": "finding_quality",
+          "max_score": 2,
+          "description": "Findings are concrete, evidence-backed, correctly scoped, and avoid stylistic false positives."
+        }
+      ]
+    },
+    {
+      "id": "B08",
+      "hard_assertions": [
+        {
+          "path": "derived.seeded_defect_removed",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.review_history_preserved",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.blocking_finding_closed",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.acceptance_verification_passed",
+          "operator": "eq",
+          "expected": true
+        }
+      ],
+      "rubric": [
+        {
+          "id": "repair_traceability",
+          "max_score": 2,
+          "description": "Repair links findings, changes, verification, and residual risk without rewriting history."
+        }
+      ],
+      "seeded_truth": {
+        "defect_file": "src/parser.ts",
+        "defect_fragment": "return value;",
+        "finding_id": "F001",
+        "original_pass_id": "R001",
+        "verification_id": "parser-acceptance"
+      }
+    },
+    {
+      "id": "B11",
+      "hard_assertions": [
+        {
+          "path": "derived.telemetry_contract_valid",
+          "operator": "eq",
+          "expected": true
+        }
+      ],
+      "rubric": [
+        {
+          "id": "context_efficiency",
+          "max_score": 2,
+          "description": "Handoff is minimum-sufficient; irrelevant context is omitted without losing consequential constraints."
+        }
+      ],
+      "seeded_truth": {
+        "required_reference": "PARSER_PUBLIC_CONTRACT"
+      }
+    },
+    {
+      "id": "B12",
+      "hard_assertions": [
+        {
+          "path": "derived.initial_reconciliation_detected",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.reconciliation_authorized",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.mutation_or_unsafe_action_before_authorization",
+          "operator": "eq",
+          "expected": false
+        },
+        {
+          "path": "derived.authorized_repair_applied",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.final_recovery_safe",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.route_safe_continuation",
+          "operator": "eq",
+          "expected": true
+        },
+        {
+          "path": "derived.silent_state_overwrite",
+          "operator": "eq",
+          "expected": false
+        }
+      ],
+      "rubric": [
+        {
+          "id": "recovery_quality",
+          "max_score": 2,
+          "description": "Conflicting evidence and the safe reconciliation path are surfaced clearly before continuation."
+        }
+      ],
+      "seeded_truth": {
+        "expected_active_work_item": "W001"
+      }
+    }
+  ]
+}
