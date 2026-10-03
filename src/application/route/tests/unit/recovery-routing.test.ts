@@ -29,13 +29,13 @@ function setCheckpoint(root: string, checkpoint: ReturnType<typeof parseCheckpoi
   writeExecutionState(root, state);
 }
 
-function checkpoint(
-  input: Partial<Parameters<typeof parseCheckpoint>[0]> & {
-    phase: string;
-    step: string;
-    target: { kind: string; ref: string; revision: string | null };
-  }
-) {
+function checkpoint(input: {
+  phase: string;
+  step: string;
+  target: { kind: string; ref: string; revision: string | null };
+  status?: 'active' | 'approval_ready';
+  inputs?: Array<{ ref: string; revision: string }>;
+}) {
   return parseCheckpoint({
     status: 'active',
     inputs: [],
