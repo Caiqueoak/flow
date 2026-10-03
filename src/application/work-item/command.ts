@@ -18,7 +18,6 @@ import { updateWorkItemIdentity } from './commands/set.js';
 import { findWorkItem, loadProjectWorkItems } from './work-item-context.js';
 import { assertProjectContractsAuthorized } from '../project-contracts.mjs';
 import { assertWorkItemHistoryMutable } from '../../domain/work-item/lifecycle.js';
-import { loadExecutionState } from '../../infrastructure/persistence/execution-state.mjs';
 
 interface WorkItemCommandContext {
   root: string;
@@ -80,12 +79,7 @@ export function runWorkItem({ args }: { args: string[] }): void {
   if (action !== 'create') {
     const items = loadProjectWorkItems(root);
     const item = findWorkItem(root, target);
-    const state = loadExecutionState(root);
-    const allowOpenReviewCompletion =
-      ['review-pass', 'review-complete'].includes(action) && state.active.work_item === item.id;
-    assertWorkItemHistoryMutable(item, new Map(items.map((candidate) => [candidate.id, candidate])), {
-      allowOpenReviewCompletion
-    });
+    assertWorkItemHistoryMutable(item, new Map(items.map((candidate) => [candidate.id, candidate])));
   }
 
   if (['create', 'set', 'priority', 'dependencies', 'promote', 'review-pass', 'review-complete'].includes(action)) {
