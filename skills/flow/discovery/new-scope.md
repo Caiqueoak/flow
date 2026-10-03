@@ -18,12 +18,14 @@ Before making consequential new-scope decisions, inspect `_flow/state.yaml`:
 
 Persist each meaningful decision batch with `flow checkpoint update --data <json>`. Record only bounded decision state; PRD/experience/engineering prose remains in its canonical document.
 
-For the new scope, assess proportionally:
+For the new scope, inspect only the repository areas affected by the request. Do not rediscover unrelated parts of the project.
+
+Assess proportionally:
 
 1. affected product behavior, assumptions, requirements, constraints and non-goals;
 2. whether experience definition is consequential for the changed scope and whether the PRD's `experience: required|not_required` decision must change;
 3. whether architecture, boundaries, operations, security, data/API contracts or adoption strategy create a consequential engineering impact;
-4. whether the approved PRD and engineering contract remain valid unchanged or need a bounded draft revision.
+4. whether the approved PRD and engineering contract remain valid; if a contract still covers the request, reuse it unchanged, otherwise make only the bounded draft revision required by the new scope.
 
 Represent consequential dimensions explicitly in the checkpoint. A dimension may be `resolved`, `deferred` with a concrete revisit condition, or `not_relevant`; unresolved dimensions stay in `next_frontier`. Do not run `flow checkpoint ready` while any relevant product, experience-relevance or engineering-impact dimension remains unresolved or while assumptions are still under test.
 
