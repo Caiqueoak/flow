@@ -42,7 +42,7 @@ export function runTask({ args }: { args: string[] }): void {
   const [action, target] = positionalArguments(args);
 
   if (action && Object.hasOwn(taskCommands, action)) {
-    assertWorkItemHistoryMutable(root, workItemIdFromTarget(target));
+    assertWorkItemHistoryMutable(root, (target ?? '').split('-T')[0] ?? '');
   }
   if (['create', 'start', 'commit'].includes(action ?? '')) {
     assertProjectContractsAuthorized(root);
@@ -51,6 +51,3 @@ export function runTask({ args }: { args: string[] }): void {
   resolveSubcommand(taskCommands, action, `Unknown task operation '${action}'.`)(target, args);
 }
 
-function workItemIdFromTarget(target: string | undefined): string {
-  return (target ?? '').split('-T')[0] ?? '';
-}
