@@ -304,10 +304,7 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
     });
     await flow(root, ['checkpoint', 'begin', '--data', checkpoint]);
     await flow(root, ['checkpoint', 'ready']);
-    assert.match(
-      await flow(root, ['approval', 'record', target, '--at', '2026-01-01']),
-      /specification approved/
-    );
+    assert.match(await flow(root, ['approval', 'record', target, '--at', '2026-01-01']), /specification approved/);
     await flow(root, ['task', 'create', 'W101', '--title', 'Implement source workflow']);
     await flow(root, ['task', 'set', 'W101-T001', '--title', 'Implement updated source workflow']);
     assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
