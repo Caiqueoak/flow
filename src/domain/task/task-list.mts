@@ -35,7 +35,10 @@ export function parseTasks(
   const document = parseDocument(text, { prettyErrors: false, uniqueKeys: true });
   if (document.errors.length) fail(`${source} is invalid: ${document.errors[0]?.message ?? 'unknown YAML error'}`);
   const value = requireObject(document.toJS(), source);
-  if (value.schema_version !== TASKS_SCHEMA_VERSION) fail(`${source} schema_version must be ${TASKS_SCHEMA_VERSION}.`);
+  const schemaVersion = value.schema_version;
+  if (schemaVersion !== 2 && schemaVersion !== TASKS_SCHEMA_VERSION)
+    fail(`${source} schema_version must be 2 or ${TASKS_SCHEMA_VERSION}.`);
+  const legacySchema = schemaVersion === 2;
   const workItem = requireString(value.work_item, `${source} work_item`);
   if (!WORK_ITEM_ID.test(workItem)) fail(`${source} work_item must use W followed by a zero-padded numeric sequence.`);
   if (expectedWorkItem && workItem !== expectedWorkItem)
@@ -64,11 +67,12 @@ export function parseTasks(
     }
     const mutation = parseMutation(task.mutation, `${id}.mutation`);
     if (
-      Object.hasOwn(task, 'traceability') ||
-      Object.hasOwn(task, 'implementation') ||
-      Object.hasOwn(task, 'commit_sha')
+      !legacySchema &&
+      (Object.hasOwn(task, 'traceability') ||
+        Object.hasOwn(task, 'implementation') ||
+        Object.hasOwn(task, 'commit_sha'))
     )
-      fail(`${id}: traceability, implementation and commit_sha are retired.`);
+      fail(`${id}: traceability, implementation and commit_sha are retired from schema ${TASKS_SCHEMA_VERSION}.`);
     if (task.provenance !== undefined && task.provenance !== 'legacy_migration')
       fail(`${id}.provenance must be legacy_migration when present.`);
     if (task.provenance === 'legacy_migration' && state !== 'completed')
@@ -83,12 +87,15 @@ export function parseTasks(
       ...(task.legacy_commit ? { legacy_commit: task.legacy_commit as string } : {})
     };
   });
+  if (legacySchema && (tasks.length === 0 || tasks.some((task) => task.state !== 'completed')))
+    fail(`${source} schema_version 2 is supported only for immutable completed task history.`);
+
   const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of tasks)
     for (const dependency of task.depends_on)
       if (!byId.has(dependency)) fail(`${task.id} depends on unknown task '${dependency}'.`);
   validateTaskDag(tasks);
-  return { schema_version: TASKS_SCHEMA_VERSION, work_item: workItem as WorkItemId, tasks };
+  return { schema_version: schemaVersion as number, work_item: workItem as WorkItemId, tasks };
 }
 
 function parseMutation(value: unknown, label: string): Task['mutation'] | undefined {

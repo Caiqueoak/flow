@@ -10,6 +10,8 @@ Status entries track delivery state, while detailed implementation evidence and 
 
 **Flow vNext implementation status: complete. W1–W8 are merged.**
 
+A final integrated release audit identified three cross-work-item blockers; PR #72 contains their remediation and regression coverage for mandatory approval-ready checkpoints, immutable completed history, and mandatory post-migration reconciliation.
+
 - **W1 — Decision-heavy work can stop and resume safely from repository state:** completed and merged via PR #53; main commit `2cdc079976829872dbfc759fdbdd0b9ea3e019cd`.
 - **W2 — Approved project contracts remain trustworthy and experience routes correctly:** completed and merged via PR #56; main commit `9d94a4c24a4d43108c94d3d52c468dca15e8da59`.
 - **W3 — Fresh chats recover the correct next safe action:** completed and merged via PR #59; main commit `5300028a3330d48fe82e78af61fc7d2964169daa`.

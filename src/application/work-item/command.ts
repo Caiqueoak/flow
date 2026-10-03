@@ -17,6 +17,7 @@ import { persistWorkItemReviewPass } from './commands/review-pass.js';
 import { updateWorkItemIdentity } from './commands/set.js';
 import { findWorkItem } from './work-item-context.js';
 import { assertProjectContractsAuthorized } from '../project-contracts.mjs';
+import { assertWorkItemHistoryMutable } from './operations/history.mjs';
 
 interface WorkItemCommandContext {
   root: string;
@@ -74,6 +75,12 @@ export function runWorkItem({ args }: { args: string[] }): void {
   }
 
   const execute = resolveSubcommand(workItemCommands, action, `Unknown work-item operation '${action}'.`);
+
+  if (action !== 'create') {
+    assertWorkItemHistoryMutable(root, target ?? '', {
+      allowActiveReview: action === 'review-pass' || action === 'review-complete'
+    });
+  }
 
   if (['create', 'set', 'priority', 'dependencies', 'promote', 'review-pass', 'review-complete'].includes(action)) {
     assertProjectContractsAuthorized(root);

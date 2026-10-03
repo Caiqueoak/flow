@@ -46,6 +46,27 @@ async function flow(root: string, args: string[]) {
   return output.join('\n');
 }
 
+async function approveCanonical(
+  root: string,
+  target: string,
+  phase: 'discovery' | 'experience' | 'engineering' | 'specification',
+  kind = 'project_document'
+) {
+  const checkpoint = JSON.stringify({
+    phase,
+    step: 'await_approval',
+    target: { kind, ref: target, revision: null },
+    inputs: [],
+    dimensions: [{ id: 'approval', state: 'resolved', summary: 'The exact approval target is complete.' }],
+    assumptions: [],
+    latest_authorized_direction: 'Approve this exact canonical revision.',
+    next_frontier: []
+  });
+  await flow(root, ['checkpoint', 'begin', '--data', checkpoint]);
+  await flow(root, ['checkpoint', 'ready']);
+  return flow(root, ['approval', 'record', target, '--at', '2026-01-01']);
+}
+
 async function approveReview(root: string, id = 'W101') {
   const data = JSON.stringify({
     pass: {
@@ -292,7 +313,7 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
 
   await t.test('approves, executes and commits one task with exact evidence', async () => {
     assert.match(
-      await flow(root, ['approval', 'record', '_flow/work-items/W101-source-workflow/spec.md', '--at', '2026-01-01']),
+      await approveCanonical(root, '_flow/work-items/W101-source-workflow/spec.md', 'specification', 'work_item_spec'),
       /specification approved/
     );
     await flow(root, ['task', 'create', 'W101', '--title', 'Implement source workflow']);

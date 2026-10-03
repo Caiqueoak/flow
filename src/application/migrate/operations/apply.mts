@@ -27,6 +27,8 @@ import { validateEngineeringDocument } from '../../../domain/project/engineering
 import { BACKLOG_SCHEMA_VERSION } from '../../../domain/work-item/work-item.js';
 import { GATES_SCHEMA_VERSION } from '../../../domain/gate/gate.js';
 import { TASKS_SCHEMA_VERSION } from '../../../domain/task/task.js';
+import { parseTasks } from '../../../domain/task/task-list.mjs';
+import { isReviewApproved, parseReview } from '../../../domain/work-item/review.mjs';
 import type { LifecycleState } from '../../../domain/task/task.js';
 import {
   copyMigrationDirectory,
@@ -244,10 +246,13 @@ function inspectCurrent(root: string, targetVersion: string): string[] {
     changes.push('upgrade config.yaml');
   }
   const workItems = path.join(flow, 'work-items');
+  const completedHistory = completedHistoricalWorkItemIds(root);
   if (!migrationPathExists(workItems)) changes.push('restore work-items directory');
   else
     for (const entry of migrationDirectoryEntries(workItems)) {
       if (!entry.isDirectory) continue;
+      const workItemId = entry.name.match(/^(W\d{3,})-/)?.[1];
+      if (workItemId && completedHistory.has(workItemId)) continue;
       const tasks = path.join(workItems, entry.name, 'tasks.yaml');
       if (!migrationPathExists(tasks)) {
         changes.push(`restore work-items/${entry.name}/tasks.yaml`);
@@ -455,9 +460,12 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
 function upgradeCanonicalStaged(root: string, targetVersion: string): void {
   const flow = path.join(root, '_flow');
   const workItems = path.join(flow, 'work-items');
+  const completedHistory = completedHistoricalWorkItemIds(root);
   if (migrationPathExists(workItems))
     for (const entry of migrationDirectoryEntries(workItems)) {
       if (!entry.isDirectory) continue;
+      const workItemId = entry.name.match(/^(W\d{3,})-/)?.[1];
+      if (workItemId && completedHistory.has(workItemId)) continue;
       const taskPath = path.join(workItems, entry.name, 'tasks.yaml');
       if (!migrationPathExists(taskPath)) continue;
       const value = asRecord(parse(readMigrationText(taskPath)));
@@ -515,6 +523,39 @@ function upgradeExecutionState(root: string, flow: string): void {
   }
 
   writeMigrationText(stateFile, stringifyState(state));
+}
+
+function completedHistoricalWorkItemIds(root: string): Set<string> {
+  const directory = path.join(root, '_flow', 'work-items');
+  if (!migrationPathExists(directory)) return new Set();
+
+  const completed = new Set<string>();
+  for (const entry of migrationDirectoryEntries(directory)) {
+    if (!entry.isDirectory) continue;
+    const workItemId = entry.name.match(/^(W\d{3,})-/)?.[1];
+    if (!workItemId) continue;
+    const base = path.join(directory, entry.name);
+    try {
+      const tasks = parseTasks(readMigrationText(path.join(base, 'tasks.yaml')), { expectedWorkItem: workItemId });
+      const review = parseReview(readMigrationText(path.join(base, 'review.yaml')), { expectedWorkItem: workItemId });
+      if (
+        tasks.tasks.length > 0 &&
+        tasks.tasks.every((task) => task.state === 'completed') &&
+        isReviewApproved(review)
+      ) {
+        completed.add(workItemId);
+      }
+    } catch {
+      // Invalid/incomplete history is not treated as completed; normal migration/reconciliation handles it.
+    }
+  }
+  return completed;
+}
+
+function markMigrationReconciliationPending(root: string): void {
+  const state = loadExecutionState(root);
+  state.migration.status = 'pending_reconciliation';
+  writeExecutionState(root, state);
 }
 
 function recoverExistingCodePolicy(sourceFlow: string): string {
@@ -618,6 +659,7 @@ export function migrateProject(
       if (findings.length)
         throw new Error(`Migration rescue staging validation failed: ${findings.map((x) => x.code).join(', ')}.`);
     }
+    markMigrationReconciliationPending(staging);
     renameMigrationPath(sourceFlow, backup);
     try {
       renameMigrationPath(staged, targetFlow);

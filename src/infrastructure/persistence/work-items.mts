@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseWorkItemSpec } from '../../domain/work-item/specification.mjs';
 import { parseTasks } from '../../domain/task/task-list.mjs';
+import { TASKS_SCHEMA_VERSION } from '../../domain/task/task.js';
+import { lifecycle } from '../../domain/work-item/lifecycle.js';
 import { parseReview, validateReviewTaskReferences } from '../../domain/work-item/review.mjs';
 import { validateAcyclic, ArtifactValidationError } from '../../domain/work-item/backlog.mjs';
 import type { LoadedWorkItem, WorkItemId } from '../../domain/work-item/work-item.js';
@@ -39,5 +41,13 @@ export function loadWorkItems(root: string): LoadedWorkItem[] {
       if (dep === item.id) throw new ArtifactValidationError(`${item.id} cannot depend on itself.`);
     }
   validateAcyclic(items);
+  const byId = new Map<WorkItemId, LoadedWorkItem>(items.map((item) => [item.id, item]));
+  for (const item of items) {
+    if (item.tasks.schema_version !== TASKS_SCHEMA_VERSION && lifecycle(item, byId).status !== 'completed') {
+      throw new ArtifactValidationError(
+        `${item.id} uses legacy tasks schema outside immutable completed history; run Flow migration before mutation.`
+      );
+    }
+  }
   return items;
 }
