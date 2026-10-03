@@ -11,7 +11,7 @@ On every invocation:
 
 1. Run `npx --no-install flow doctor --quick --json` first. Always do this even when the user only says to continue: migrations, manual edits or partial Flow directories may have changed repository state.
 2. If doctor reports a version/migration/reconciliation problem, follow its safe recovery path before normal delivery.
-3. Run `npx --no-install flow sync`, `npx --no-install flow validate --json`, then `npx --no-install flow route --json`. Routing derives bootstrap progress from canonical artifacts: approved PRD -> approved engineering -> at least one MVP work-item -> normal delivery.
+3. Run `npx --no-install flow sync`, `npx --no-install flow validate --json`, then `npx --no-install flow route --json`. Routing derives bootstrap progress from exact-approved canonical artifacts: approved PRD -> approved experience when the PRD requires it -> approved engineering -> at least one MVP work-item -> normal delivery.
 4. Read the routed instruction and only the modular guidance relevant to that action. Use `core/decisions.md`, `core/continuation.md` and `core/recovery.md` when applicable. If route returns `finished`, compare that result with the current user intent: plain continuation means completion; a substantive new feature/change request means read `discovery/new-scope.md` and re-enter bounded discovery for only the new scope.
 5. Execute the routed action, persist it, validate the minimum necessary state, route again and continue until completion or a legitimate human stop.
 
@@ -25,7 +25,9 @@ Work-items are implementation outcomes. Read `backlog/work-items.md` when creati
 
 Canonical delivery truth is:
 
-- product contract in `_flow/docs/prd.md`;
+- product contract and experience relevance in `_flow/docs/prd.md`;
+
+- consequential experience contract in `_flow/docs/experience.md` when the approved PRD requires it;
 
 - engineering contract in `_flow/docs/engineering.md`;
 

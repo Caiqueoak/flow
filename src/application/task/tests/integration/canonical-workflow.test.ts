@@ -56,9 +56,9 @@ const engineeringHeadings = [
   '## Exceptions'
 ];
 
-function approvedDocument(headings: readonly string[], baseline = '') {
+function projectDocument(headings: readonly string[], metadata = '') {
   const body = headings.map((heading) => `${heading}\nText.`).join('\n\n');
-  return `---\nschema_version: 1\nstatus: approved\napproved_at: 2026-01-01T00:00:00.000Z\n${baseline}---\n\n${body}\n`;
+  return `---\nschema_version: 2\nstatus: draft\n${metadata}---\n\n${body}\n`;
 }
 
 function project() {
@@ -70,14 +70,16 @@ function project() {
   assert.equal(run(root, ['init', '--runtime', 'codex', '--existing-code', 'incremental']).status, 0);
   const docs = path.join(root, '_flow', 'docs');
   fs.mkdirSync(docs, { recursive: true });
-  fs.writeFileSync(path.join(docs, 'prd.md'), approvedDocument(prdHeadings));
+  fs.writeFileSync(path.join(docs, 'prd.md'), projectDocument(prdHeadings, 'experience: not_required\n'));
   fs.writeFileSync(
     path.join(docs, 'engineering.md'),
-    approvedDocument(
+    projectDocument(
       engineeringHeadings,
       'baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: incremental\n'
     )
   );
+  assert.equal(run(root, ['approval', 'record', '_flow/docs/prd.md']).status, 0);
+  assert.equal(run(root, ['approval', 'record', '_flow/docs/engineering.md']).status, 0);
   return root;
 }
 function ready(root: string, id = 'W101') {
@@ -147,7 +149,9 @@ test('approved spec routes directly through task creation and start without a pl
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
   assert.equal(fs.existsSync(path.join(base, 'implementation-plan.md')), false);
   fs.appendFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), 'changed\n');
-  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  const rejected = run(root, ['task', 'start', 'W101-T001']);
+  assert.notEqual(rejected.status, 0);
+  assert.match(rejected.stderr, /engineering\.md is not authorized at its current exact revision/);
 });
 
 test('quick doctor validates canonical work-items', () => {

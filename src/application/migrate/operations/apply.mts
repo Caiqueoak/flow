@@ -15,6 +15,13 @@ import {
   type RuntimeConfiguration
 } from '../../../infrastructure/persistence/configuration.mjs';
 import { FLOW_SCHEMA_VERSION } from '../../../domain/project/project.js';
+import {
+  approveProjectDocument,
+  parseProjectDocument,
+  serializeProjectDocument
+} from '../../../domain/project/document.mjs';
+import { validatePrdDocument } from '../../../domain/project/product-requirements-document.mjs';
+import { validateEngineeringDocument } from '../../../domain/project/engineering-document.mjs';
 import { BACKLOG_SCHEMA_VERSION } from '../../../domain/work-item/work-item.js';
 import { GATES_SCHEMA_VERSION } from '../../../domain/gate/gate.js';
 import { TASKS_SCHEMA_VERSION } from '../../../domain/task/task.js';
@@ -265,6 +272,9 @@ function inspectCurrent(root: string, targetVersion: string): string[] {
   } catch {
     changes.push('upgrade gates.yaml');
   }
+  inspectLegacyProjectDocumentApproval(flow, 'prd.md', validatePrdDocument, changes);
+  inspectLegacyProjectDocumentApproval(flow, 'engineering.md', validateEngineeringDocument, changes);
+
   const stateFile = path.join(flow, 'state.yaml');
   if (!migrationPathExists(stateFile)) changes.push('create state.yaml');
   else {
@@ -277,6 +287,58 @@ function inspectCurrent(root: string, targetVersion: string): string[] {
     }
   }
   return [...new Set(changes)];
+}
+
+function inspectLegacyProjectDocumentApproval(
+  flow: string,
+  fileName: string,
+  validate: (text: string) => { schema_version?: number; status?: string; approved_at?: string; errors: string[] },
+  changes: string[]
+): void {
+  const file = path.join(flow, 'docs', fileName);
+  if (!migrationPathExists(file)) return;
+  const text = readMigrationText(file);
+  const document = validate(text);
+  if (
+    document.schema_version === 1 &&
+    document.status === 'approved' &&
+    typeof document.approved_at === 'string' &&
+    !Number.isNaN(Date.parse(document.approved_at)) &&
+    document.errors.length === 0
+  ) {
+    changes.push(`bind exact approval revision for docs/${fileName}`);
+  }
+}
+
+function upgradeLegacyProjectDocumentApproval(
+  flow: string,
+  fileName: 'prd.md' | 'engineering.md',
+  validate: (text: string) => { schema_version?: number; status?: string; approved_at?: string; errors: string[] }
+): void {
+  const file = path.join(flow, 'docs', fileName);
+  if (!migrationPathExists(file)) return;
+  const text = readMigrationText(file);
+  const document = validate(text);
+  if (
+    document.schema_version !== 1 ||
+    document.status !== 'approved' ||
+    typeof document.approved_at !== 'string' ||
+    Number.isNaN(Date.parse(document.approved_at)) ||
+    document.errors.length
+  ) {
+    return;
+  }
+
+  let candidate = text;
+  if (fileName === 'prd.md') {
+    const parsed = parseProjectDocument(candidate);
+    if (parsed.metadata.experience === undefined) {
+      candidate = serializeProjectDocument({ ...parsed.metadata, experience: 'not_required' }, parsed.body);
+    }
+  }
+
+  const approved = approveProjectDocument(candidate, document.approved_at);
+  writeMigrationText(file, approved.text);
 }
 
 function parseFlowVersion(version: string): SemanticVersion | null {
@@ -412,6 +474,8 @@ function upgradeCanonicalStaged(root: string, targetVersion: string): void {
       }
       writeMigrationText(taskPath, stringify(value, { lineWidth: 0 }));
     }
+  upgradeLegacyProjectDocumentApproval(flow, 'prd.md', validatePrdDocument);
+  upgradeLegacyProjectDocumentApproval(flow, 'engineering.md', validateEngineeringDocument);
   upgradeExecutionState(root, flow);
   const config = readConfig(root) ?? defaultConfig(targetVersion);
   config.flow_version = targetVersion;

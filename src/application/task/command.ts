@@ -1,9 +1,10 @@
-import { positionalArguments, resolveSubcommand } from '../command-runtime.js';
+import { positionalArguments, projectRoot, resolveSubcommand } from '../command-runtime.js';
 import { projectPathOption, type CommandDefinition } from '../command-definition.js';
 import { runCommit } from './commands/commit.js';
 import { runCreate } from './commands/create.js';
 import { runSet } from './commands/set.js';
 import { runStart } from './commands/start.js';
+import { assertProjectContractsAuthorized } from '../project-contracts.mjs';
 
 const taskCommands = {
   create: runCreate,
@@ -33,6 +34,10 @@ export const command: CommandDefinition = {
 
 export function runTask({ args }: { args: string[] }): void {
   const [action, target] = positionalArguments(args);
+
+  if (['create', 'start', 'commit'].includes(action ?? '')) {
+    assertProjectContractsAuthorized(projectRoot(args));
+  }
 
   resolveSubcommand(taskCommands, action, `Unknown task operation '${action}'.`)(target, args);
 }

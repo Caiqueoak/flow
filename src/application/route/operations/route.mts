@@ -4,8 +4,7 @@ import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mj
 import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 import { parseState } from '../../../domain/workflow/execution-state.mjs';
 import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
-import { validateEngineeringDocument } from '../../../domain/project/engineering-document.mjs';
-import { validatePrdDocument } from '../../../domain/project/product-requirements-document.mjs';
+import { inspectProjectContract } from '../../project-contracts.mjs';
 import { isWorkItemSpecApproved } from '../../../domain/work-item/specification.mjs';
 import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
@@ -35,55 +34,58 @@ function migrationRoute(root: string): RouteResult | null {
     : null;
 }
 
-function projectDocumentRoute(
+function projectContractRoute(
   root: string,
   {
-    fileName,
+    kind,
     phase,
     draftInstruction,
-    approvalInstruction,
-    validate
+    approvalInstruction
   }: {
-    fileName: string;
-    phase: 'discovery' | 'engineering';
+    kind: 'prd' | 'experience' | 'engineering';
+    phase: 'discovery' | 'experience' | 'engineering';
     draftInstruction: string;
     approvalInstruction: string;
-    validate: (text: string) => { errors: string[]; status?: string };
   }
 ): RouteResult | null {
-  const file = path.join(root, '_flow', 'docs', fileName);
-  if (!fileExists(file)) return step(phase, draftInstruction);
-
-  const document = validate(readText(file));
-  if (document.errors.length) return step(phase, draftInstruction);
-  if (document.status !== 'approved')
+  const document = inspectProjectContract(root, kind);
+  if (!document.exists || !document.valid) return step(phase, draftInstruction);
+  if (!document.approved)
     return {
       action: 'stop',
       reason: 'consequential_decision',
       phase,
       instruction: approvalInstruction
     };
-
   return null;
 }
 
 function productBootstrapRoute(root: string): RouteResult | null {
-  return projectDocumentRoute(root, {
-    fileName: 'prd.md',
+  return projectContractRoute(root, {
+    kind: 'prd',
     phase: 'discovery',
     draftInstruction: 'discovery/step-01-project.md',
-    approvalInstruction: 'discovery/step-02-await-approval.md',
-    validate: validatePrdDocument
+    approvalInstruction: 'discovery/step-02-await-approval.md'
+  });
+}
+
+function experienceBootstrapRoute(root: string): RouteResult | null {
+  const prd = inspectProjectContract(root, 'prd');
+  if (!prd.approved || prd.experience !== 'required') return null;
+  return projectContractRoute(root, {
+    kind: 'experience',
+    phase: 'experience',
+    draftInstruction: 'experience/step-01-define.md',
+    approvalInstruction: 'experience/step-02-await-approval.md'
   });
 }
 
 function engineeringBootstrapRoute(root: string): RouteResult | null {
-  return projectDocumentRoute(root, {
-    fileName: 'engineering.md',
+  return projectContractRoute(root, {
+    kind: 'engineering',
     phase: 'engineering',
     draftInstruction: 'engineering/step-02-synthesize.md',
-    approvalInstruction: 'engineering/step-05-present.md',
-    validate: validateEngineeringDocument
+    approvalInstruction: 'engineering/step-05-present.md'
   });
 }
 
@@ -93,6 +95,9 @@ export function routeProject(root: string): RouteResult {
 
   const product = productBootstrapRoute(root);
   if (product) return product;
+
+  const experience = experienceBootstrapRoute(root);
+  if (experience) return experience;
 
   const engineering = engineeringBootstrapRoute(root);
   if (engineering) return engineering;

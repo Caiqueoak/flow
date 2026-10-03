@@ -20,6 +20,8 @@ Cover, proportionally:
 
 - gaps that prevent a coherent product contract, engineering contract or MVP outcome map.
 
+For every new vNext PRD, decide whether consequential experience definition is `required` or `not_required` and persist that exact value in PRD frontmatter. Base the decision on the product; do not use a rigid UX taxonomy.
+
 Technical discovery is allowed here when it affects product decisions. Implementation-level architecture is synthesized in engineering after product intent is sufficiently clear.
 
 For existing repositories without Flow, inspect the repository and read `brownfield.md`. Understand both the existing product behavior and the user's requested product change here; produce/approve the PRD before engineering evaluates preserve, incremental or refactor adoption.
@@ -32,4 +34,4 @@ Before asking or answering a new consequential discovery batch, inspect the chec
 
 If no matching checkpoint exists, start one with `flow checkpoint begin --data <json>`. Persist each meaningful decision batch with `flow checkpoint update --data <json>`. The JSON is the compact checkpoint payload: `phase`, `step`, `target`, `inputs`, `dimensions`, `assumptions`, `latest_authorized_direction` and `next_frontier`. Do not copy PRD prose into it and do not hand-edit `state.yaml`.
 
-W1 provides the structural `approval_ready` transition, but exact project-document approval and approval-owned cleanup belong to W2. Do not treat checkpoint status as document approval.
+Materialize the final PRD with `schema_version: 2`, `status: draft`, and explicit `experience: required|not_required`. When all consequential dimensions are resolved, run `flow checkpoint ready`; the runtime binds the checkpoint to the exact current PRD revision. Checkpoint status is not document approval.

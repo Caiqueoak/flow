@@ -8,6 +8,7 @@ import { parse, stringify } from 'yaml';
 import { runCli } from '../../dispatch-command.js';
 import { migrateProject } from '../../../../application/migrate/operations/apply.mjs';
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
+import { approveProjectDocument } from '../../../../domain/project/document.mjs';
 
 const PRD_HEADINGS = [
   '# Product Requirements',
@@ -55,13 +56,13 @@ function project(t: test.TestContext) {
 }
 
 function prdDocument(status: 'draft' | 'approved') {
-  const approvedAt = status === 'approved' ? 'approved_at: 2026-01-01T00:00:00.000Z\n' : '';
-  return `---\nschema_version: 1\nstatus: ${status}\n${approvedAt}---\n\n${PRD_HEADINGS.map((heading) => `${heading}\nText.`).join('\n\n')}\n`;
+  const draft = `---\nschema_version: 2\nstatus: draft\nexperience: not_required\n---\n\n${PRD_HEADINGS.map((heading) => `${heading}\nText.`).join('\n\n')}\n`;
+  return status === 'approved' ? approveProjectDocument(draft, '2026-01-01T00:00:00.000Z').text : draft;
 }
 
 function engineeringDocument(status: 'draft' | 'approved', policy: string) {
-  const approvedAt = status === 'approved' ? 'approved_at: 2026-01-01T00:00:00.000Z\n' : '';
-  return `---\nschema_version: 1\nstatus: ${status}\n${approvedAt}baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: ${policy}\n---\n\n${ENGINEERING_HEADINGS.map((heading) => `${heading}\nText.`).join('\n\n')}\n`;
+  const draft = `---\nschema_version: 2\nstatus: draft\nbaseline:\n  profile: flow/readability-first@2\n  existing_code_policy: ${policy}\n---\n\n${ENGINEERING_HEADINGS.map((heading) => `${heading}\nText.`).join('\n\n')}\n`;
+  return status === 'approved' ? approveProjectDocument(draft, '2026-01-01T00:00:00.000Z').text : draft;
 }
 
 function writeApprovedProjectBaseline(root: string, policy = 'not_applicable') {
