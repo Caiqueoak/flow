@@ -9,8 +9,8 @@ The accepted Flow vNext technical design is `docs/research/flow-vnext-technical-
 Status entries track delivery state, while detailed implementation evidence and exact reviewed heads remain in the corresponding pull requests.
 
 - **W1 — Decision-heavy work can stop and resume safely from repository state:** completed and merged via PR #53; main commit `2cdc079976829872dbfc759fdbdd0b9ea3e019cd`.
-- **W2 — Approved project contracts remain trustworthy and experience routes correctly:** implementation complete and reviewed in PR #56 at reviewed head `24195686f92460ed113cff77125bfb8edbeed508`; pending merge.
-- **W3 — Fresh chats recover the correct next safe action:** not started; blocked on W2 being merged to main.
+- **W2 — Approved project contracts remain trustworthy and experience routes correctly:** completed and merged via PR #56; main commit `9d94a4c24a4d43108c94d3d52c468dca15e8da59`.
+- **W3 — Fresh chats recover the correct next safe action:** not started; W1/W2 prerequisites are merged and W3 is ready to start.
 - **W4–W7:** not started; dependencies remain as defined by the technical design.
 
 ## Direction
