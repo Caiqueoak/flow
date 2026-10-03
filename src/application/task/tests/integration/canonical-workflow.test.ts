@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { parse } from 'yaml';
+import { parse, stringify } from 'yaml';
 
 const cli = path.resolve('dist/entry.js');
 const temporaryRoots = new Set<string>();
@@ -485,10 +485,14 @@ test('W4 starts independent same-work-item tasks concurrently and routes through
   );
 
   assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
-  assert.equal(run(root, ['task', 'start', 'W101-T002']).status, 0);
+  const accidental = run(root, ['task', 'start', 'W101-T002']);
+  assert.notEqual(accidental.status, 0);
+  assert.match(accidental.stderr, /explicit --concurrent intent/);
+  assert.equal(run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'shared']).status, 0);
 
   const state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
   assert.equal(state.active.work_item, 'W101');
+  assert.deepEqual(state.active.concurrency, { tasks: ['W101-T001', 'W101-T002'], workspace: 'shared' });
   const route = JSON.parse(run(root, ['route', '--json']).stdout);
   assert.equal(route.work_item, 'W101');
   assert.match(route.details?.join(' ') ?? '', /W101-T001, W101-T002/);
@@ -503,7 +507,10 @@ test('W4 blocks second writers without claims and cross-work-item execution', ()
   assert.equal(run(root, ['task', 'create', 'W102', '--title', 'Other item task']).status, 0);
 
   assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
-  const missingClaims = run(root, ['task', 'start', 'W101-T002']);
+  const missingIntent = run(root, ['task', 'start', 'W101-T002']);
+  assert.notEqual(missingIntent.status, 0);
+  assert.match(missingIntent.stderr, /explicit --concurrent intent/);
+  const missingClaims = run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'isolated']);
   assert.notEqual(missingClaims.status, 0);
   assert.match(missingClaims.stderr, /requires mutation\.surfaces and mutation\.resources/);
 
@@ -538,7 +545,7 @@ test('W4 rejects a second concurrent start when the work-item SPEC is no longer 
   assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
   fs.appendFileSync(path.join(base, 'spec.md'), '\nChanged after approval.\n');
 
-  const second = run(root, ['task', 'start', 'W101-T002']);
+  const second = run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'isolated']);
   assert.notEqual(second.status, 0);
   assert.match(second.stderr, /requires an approved specification/);
 });
@@ -566,7 +573,7 @@ test('W4 concurrent commit stays inside its claim and outside another active cla
     );
   }
   assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
-  assert.equal(run(root, ['task', 'start', 'W101-T002']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'isolated']).status, 0);
   assert.equal(run(root, ['sync']).status, 0);
 
   fs.mkdirSync(path.join(root, 'src', 'b'), { recursive: true });
@@ -615,6 +622,30 @@ test('W4 concurrent commit stays inside its claim and outside another active cla
     ]).status,
     0
   );
+});
+
+test('W4 reports active work-item conflicts consistently across route, validate and Doctor', () => {
+  const root = project();
+  ready(root);
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+
+  const stateFile = path.join(root, '_flow', 'state.yaml');
+  const state = parse(fs.readFileSync(stateFile, 'utf8'));
+  state.active.work_item = null;
+  fs.writeFileSync(stateFile, stringify(state));
+
+  assert.match(run(root, ['route', '--json']).stdout, /ACTIVE_WORK_ITEM_REQUIRED/);
+  const validate = run(root, ['validate', '--json']);
+  assert.notEqual(validate.status, 0);
+  assert.match(validate.stdout, /ACTIVE_WORK_ITEM_REQUIRED/);
+  const doctor = run(root, ['doctor', '--quick', '--json']);
+  assert.notEqual(doctor.status, 0);
+  assert.match(doctor.stdout, /ACTIVE_WORK_ITEM_REQUIRED/);
+
+  state.active.work_item = 'W102';
+  fs.writeFileSync(stateFile, stringify(state));
+  assert.match(run(root, ['route', '--json']).stdout, /ACTIVE_WORK_ITEM_CONFLICT/);
 });
 
 test('W4 rejects invalid and traversing mutation surfaces before persistence', () => {

@@ -35,6 +35,12 @@ test('first active task remains valid without mutation claims', () => {
   assert.deepEqual(issues, []);
 });
 
+test('one active task requires matching active work-item focus', () => {
+  const items = [{ id: 'W001' as const, tasks: collection('W001', [task('T001')]) }];
+  assert.ok(validateConcurrentTaskState(items, null).some((issue) => issue.code === 'ACTIVE_WORK_ITEM_REQUIRED'));
+  assert.ok(validateConcurrentTaskState(items, 'W002').some((issue) => issue.code === 'ACTIVE_WORK_ITEM_CONFLICT'));
+});
+
 test('independent same-work-item tasks with disjoint complete claims are valid', () => {
   const issues = validateConcurrentTaskState(
     [
@@ -46,9 +52,28 @@ test('independent same-work-item tasks with disjoint complete claims are valid',
         ])
       }
     ],
-    'W001'
+    'W001',
+    { concurrency: { tasks: ['W001-T001', 'W001-T002'], workspace: 'shared' } }
   );
   assert.deepEqual(issues, []);
+});
+
+test('concurrent tasks require persisted explicit intent matching the active set', () => {
+  const items = [
+    {
+      id: 'W001' as const,
+      tasks: collection('W001', [
+        task('T001', 'in_progress', [], ['src/a'], []),
+        task('T002', 'in_progress', [], ['src/b'], [])
+      ])
+    }
+  ];
+  assert.ok(validateConcurrentTaskState(items, 'W001').some((issue) => issue.code === 'CONCURRENCY_INTENT_REQUIRED'));
+  assert.ok(
+    validateConcurrentTaskState(items, 'W001', {
+      concurrency: { tasks: ['W001-T001', 'W001-T003'], workspace: 'isolated' }
+    }).some((issue) => issue.code === 'CONCURRENCY_STATE_CONFLICT')
+  );
 });
 
 test('direct and transitive dependencies block concurrent tasks', () => {
@@ -62,7 +87,8 @@ test('direct and transitive dependencies block concurrent tasks', () => {
         ])
       }
     ],
-    'W001'
+    'W001',
+    { concurrency: { tasks: ['W001-T001', 'W001-T002'], workspace: 'shared' } }
   );
   assert.ok(direct.some((issue) => issue.code === 'DEPENDENCY_CONFLICT'));
 
@@ -77,7 +103,8 @@ test('direct and transitive dependencies block concurrent tasks', () => {
         ])
       }
     ],
-    'W001'
+    'W001',
+    { concurrency: { tasks: ['W001-T001', 'W001-T003'], workspace: 'shared' } }
   );
   assert.ok(transitive.some((issue) => issue.code === 'DEPENDENCY_CONFLICT'));
 });
@@ -93,7 +120,8 @@ test('overlapping surfaces, shared resources and missing claims block concurrenc
         ])
       }
     ],
-    'W001'
+    'W001',
+    { concurrency: { tasks: ['W001-T001', 'W001-T002'], workspace: 'shared' } }
   );
   assert.ok(overlap.some((issue) => issue.code === 'SURFACE_CONFLICT'));
 
@@ -107,13 +135,15 @@ test('overlapping surfaces, shared resources and missing claims block concurrenc
         ])
       }
     ],
-    'W001'
+    'W001',
+    { concurrency: { tasks: ['W001-T001', 'W001-T002'], workspace: 'shared' } }
   );
   assert.ok(shared.some((issue) => issue.code === 'RESOURCE_CONFLICT'));
 
   const missing = validateConcurrentTaskState(
     [{ id: 'W001', tasks: collection('W001', [task('T001'), task('T002', 'in_progress', [], ['src/b'], [])]) }],
-    'W001'
+    'W001',
+    { concurrency: { tasks: ['W001-T001', 'W001-T002'], workspace: 'shared' } }
   );
   assert.ok(missing.some((issue) => issue.code === 'MISSING_MUTATION_CLAIMS'));
 });
@@ -140,7 +170,7 @@ test('cross-work-item active tasks and checkpoint concurrency are invalid', () =
       }
     ],
     'W001',
-    { checkpointActive: true }
+    { checkpointActive: true, concurrency: { tasks: ['W001-T001', 'W001-T002'], workspace: 'shared' } }
   );
   assert.ok(checkpoint.some((issue) => issue.code === 'CHECKPOINT_CONFLICT'));
 });
