@@ -316,10 +316,7 @@ test('B12 rejects mutation before reconciliation authorization', (t) => {
   fs.writeFileSync(path.join(runRoot, 'observation.json'), JSON.stringify({}));
   const result = evaluateRun(repoRoot, runRoot);
   assert.equal(result.hard_pass, false);
-  assert.equal(
-    (result.derived_facts as Record<string, unknown>).mutation_or_unsafe_action_before_authorization,
-    true
-  );
+  assert.equal((result.derived_facts as Record<string, unknown>).mutation_or_unsafe_action_before_authorization, true);
 });
 
 test('B12 rejects an authorized repair that does not reach safe continuation', (t) => {
