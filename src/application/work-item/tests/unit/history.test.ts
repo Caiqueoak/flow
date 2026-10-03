@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { assertWorkItemHistoryMutable } from '../../operations/history.mjs';
+import { runWorkItem } from '../../command.js';
+import { runTask } from '../../../task/command.js';
 
 function project(t: test.TestContext, taskState: 'pending' | 'completed', reviewStatus: 'pending' | 'approved') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-history-guard-'));
@@ -60,4 +62,21 @@ test('non-completed work-item remains mutable', (t) => {
 test('history guard rejects unknown work-items', (t) => {
   const root = project(t, 'pending', 'pending');
   assert.throws(() => assertWorkItemHistoryMutable(root, 'W999'), /Unknown work-item 'W999'/);
+});
+
+
+test('work-item dispatcher applies completed-history guard before mutation', (t) => {
+  const root = project(t, 'completed', 'approved');
+  assert.throws(
+    () => runWorkItem({ args: ['priority', 'W001', '--priority', '2', '--path', root] }),
+    /completed and its canonical history is immutable/
+  );
+});
+
+test('task dispatcher applies completed-history guard before mutation', (t) => {
+  const root = project(t, 'completed', 'approved');
+  assert.throws(
+    () => runTask({ args: ['create', 'W001', '--title', 'Late task', '--path', root] }),
+    /completed and its canonical history is immutable/
+  );
 });
