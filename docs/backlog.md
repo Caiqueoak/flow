@@ -6,6 +6,8 @@ Working notes and implementation status for Flow vNext. This file is a concise e
 
 The accepted Flow vNext technical design is `docs/research/flow-vnext-technical-design.md`. It is authoritative for W1–W7 scope and dependencies; this backlog only summarizes delivery status.
 
+Status entries track delivery state, while detailed implementation evidence and exact reviewed heads remain in the corresponding pull requests.
+
 - **W1 — Decision-heavy work can stop and resume safely from repository state:** completed and merged via PR #53; main commit `2cdc079976829872dbfc759fdbdd0b9ea3e019cd`.
 - **W2 — Approved project contracts remain trustworthy and experience routes correctly:** implementation complete and reviewed in PR #56 at reviewed head `24195686f92460ed113cff77125bfb8edbeed508`; pending merge.
 - **W3 — Fresh chats recover the correct next safe action:** not started; blocked on W2 being merged to main.
