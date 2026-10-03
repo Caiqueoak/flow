@@ -6,6 +6,8 @@ import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mj
 import { parseState } from '../../../domain/workflow/execution-state.mjs';
 import { validateProject } from '../../project-validation.mjs';
 import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
+import { inspectRecoveryState } from '../../recovery-consistency.mjs';
+import { clearCheckpoint } from '../../checkpoint/operations/checkpoint.mjs';
 
 interface RuntimeConfiguration {
   skills_path: string;
@@ -131,6 +133,8 @@ export function diagnoseProject(
     );
   }
 
+  checkRecoveryState(root, add);
+
   if (quick) {
     checkQuickStructure(root, flow, add);
   } else {
@@ -170,6 +174,42 @@ export function runDoctor({ args, version, packageRoot }: DoctorCommandContext):
   if (!result.healthy) {
     setExitCode(1);
   }
+}
+
+function checkRecoveryState(root: string, add: AddCheck): void {
+  const recovery = inspectRecoveryState(root);
+
+  if (recovery.classification === 'safely_repairable' && recovery.repair) {
+    clearCheckpoint(root, {
+      targetRef: recovery.repair.target_ref,
+      targetRevision: recovery.repair.target_revision
+    });
+    add(
+      'recovery',
+      true,
+      `Repaired ${recovery.findings[0]?.code ?? 'stale checkpoint'} by clearing ${recovery.repair.target_ref} at exact revision ${recovery.repair.target_revision}.`
+    );
+    return;
+  }
+
+  if (recovery.classification === 'requires_reconciliation') {
+    add(
+      'recovery',
+      false,
+      recovery.findings.map((finding) => `${finding.code}: ${finding.message}`).join(' '),
+      'Run flow validate --json and reconcile the reported canonical-state conflict.'
+    );
+    return;
+  }
+
+  const continuation = recovery.continuation;
+  add(
+    'recovery',
+    true,
+    continuation
+      ? `Recovery state is consistent; resume ${continuation.phase}${continuation.work_item ? ` for ${continuation.work_item}` : ''}.`
+      : 'Recovery state is consistent.'
+  );
 }
 
 function checkQuickStructure(root: string, flow: string, add: AddCheck): void {
