@@ -85,8 +85,8 @@
       },
       "workspace_files": {
         "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: null\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n",
-        "AGENTS.md": "Rule ID INGESTION_DEPENDENCY: Parsers owned by ingestion belong under src/application/ingestion/ and must not import src/presentation/.\\n",
-        "task.md": "Add a parser for newline-delimited ingestion records under src/application/ingestion/ and add focused verification.\\n"
+        "AGENTS.md": "Rule ID INGESTION_DEPENDENCY: Parsers owned by ingestion belong under src/application/ingestion/ and must not import src/presentation/.\n",
+        "task.md": "Add a parser for newline-delimited ingestion records under src/application/ingestion/ and add focused verification.\n"
       }
     },
     {
@@ -106,8 +106,8 @@
         "_flow/work-items/W001-benchmark/spec.md": "---\nschema_version: 1\nwork_item: W001\ntitle: Parser hardening\nkind: technical\npriority: 1\ndepends_on: []\nblockers: []\nmaturity: ready\n---\n# Work Item Specification\n## Problem\nBenchmark fixture.\n## Scope\nExercise the intended W8 behavior.\n## Non-goals\nNo unrelated production changes.\n## Requirements\nReject empty records and trim surrounding whitespace before validation.\n## Acceptance criteria\n- reject empty records;\n- trim surrounding whitespace before validation;\n- preserve valid non-empty records.\n## Contracts\nValidation must not silently accept invalid input.\n## Data and APIs\nNone beyond the fixture surface.\n## Edge cases\nFixture-specific edge cases are explicit above.\n## Risks\nFalse-positive benchmark evidence.\n## Decisions\nUse canonical Flow artifacts.\n## Gates\nFixture must remain structurally valid.\n",
         "_flow/work-items/W001-benchmark/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Parser hardening\n    state: completed\n    depends_on: []\n    mutation:\n      surfaces: [src/parser.ts]\n      resources: [parser]\n",
         "_flow/work-items/W001-benchmark/review.yaml": "schema_version: 2\nwork_item: W001\ndisposition: pending\nactive_pass: null\nworker_runs: []\npasses: []\n",
-        "src/parser.ts": "export function parseRecord(value: string): string {\\n  return value;\\n}\\n",
-        "src/parser.test.ts": "// Seeded fixture intentionally lacks empty-record coverage.\\n"
+        "src/parser.ts": "export function parseRecord(value: string): string {\n  return value;\n}\n",
+        "src/parser.test.ts": "// Seeded fixture intentionally lacks empty-record coverage.\n"
       }
     },
     {
@@ -127,8 +127,8 @@
         "_flow/work-items/W001-benchmark/spec.md": "---\nschema_version: 1\nwork_item: W001\ntitle: Parser hardening\nkind: technical\npriority: 1\ndepends_on: []\nblockers: []\nmaturity: ready\n---\n# Work Item Specification\n## Problem\nBenchmark fixture.\n## Scope\nExercise the intended W8 behavior.\n## Non-goals\nNo unrelated production changes.\n## Requirements\nReject empty records and trim surrounding whitespace before validation.\n## Acceptance criteria\n- reject empty records;\n- trim surrounding whitespace before validation;\n- preserve valid non-empty records.\n## Contracts\nValidation must not silently accept invalid input.\n## Data and APIs\nNone beyond the fixture surface.\n## Edge cases\nFixture-specific edge cases are explicit above.\n## Risks\nFalse-positive benchmark evidence.\n## Decisions\nUse canonical Flow artifacts.\n## Gates\nFixture must remain structurally valid.\n",
         "_flow/work-items/W001-benchmark/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Parser hardening\n    state: completed\n    depends_on: []\n    mutation:\n      surfaces: [src/parser.ts]\n      resources: [parser]\n",
         "_flow/work-items/W001-benchmark/review.yaml": "schema_version: 2\nwork_item: W001\ndisposition: changes_required\nactive_pass: null\nworker_runs: []\npasses:\n  - id: R001\n    scope:\n      kind: work_item\n      ref: W001\n    inspected:\n      - src/parser.ts\n    parecer: Empty-record handling violates acceptance.\n    disposition: changes_required\n    findings:\n      - id: F001\n        blocking: true\n        claim: Empty records are accepted.\n        evidence:\n          - src/parser.ts\n        cause: verification_gap\n    actions: []\n    resolutions: []\n    residual_risk: []\n    finalized_at: 2026-10-03T12:00:00.000Z\n",
-        "src/parser.ts": "export function parseRecord(value: string): string {\\n  return value;\\n}\\n",
-        "task.md": "Repair F001, preserve review history, and rerun parser acceptance verification.\\n"
+        "src/parser.ts": "export function parseRecord(value: string): string {\n  return value;\n}\n",
+        "task.md": "Repair F001, preserve review history, and rerun parser acceptance verification.\n"
       }
     },
     {
@@ -145,8 +145,8 @@
       },
       "workspace_files": {
         "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: null\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n",
-        "task.md": "Delegate implementation of a bounded parser change.\\n",
-        "docs/engineering.md": "Rule ID PARSER_PUBLIC_CONTRACT: parser changes are owned by src/application/ingestion and must preserve the public parseRecord contract. No UI context is relevant.\\n"
+        "task.md": "Delegate implementation of a bounded parser change.\n",
+        "docs/engineering.md": "Rule ID PARSER_PUBLIC_CONTRACT: parser changes are owned by src/application/ingestion and must preserve the public parseRecord contract. No UI context is relevant.\n"
       }
     },
     {
@@ -167,7 +167,7 @@
         "_flow/work-items/W001-benchmark/spec.md": "---\nschema_version: 1\nwork_item: W001\ntitle: Benchmark fixture\nkind: technical\npriority: 1\ndepends_on: []\nblockers: []\nmaturity: ready\n---\n# Work Item Specification\n## Problem\nBenchmark fixture.\n## Scope\nExercise the intended W8 behavior.\n## Non-goals\nNo unrelated production changes.\n## Requirements\nPreserve canonical Flow structure.\n## Acceptance criteria\nFixture is parseable.\n## Contracts\nUse canonical state, tasks, and review artifacts.\n## Data and APIs\nNone beyond the fixture surface.\n## Edge cases\nFixture-specific edge cases are explicit above.\n## Risks\nFalse-positive benchmark evidence.\n## Decisions\nUse canonical Flow artifacts.\n## Gates\nFixture must remain structurally valid.\n",
         "_flow/work-items/W001-benchmark/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Parser hardening\n    state: in_progress\n    depends_on: []\n    mutation:\n      surfaces: [src/parser.ts]\n      resources: [parser]\n",
         "_flow/work-items/W001-benchmark/review.yaml": "schema_version: 2\nwork_item: W001\ndisposition: pending\nactive_pass: null\nworker_runs: []\npasses: []\n",
-        "RECOVERY.md": "Authorized repair, when explicitly granted by evaluator/runtime: reconcile the stale W002 focus before continuation.\\n"
+        "RECOVERY.md": "Authorized repair, when explicitly granted by evaluator/runtime: reconcile the stale W002 focus before continuation.\n"
       }
     }
   ]
