@@ -88,4 +88,4 @@ The W1-W7 test suite remains the structural regression baseline required by tech
 
 ## Residual limitation
 
-Live model/runtime execution is not portable across supported environments, so W8 stops at the repeatable fixture/manifest/observation/evaluator contract. A CI or external runtime adapter may invoke the commands above without changing benchmark semantics.
+Live model/runtime execution is not portable across supported environments, so W8 stops at the repeatable fixture/manifest/observation/evaluator contract. Run artifacts are evaluation evidence, not canonical Flow project state. A CI or external runtime adapter may invoke the commands above without changing benchmark semantics.
