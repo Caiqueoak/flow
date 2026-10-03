@@ -3,25 +3,31 @@ import { REVIEW_FILE } from '../../../domain/project/project.js';
 import type { ActiveReviewPass, WorkerRunEvidence } from '../../../domain/work-item/review.mjs';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import { fail, optionValue, requiredOption } from '../../command-runtime.js';
-import { checkpointReviewPass, finalizeReviewPass } from '../operations/review-history.mjs';
+import {
+  assertReviewMutationAllowed,
+  checkpointReviewPass,
+  finalizeReviewPass
+} from '../operations/review-history.mjs';
 
 interface ReviewPassPayload {
   pass: ActiveReviewPass;
   worker_runs?: WorkerRunEvidence[];
 }
 
-export function persistWorkItemReviewPass(item: LoadedWorkItem, args: readonly string[]): void {
+export function persistWorkItemReviewPass(root: string, item: LoadedWorkItem, args: readonly string[]): void {
+  assertReviewMutationAllowed(root, item.id);
   const mode = requiredOption(args, '--mode');
   const reviewFile = path.join(item.base, REVIEW_FILE);
+  const canonicalTaskRefs = new Set(item.tasks.tasks.map((task) => `${item.id}-${task.id}`));
 
   if (mode === 'finalize') {
     if (optionValue(args, '--data')) fail('--data is not accepted when --mode finalize is used.');
-    finalizeReviewPass(reviewFile, item.id);
+    finalizeReviewPass(reviewFile, item.id, new Date().toISOString(), canonicalTaskRefs);
     return;
   }
 
   if (mode !== 'checkpoint') fail("--mode must be 'checkpoint' or 'finalize'.");
-  checkpointReviewPass(reviewFile, item.id, parsePayload(requiredOption(args, '--data')));
+  checkpointReviewPass(reviewFile, item.id, parsePayload(requiredOption(args, '--data')), canonicalTaskRefs);
 }
 
 function parsePayload(value: string): ReviewPassPayload {
