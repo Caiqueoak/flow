@@ -175,7 +175,14 @@ export function evaluateRun(repoRoot: string, runRoot: string): Record<string, u
 }
 
 function validateTelemetry(telemetry: Telemetry | undefined): void {
-  if (!telemetry || telemetry.status === 'unavailable') return;
+  if (!telemetry) return;
+  if (telemetry.status === 'unavailable') {
+    if (Object.keys(telemetry).length !== 1) {
+      throw new Error('Unavailable telemetry cannot contain numeric values; unavailable is distinct from zero.');
+    }
+    return;
+  }
+  if (telemetry.status !== 'available') throw new Error('Telemetry status must be available or unavailable.');
   for (const [key, value] of Object.entries(telemetry)) {
     if (key === 'status' || value === undefined) continue;
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
