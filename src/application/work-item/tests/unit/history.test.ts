@@ -43,10 +43,7 @@ function project(t: test.TestContext, taskState: 'pending' | 'completed', review
       ''
     ].join('\n')
   );
-  fs.writeFileSync(
-    path.join(base, 'review.yaml'),
-    `schema_version: 1\nwork_item: W001\nstatus: ${reviewStatus}\n`
-  );
+  fs.writeFileSync(path.join(base, 'review.yaml'), `schema_version: 1\nwork_item: W001\nstatus: ${reviewStatus}\n`);
   return root;
 }
 
@@ -81,7 +78,6 @@ test('history guard rejects unknown work-items', (t) => {
   const root = project(t, 'pending', 'pending');
   assert.throws(() => assertWorkItemHistoryMutable(root, 'W999'), /Unknown work-item 'W999'/);
 });
-
 
 test('work-item dispatcher applies completed-history guard before mutation', (t) => {
   const root = project(t, 'completed', 'approved');

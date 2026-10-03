@@ -538,7 +538,11 @@ function completedHistoricalWorkItemIds(root: string): Set<string> {
     try {
       const tasks = parseTasks(readMigrationText(path.join(base, 'tasks.yaml')), { expectedWorkItem: workItemId });
       const review = parseReview(readMigrationText(path.join(base, 'review.yaml')), { expectedWorkItem: workItemId });
-      if (tasks.tasks.length > 0 && tasks.tasks.every((task) => task.state === 'completed') && isReviewApproved(review)) {
+      if (
+        tasks.tasks.length > 0 &&
+        tasks.tasks.every((task) => task.state === 'completed') &&
+        isReviewApproved(review)
+      ) {
         completed.add(workItemId);
       }
     } catch {

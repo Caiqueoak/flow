@@ -33,7 +33,16 @@ function completedProject(t: test.TestContext): string {
   );
   fs.writeFileSync(
     path.join(base, 'tasks.yaml'),
-    ['schema_version: 3', 'work_item: W001', 'tasks:', '  - id: T001', '    title: Done', '    state: completed', '    depends_on: []', ''].join('\n')
+    [
+      'schema_version: 3',
+      'work_item: W001',
+      'tasks:',
+      '  - id: T001',
+      '    title: Done',
+      '    state: completed',
+      '    depends_on: []',
+      ''
+    ].join('\n')
   );
   fs.writeFileSync(path.join(base, 'review.yaml'), 'schema_version: 1\nwork_item: W001\nstatus: approved\n');
   return root;

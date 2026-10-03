@@ -81,7 +81,10 @@ test('canonical migration requiring semantic reconciliation blocks normal routin
   const result = migrateProject(root, { targetVersion: '0.8.0' });
 
   assert.deepEqual(result.unresolved, ['semantic reconciliation']);
-  assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status, 'pending_reconciliation');
+  assert.equal(
+    parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status,
+    'pending_reconciliation'
+  );
   assert.deepEqual(routeProject(root), {
     action: 'continue',
     phase: 'reconcile',
@@ -346,7 +349,10 @@ test('preserves completed canonical task and review history verbatim during migr
   const reviewBefore = fs.readFileSync(reviewFile, 'utf8');
   const plan = migrationPlan(root, '0.8.0');
 
-  assert.equal(plan.changes.some((change) => change.includes('work-items/W101-item/tasks.yaml')), false);
+  assert.equal(
+    plan.changes.some((change) => change.includes('work-items/W101-item/tasks.yaml')),
+    false
+  );
 
   const result = migrateProject(root, { targetVersion: '0.8.0' });
   const gates = parse(fs.readFileSync(path.join(root, '_flow', 'gates.yaml'), 'utf8'));
@@ -357,7 +363,10 @@ test('preserves completed canonical task and review history verbatim during migr
   assert.deepEqual(gates.gates[0].scope, {});
   assert.equal(gates.gates[0].stage, 'full');
   assert.equal(gates.gates[0].cost, 'medium');
-  assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status, 'pending_reconciliation');
+  assert.equal(
+    parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status,
+    'pending_reconciliation'
+  );
   assert.ok(result.backup && fs.existsSync(result.backup));
 });
 test('upgrades v2 state without trusting its dormant execution cursor', (t) => {

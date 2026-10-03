@@ -313,12 +313,7 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
 
   await t.test('approves, executes and commits one task with exact evidence', async () => {
     assert.match(
-      await approveCanonical(
-        root,
-        '_flow/work-items/W101-source-workflow/spec.md',
-        'specification',
-        'work_item_spec'
-      ),
+      await approveCanonical(root, '_flow/work-items/W101-source-workflow/spec.md', 'specification', 'work_item_spec'),
       /specification approved/
     );
     await flow(root, ['task', 'create', 'W101', '--title', 'Implement source workflow']);

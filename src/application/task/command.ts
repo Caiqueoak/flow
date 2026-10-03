@@ -50,4 +50,3 @@ export function runTask({ args }: { args: string[] }): void {
 
   resolveSubcommand(taskCommands, action, `Unknown task operation '${action}'.`)(target, args);
 }
-
