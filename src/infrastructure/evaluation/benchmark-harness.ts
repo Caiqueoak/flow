@@ -79,6 +79,7 @@ export function prepareRun(
   const runRoot = path.resolve(runsRoot, runId);
   const resolvedRunsRoot = path.resolve(runsRoot);
   assertChildPath(resolvedRunsRoot, runRoot);
+  fs.mkdirSync(resolvedRunsRoot, { recursive: true });
   fs.mkdirSync(runRoot, { recursive: false });
   const workspace = path.join(runRoot, 'workspace');
   fs.mkdirSync(workspace);
