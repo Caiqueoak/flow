@@ -9,6 +9,7 @@ import { isWorkItemSpecApproved } from '../../../domain/work-item/specification.
 import { SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import { inspectRecovery } from '../../recovery/recovery.mjs';
+import { loadExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 
 interface RouteResult {
   action: 'continue' | 'stop';
@@ -146,14 +147,15 @@ export function routeProject(root: string): RouteResult {
   if (!items.length) return step('planning', 'planning/step-01-plan-work-item.md');
 
   const by = new Map(items.map((i) => [i.id, i]));
+  const executionState = loadExecutionState(root);
+  const focused = executionState.active.work_item
+    ? items.find((item) => item.id === executionState.active.work_item)
+    : undefined;
+  if (focused && lifecycle(focused, by).status !== 'completed') return routeWorkItem(focused, by);
+
   const active = items.find((i) => lifecycle(i, by).status === 'in_progress');
-  if (active) {
-    const task = active.tasks.tasks.find((t) => t.state === 'in_progress');
-    return step('implementation', 'build/step-01-execute-task.md', {
-      work_item: active.id,
-      task: `${active.id}-${task!.id}`
-    });
-  }
+  if (active) return routeWorkItem(active, by);
+
   const candidate = items
     .filter((i) => ['outlined', 'eligible', 'review'].includes(lifecycle(i, by).status))
     .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))[0];
@@ -163,8 +165,11 @@ export function routeProject(root: string): RouteResult {
       reason:
         items.length && items.every((i) => lifecycle(i, by).status === 'completed') ? 'finished' : 'external_action'
     };
-  const state = lifecycle(candidate, by).status;
-  if (state === 'outlined')
+  return routeWorkItem(candidate, by);
+}
+function routeWorkItem(candidate: LoadedWorkItem, by: ReadonlyMap<LoadedWorkItem['id'], LoadedWorkItem>): RouteResult {
+  const state = lifecycle(candidate, by);
+  if (state.status === 'outlined')
     return step('specification', 'specification/step-01-deepen-spec.md', { work_item: candidate.id });
   if (!isWorkItemSpecApproved(readText(path.join(candidate.base, SPEC_FILE)), { expectedWorkItem: candidate.id }))
     return {
@@ -174,13 +179,32 @@ export function routeProject(root: string): RouteResult {
       instruction: 'specification/step-02-await-approval.md',
       work_item: candidate.id
     };
-  if (state === 'review') return step('review', 'review/step-01-review-work-item.md', { work_item: candidate.id });
+  if (state.status === 'review')
+    return step('review', 'review/step-01-review-work-item.md', { work_item: candidate.id });
+
+  const activeTasks = candidate.tasks.tasks.filter((task) => task.state === 'in_progress');
+  if (activeTasks.length) {
+    return step('implementation', 'build/step-01-execute-task.md', {
+      work_item: candidate.id,
+      task: `${candidate.id}-${activeTasks[0]!.id}`,
+      ...(activeTasks.length > 1
+        ? {
+            details: [`Concurrent active tasks: ${activeTasks.map((task) => `${candidate.id}-${task.id}`).join(', ')}`]
+          }
+        : {})
+    });
+  }
+
   if (!candidate.tasks.tasks.length)
     return step('planning', 'planning/step-01-create-tasks.md', { work_item: candidate.id });
+
   const task = candidate.tasks.tasks.find(
-    (t) =>
-      t.state === 'pending' &&
-      t.depends_on.every((d) => candidate.tasks.tasks.find((x) => x.id === d)?.state === 'completed')
+    (task) =>
+      task.state === 'pending' &&
+      task.depends_on.every(
+        (dependency) =>
+          candidate.tasks.tasks.find((candidateTask) => candidateTask.id === dependency)?.state === 'completed'
+      )
   );
   return task
     ? step('implementation', 'build/step-01-execute-task.md', {
@@ -189,6 +213,7 @@ export function routeProject(root: string): RouteResult {
       })
     : step('reconcile', 'reconcile/step-01-reconcile.md', { work_item: candidate.id });
 }
+
 export function runRoute({ args }: { args: string[] }): void {
   const r = routeProject(projectRoot(args));
   info(

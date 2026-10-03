@@ -125,10 +125,15 @@ test('task lists enforce identity, dependencies, lifecycle and retired fields', 
         { ...task, id: 'T002', depends_on: ['T001'] }
       ],
       /cycle/
-    ],
-    [[task, { ...task, id: 'T002', state: 'in_progress' }, { ...task, id: 'T003', state: 'in_progress' }], /Only one/]
+    ]
   ];
   for (const [tasks, expected] of cases) assert.throws(() => parseTasksTyped(tasksWith(tasks)), expected);
+
+  const multipleActive = [
+    { ...task, id: 'T002', state: 'in_progress' as const },
+    { ...task, id: 'T003', state: 'in_progress' as const }
+  ];
+  assert.deepEqual(parseTasksTyped(tasksWith(multipleActive)).tasks, multipleActive);
   assert.throws(() => parseTasksTyped('{'), /invalid/);
   assert.throws(() => parseTasksTyped('[]'), /mapping/);
   assert.throws(

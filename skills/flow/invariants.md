@@ -2,7 +2,7 @@
 
 1. Run `flow doctor --quick --json` at the start of every /flow invocation before trusting repository state.
 2. Persist lifecycle states only pending, in_progress and completed. Eligible/Blocked are derived.
-3. One mutating work item and task at a time across the project. Read-only investigation may be parallel; Flow does not orchestrate concurrent mutating worktrees.
+3. One active work item is the delivery boundary. Every `in_progress` task must match `state.active.work_item`. Multiple `in_progress` tasks are allowed only inside that work item when every concurrent task has complete non-conflicting mutation claims, no dependency path or shared resource conflict exists, recovery/contracts remain authorized, and the orchestrator explicitly starts each additional writer with a persisted `shared` or `isolated` workspace strategy. Parallelism is an orchestrator judgment; no fixed worker count or mandatory worktree is imposed.
 4. The CLI owns deterministic structure, state transitions, dependency legality, traceability, gates and migration safety. The agent owns product, architecture, decomposition and trade-off judgment.
 5. Discovery is recommendation-driven: present reasonable options, recommend one with justification, and ask only consequential questions.
 6. Keep the complete known MVP work-item map so the dependency graph remains useful, but deepen only the next eligible item.

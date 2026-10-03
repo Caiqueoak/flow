@@ -9,6 +9,7 @@ import type { WorkflowCheckpoint } from '../../domain/workflow/checkpoint.mjs';
 import { fileExists, readText } from '../../infrastructure/filesystem/index.js';
 import { loadExecutionState, writeExecutionState } from '../../infrastructure/persistence/execution-state.mjs';
 import { loadWorkItems } from '../../infrastructure/persistence/work-items.mjs';
+import { validateConcurrentTaskState } from '../../domain/work-item/concurrency.mjs';
 import {
   canonicalProjectDocumentKind,
   inspectProjectContract,
@@ -34,7 +35,8 @@ export interface RecoveryFinding {
     | 'RECOVERY_UPSTREAM_UNAUTHORIZED'
     | 'RECOVERY_SPEC_UNAUTHORIZED'
     | 'RECOVERY_PLANNING_TARGET_INVALID'
-    | 'RECOVERY_PLANNING_STATE_CONFLICT';
+    | 'RECOVERY_PLANNING_STATE_CONFLICT'
+    | 'RECOVERY_CONCURRENT_TASKS_INVALID';
   message: string;
 }
 
@@ -81,6 +83,17 @@ export function inspectRecovery(root: string): RecoveryAssessment {
   }
 
   const checkpoint = state.checkpoint;
+
+  for (const issue of validateConcurrentTaskState(items, state.active.work_item, {
+    checkpointActive: Boolean(checkpoint),
+    concurrency: state.active.concurrency
+  })) {
+    findings.push({
+      code: 'RECOVERY_CONCURRENT_TASKS_INVALID',
+      message: `${issue.code}: ${issue.message}`
+    });
+  }
+  validateConcurrentTaskAuthorization(root, items, findings);
 
   if (state.active.work_item && !items.some((item) => item.id === state.active.work_item)) {
     findings.push({
@@ -393,6 +406,37 @@ function validatePlanningShape(
       code: 'RECOVERY_ACTIVE_WORK_ITEM_CONFLICT',
       message: `Checkpoint references ${checkpointWorkItemId} while state.active.work_item is ${activeWorkItem}.`
     });
+  }
+}
+
+function validateConcurrentTaskAuthorization(
+  root: string,
+  items: ReturnType<typeof loadWorkItems>,
+  findings: RecoveryFinding[]
+): void {
+  const activeItems = items.filter((item) => item.tasks.tasks.some((task) => task.state === 'in_progress'));
+  const activeTaskCount = activeItems.reduce(
+    (count, item) => count + item.tasks.tasks.filter((task) => task.state === 'in_progress').length,
+    0
+  );
+  if (activeTaskCount < 2) return;
+
+  const unauthorized = requiredProjectContracts(root).find((contract) => !contract.approved);
+  if (unauthorized) {
+    findings.push({
+      code: 'RECOVERY_UPSTREAM_UNAUTHORIZED',
+      message: `${unauthorized.ref} is not authorized for concurrent task execution.`
+    });
+  }
+
+  for (const item of activeItems) {
+    const specFile = path.join(item.base, 'spec.md');
+    if (!isWorkItemSpecApproved(readText(specFile), { expectedWorkItem: item.id })) {
+      findings.push({
+        code: 'RECOVERY_SPEC_UNAUTHORIZED',
+        message: `${item.id} specification is not authorized for concurrent task execution.`
+      });
+    }
   }
 }
 

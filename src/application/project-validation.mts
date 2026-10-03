@@ -41,8 +41,6 @@ export function validateProject(
     for (const message of spec.errors) error('SPEC', `${item.id}: ${message}`);
     if (item.maturity === 'outlined' && item.tasks.tasks.length)
       error('TASKS', `${item.id}: outlined work cannot have tasks.`);
-    if (item.tasks.tasks.filter((t: { state: string }) => t.state === 'in_progress').length > 1)
-      error('TASKS', `${item.id}: only one task can be in_progress.`);
     if (lifecycle(item, by).status === 'completed' && item.review.status !== 'approved')
       error('REVIEW', `${item.id}: completed work requires approved review.`);
   }

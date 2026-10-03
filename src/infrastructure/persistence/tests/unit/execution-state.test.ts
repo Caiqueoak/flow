@@ -16,7 +16,7 @@ test('execution state persistence atomically replaces a valid checkpoint state',
 
   const next: ExecutionState = {
     ...original,
-    active: { work_item: 'W101' }
+    active: { work_item: 'W101', concurrency: null }
   };
   writeExecutionState(root, next);
 

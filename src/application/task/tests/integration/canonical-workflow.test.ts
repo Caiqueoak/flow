@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { parse } from 'yaml';
+import { parse, stringify } from 'yaml';
 
 const cli = path.resolve('dist/entry.js');
 const temporaryRoots = new Set<string>();
@@ -152,6 +152,8 @@ test('approved spec routes directly through task creation and start without a pl
   const base = ready(root);
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
   assert.equal(fs.existsSync(path.join(base, 'implementation-plan.md')), false);
+  const focused = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.equal(focused.active.work_item, 'W101');
   fs.appendFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), 'changed\n');
   const rejected = run(root, ['task', 'start', 'W101-T001']);
   assert.notEqual(rejected.status, 0);
@@ -450,4 +452,291 @@ test('packaged workflow instructions use the canonical task and review commands'
   assert.match(build, /flow task commit W###-T### --message "type\(domain\): description \[W###-T###\]" --files/);
   assert.match(review, /flow work-item review-complete W### --domain domain/);
   assert.match(readme, /flow task commit W015-T001 --message "feat\(search\): add customer query \[W015-T001\]"/);
+});
+
+test('W4 task decomposition establishes and respects active work-item focus', () => {
+  const root = project();
+  ready(root, 'W101');
+  const otherBase = ready(root, 'W102');
+  const otherTasksFile = path.join(otherBase, 'tasks.yaml');
+  const otherTasks = parse(fs.readFileSync(otherTasksFile, 'utf8'));
+  otherTasks.tasks.push({ id: 'T001', title: 'Existing other task', state: 'pending', depends_on: [] });
+  fs.writeFileSync(otherTasksFile, stringify(otherTasks));
+
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Focused task']).status, 0);
+  let state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.equal(state.active.work_item, 'W101');
+  assert.equal(run(root, ['task', 'set', 'W101-T001', '--title', 'Focused task updated']).status, 0);
+
+  const crossCreate = run(root, ['task', 'create', 'W102', '--title', 'Wrong work item']);
+  assert.notEqual(crossCreate.status, 0);
+  assert.match(crossCreate.stderr, /state\.active\.work_item is W101/);
+
+  const crossSet = run(root, ['task', 'set', 'W102-T001', '--title', 'Wrong focus update']);
+  assert.notEqual(crossSet.status, 0);
+  assert.match(crossSet.stderr, /state\.active\.work_item is W101/);
+
+  state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.equal(state.active.work_item, 'W101');
+});
+
+test('W4 preserves the persisted workspace strategy for additional concurrent writers', () => {
+  const root = project();
+  ready(root);
+  for (const [title, surface, resource] of [
+    ['Implement A', 'src/a', 'resource-a'],
+    ['Implement B', 'src/b', 'resource-b'],
+    ['Implement C', 'src/c', 'resource-c']
+  ]) {
+    assert.equal(
+      run(root, [
+        'task',
+        'create',
+        'W101',
+        '--title',
+        title,
+        '--mutation-surfaces',
+        surface,
+        '--mutation-resources',
+        resource
+      ]).status,
+      0
+    );
+  }
+
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'shared']).status, 0);
+
+  const changedWorkspace = run(root, ['task', 'start', 'W101-T003', '--concurrent', '--workspace', 'isolated']);
+  assert.notEqual(changedWorkspace.status, 0);
+  assert.match(changedWorkspace.stderr, /already uses workspace 'shared'/);
+
+  let state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.deepEqual(state.active.concurrency, { tasks: ['W101-T001', 'W101-T002'], workspace: 'shared' });
+
+  assert.equal(run(root, ['task', 'start', 'W101-T003', '--concurrent', '--workspace', 'shared']).status, 0);
+  state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.deepEqual(state.active.concurrency, {
+    tasks: ['W101-T001', 'W101-T002', 'W101-T003'],
+    workspace: 'shared'
+  });
+});
+
+test('W4 starts independent same-work-item tasks concurrently and routes through active work-item focus', () => {
+  const root = project();
+  ready(root);
+  assert.equal(
+    run(root, [
+      'task',
+      'create',
+      'W101',
+      '--title',
+      'Implement A',
+      '--mutation-surfaces',
+      'src/a',
+      '--mutation-resources',
+      'resource-a'
+    ]).status,
+    0
+  );
+  assert.equal(
+    run(root, [
+      'task',
+      'create',
+      'W101',
+      '--title',
+      'Implement B',
+      '--mutation-surfaces',
+      'src/b',
+      '--mutation-resources',
+      'resource-b'
+    ]).status,
+    0
+  );
+
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  const accidental = run(root, ['task', 'start', 'W101-T002']);
+  assert.notEqual(accidental.status, 0);
+  assert.match(accidental.stderr, /explicit --concurrent intent/);
+  assert.equal(run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'shared']).status, 0);
+
+  const state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.equal(state.active.work_item, 'W101');
+  assert.deepEqual(state.active.concurrency, { tasks: ['W101-T001', 'W101-T002'], workspace: 'shared' });
+  const route = JSON.parse(run(root, ['route', '--json']).stdout);
+  assert.equal(route.work_item, 'W101');
+  assert.match(route.details?.join(' ') ?? '', /W101-T001, W101-T002/);
+});
+
+test('W4 blocks second writers without claims and cross-work-item execution', () => {
+  const root = project();
+  ready(root, 'W101');
+  const otherBase = ready(root, 'W102');
+  const otherTasksFile = path.join(otherBase, 'tasks.yaml');
+  const otherTasks = parse(fs.readFileSync(otherTasksFile, 'utf8'));
+  otherTasks.tasks.push({ id: 'T001', title: 'Other item task', state: 'pending', depends_on: [] });
+  fs.writeFileSync(otherTasksFile, stringify(otherTasks));
+
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Legacy single task']).status, 0);
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Second task']).status, 0);
+
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  const missingIntent = run(root, ['task', 'start', 'W101-T002']);
+  assert.notEqual(missingIntent.status, 0);
+  assert.match(missingIntent.stderr, /explicit --concurrent intent/);
+  const missingClaims = run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'isolated']);
+  assert.notEqual(missingClaims.status, 0);
+  assert.match(missingClaims.stderr, /requires mutation\.surfaces and mutation\.resources/);
+
+  const crossItem = run(root, ['task', 'start', 'W102-T001', '--concurrent', '--workspace', 'isolated']);
+  assert.notEqual(crossItem.status, 0);
+  assert.match(crossItem.stderr, /multiple work items|state\.active\.work_item/);
+});
+
+test('W4 rejects a second concurrent start when the work-item SPEC is no longer authorized', () => {
+  const root = project();
+  const base = ready(root);
+  for (const [title, surface, resource] of [
+    ['Implement A', 'src/a', 'resource-a'],
+    ['Implement B', 'src/b', 'resource-b']
+  ]) {
+    assert.equal(
+      run(root, [
+        'task',
+        'create',
+        'W101',
+        '--title',
+        title,
+        '--mutation-surfaces',
+        surface,
+        '--mutation-resources',
+        resource
+      ]).status,
+      0
+    );
+  }
+
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  fs.appendFileSync(path.join(base, 'spec.md'), '\nChanged after approval.\n');
+
+  const second = run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'isolated']);
+  assert.notEqual(second.status, 0);
+  assert.match(second.stderr, /requires an approved specification/);
+});
+
+test('W4 concurrent commit stays inside its claim and outside another active claim', () => {
+  const root = project();
+  ready(root);
+  for (const [title, surface, resource] of [
+    ['Implement A', 'src/a', 'resource-a'],
+    ['Implement B', 'src/b', 'resource-b']
+  ]) {
+    assert.equal(
+      run(root, [
+        'task',
+        'create',
+        'W101',
+        '--title',
+        title,
+        '--mutation-surfaces',
+        surface,
+        '--mutation-resources',
+        resource
+      ]).status,
+      0
+    );
+  }
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'isolated']).status, 0);
+  assert.equal(run(root, ['sync']).status, 0);
+
+  fs.mkdirSync(path.join(root, 'src', 'b'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'src', 'b', 'foreign.ts'), 'foreign\n');
+  execFileSync('git', ['add', 'src/b/foreign.ts'], { cwd: root });
+  const otherClaim = run(root, [
+    'task',
+    'commit',
+    'W101-T001',
+    '--message',
+    'feat(flow): reject other claim [W101-T001]',
+    '--files',
+    'src/b/foreign.ts'
+  ]);
+  assert.notEqual(otherClaim.status, 0);
+  assert.match(otherClaim.stderr, /another active task's mutation surface/);
+  execFileSync('git', ['reset'], { cwd: root });
+
+  fs.writeFileSync(path.join(root, 'outside.txt'), 'outside\n');
+  execFileSync('git', ['add', 'outside.txt'], { cwd: root });
+  const outsideClaim = run(root, [
+    'task',
+    'commit',
+    'W101-T001',
+    '--message',
+    'feat(flow): reject outside claim [W101-T001]',
+    '--files',
+    'outside.txt'
+  ]);
+  assert.notEqual(outsideClaim.status, 0);
+  assert.match(outsideClaim.stderr, /outside T001's declared mutation surfaces/);
+  execFileSync('git', ['reset'], { cwd: root });
+
+  fs.mkdirSync(path.join(root, 'src', 'a'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'src', 'a', 'inside.ts'), 'inside\n');
+  execFileSync('git', ['add', 'src/a/inside.ts'], { cwd: root });
+  assert.equal(
+    run(root, [
+      'task',
+      'commit',
+      'W101-T001',
+      '--message',
+      'feat(flow): commit inside claim [W101-T001]',
+      '--files',
+      'src/a/inside.ts'
+    ]).status,
+    0
+  );
+});
+
+test('W4 reports active work-item conflicts consistently across route, validate and Doctor', () => {
+  const root = project();
+  ready(root);
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+
+  const stateFile = path.join(root, '_flow', 'state.yaml');
+  const state = parse(fs.readFileSync(stateFile, 'utf8'));
+  state.active.work_item = null;
+  fs.writeFileSync(stateFile, stringify(state));
+
+  assert.match(run(root, ['route', '--json']).stdout, /ACTIVE_WORK_ITEM_REQUIRED/);
+  const validate = run(root, ['validate', '--json']);
+  assert.notEqual(validate.status, 0);
+  assert.match(validate.stdout, /ACTIVE_WORK_ITEM_REQUIRED/);
+  const doctor = run(root, ['doctor', '--quick', '--json']);
+  assert.notEqual(doctor.status, 0);
+  assert.match(doctor.stdout, /ACTIVE_WORK_ITEM_REQUIRED/);
+
+  state.active.work_item = 'W102';
+  fs.writeFileSync(stateFile, stringify(state));
+  assert.match(run(root, ['route', '--json']).stdout, /ACTIVE_WORK_ITEM_CONFLICT/);
+});
+
+test('W4 rejects invalid and traversing mutation surfaces before persistence', () => {
+  const root = project();
+  ready(root);
+  for (const surface of ['/absolute/path', '../escape', 'src/**']) {
+    const result = run(root, [
+      'task',
+      'create',
+      'W101',
+      '--title',
+      'Invalid claim',
+      '--mutation-surfaces',
+      surface,
+      '--mutation-resources',
+      'resource-invalid'
+    ]);
+    assert.notEqual(result.status, 0);
+  }
 });
