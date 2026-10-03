@@ -8,6 +8,7 @@ import {
 import { isValidTaskCommitSubject } from '../../../domain/task/commit.js';
 import type { QualifiedTaskId, Task, TaskCollection } from '../../../domain/task/task.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
+import { validateConcurrentCommitFiles } from '../../../domain/work-item/concurrency.mjs';
 import { projectRelativePath, readText, writeText, writeYaml } from '../../../infrastructure/filesystem/index.js';
 import {
   assertExactStagedFiles,
@@ -60,6 +61,7 @@ export function runCommit(target: string | undefined, args: readonly string[]): 
   ensurePreCommitValidation(root, taskId);
   const files = projectRelativeFiles(root, args);
   assertExactStagedFiles(root, files);
+  ensureConcurrentCommitScope(task, context.tasks, files, taskId);
   ensureTaskGatesPass(root, taskId);
 
   persistTaskCommit({
@@ -122,6 +124,23 @@ function ensurePreCommitValidation(root: string, taskId: QualifiedTaskId): void 
 
   if (findings.length) {
     fail(`Pre-commit validation failed: ${findings.map((finding) => finding.code).join(', ')}.`);
+  }
+}
+
+function ensureConcurrentCommitScope(
+  task: Task,
+  tasks: TaskCollection,
+  files: string[],
+  taskId: QualifiedTaskId
+): void {
+  const otherActiveTasks = tasks.tasks.filter(
+    (candidate) => candidate.id !== task.id && candidate.state === 'in_progress'
+  );
+  if (!otherActiveTasks.length) return;
+
+  const findings = validateConcurrentCommitFiles(task, otherActiveTasks, files);
+  if (findings.length) {
+    fail(`${taskId} commit violates concurrent mutation claims: ${findings.join(' ')}`);
   }
 }
 
