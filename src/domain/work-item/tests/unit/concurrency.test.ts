@@ -150,6 +150,7 @@ test('mutation surfaces normalize POSIX and Windows separators and reject unsafe
   assert.equal(normalizeMutationSurface('src\\domain\\task'), 'src/domain/task');
   assert.throws(() => normalizeMutationSurface('/absolute/path'), /repository-relative/);
   assert.throws(() => normalizeMutationSurface('C:\\absolute\\path'), /repository-relative/);
+  assert.throws(() => normalizeMutationSurface('\\absolute\\path'), /repository-relative/);
   assert.throws(() => normalizeMutationSurface('../escape'), /traversal/);
   assert.throws(() => normalizeMutationSurface('src/**'), /glob/);
 });

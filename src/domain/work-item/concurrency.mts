@@ -24,7 +24,7 @@ export interface WorkItemTaskState {
 export function normalizeMutationSurface(surface: string): string {
   const trimmed = surface.trim();
   if (!trimmed) throw new Error('Mutation surface must be a non-empty repository-relative path.');
-  if (/^[A-Za-z]:/.test(trimmed) || trimmed.startsWith('/') || trimmed.startsWith('\\\\'))
+  if (/^[A-Za-z]:/.test(trimmed) || trimmed.startsWith('/') || trimmed.startsWith('\\'))
     throw new Error(`Mutation surface must be repository-relative: '${surface}'.`);
   if (/[*?\[\]{}]/.test(trimmed)) throw new Error(`Mutation surface cannot use glob syntax: '${surface}'.`);
 

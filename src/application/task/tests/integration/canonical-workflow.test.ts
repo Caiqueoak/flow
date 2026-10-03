@@ -512,6 +512,37 @@ test('W4 blocks second writers without claims and cross-work-item execution', ()
   assert.match(crossItem.stderr, /multiple work items|state\.active\.work_item/);
 });
 
+test('W4 rejects a second concurrent start when the work-item SPEC is no longer authorized', () => {
+  const root = project();
+  const base = ready(root);
+  for (const [title, surface, resource] of [
+    ['Implement A', 'src/a', 'resource-a'],
+    ['Implement B', 'src/b', 'resource-b']
+  ]) {
+    assert.equal(
+      run(root, [
+        'task',
+        'create',
+        'W101',
+        '--title',
+        title,
+        '--mutation-surfaces',
+        surface,
+        '--mutation-resources',
+        resource
+      ]).status,
+      0
+    );
+  }
+
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  fs.appendFileSync(path.join(base, 'spec.md'), '\nChanged after approval.\n');
+
+  const second = run(root, ['task', 'start', 'W101-T002']);
+  assert.notEqual(second.status, 0);
+  assert.match(second.stderr, /specification is not authorized for concurrent task execution/);
+});
+
 test('W4 concurrent commit stays inside its claim and outside another active claim', () => {
   const root = project();
   ready(root);
