@@ -84,6 +84,14 @@ function approveTarget(root: string, target: string, kind: string, phase: string
   assert.equal(approval.status, 0, approval.stderr);
 }
 
+function approveTargetCheckpointOnly(root: string, target: string, kind: string, phase: string) {
+  assert.equal(
+    run(root, ['checkpoint', 'begin', '--data', approvalCheckpoint({ kind, ref: target }, phase)]).status,
+    0
+  );
+  assert.equal(run(root, ['checkpoint', 'ready']).status, 0);
+}
+
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-canonical-'));
   temporaryRoots.add(root);
@@ -149,6 +157,32 @@ function approveReview(root: string, id = 'W101') {
   assert.equal(run(root, ['work-item', 'review-pass', id, '--mode', 'checkpoint', '--data', data]).status, 0);
   assert.equal(run(root, ['work-item', 'review-pass', id, '--mode', 'finalize']).status, 0);
   assert.equal(run(root, ['sync']).status, 0);
+}
+
+function completeWorkItem(root: string, id = 'W101') {
+  const base = ready(root, id);
+  assert.equal(run(root, ['task', 'create', id, '--title', 'Complete outcome']).status, 0);
+  assert.equal(run(root, ['task', 'start', `${id}-T001`]).status, 0);
+  const implementation = path.join(root, `${id}.txt`);
+  fs.writeFileSync(implementation, 'done\n');
+  execFileSync('git', ['add', path.basename(implementation)], { cwd: root });
+  assert.equal(run(root, ['sync']).status, 0);
+  assert.equal(
+    run(root, [
+      'task',
+      'commit',
+      `${id}-T001`,
+      '--message',
+      `feat(flow): complete outcome [${id}-T001]`,
+      '--files',
+      path.basename(implementation)
+    ]).status,
+    0
+  );
+  assert.equal(run(root, ['sync']).status, 0);
+  approveReview(root, id);
+  assert.equal(run(root, ['work-item', 'review-complete', id, '--domain', 'flow']).status, 0);
+  return base;
 }
 
 test('compiled CLI creates canonical shells and sync never mutates them', () => {
@@ -323,6 +357,48 @@ test('finished projects stay finished until new scope creates new immutable work
 
   for (const [file, before] of Object.entries(completedHistory)) {
     assert.equal(fs.readFileSync(path.join(completedBase, file), 'utf8'), before);
+  }
+});
+
+test('completed work-item canonical history rejects every existing-item and task mutation', () => {
+  const root = project();
+  const base = completeWorkItem(root);
+  const historyFiles = ['spec.md', 'tasks.yaml', 'review.yaml'] as const;
+  const snapshot = Object.fromEntries(
+    historyFiles.map((file) => [file, fs.readFileSync(path.join(base, file), 'utf8')])
+  );
+
+  const mutationCommands = [
+    ['work-item', 'set', 'W101', '--title', 'Changed'],
+    ['work-item', 'priority', 'W101', '--priority', '99'],
+    ['work-item', 'dependencies', 'W101', '--depends-on', 'W999'],
+    ['work-item', 'blocker-add', 'W101', '--id', 'B001', '--type', 'external_action', '--description', 'Later issue'],
+    ['work-item', 'blocker-resolve', 'W101', '--id', 'B001'],
+    ['work-item', 'promote', 'W101'],
+    ['work-item', 'review-pass', 'W101', '--mode', 'finalize'],
+    ['work-item', 'review-complete', 'W101', '--domain', 'flow'],
+    ['task', 'create', 'W101', '--title', 'Forbidden task'],
+    ['task', 'set', 'W101-T001', '--title', 'Changed task'],
+    ['task', 'start', 'W101-T001'],
+    ['task', 'commit', 'W101-T001', '--message', 'fix(flow): mutate history [W101-T001]', '--files', 'W101.txt']
+  ];
+
+  for (const command of mutationCommands) {
+    const result = run(root, command);
+    assert.notEqual(result.status, 0, command.join(' '));
+    assert.match(result.stderr, /completed and its canonical history is immutable/, command.join(' '));
+    for (const [file, before] of Object.entries(snapshot)) {
+      assert.equal(fs.readFileSync(path.join(base, file), 'utf8'), before, `${command.join(' ')} changed ${file}`);
+    }
+  }
+
+  const specTarget = path.relative(root, path.join(base, 'spec.md')).replaceAll('\\', '/');
+  approveTargetCheckpointOnly(root, specTarget, 'work_item_spec', 'specification');
+  const approval = run(root, ['approval', 'record', specTarget]);
+  assert.notEqual(approval.status, 0);
+  assert.match(approval.stderr, /completed and its canonical history is immutable/);
+  for (const [file, before] of Object.entries(snapshot)) {
+    assert.equal(fs.readFileSync(path.join(base, file), 'utf8'), before);
   }
 });
 
