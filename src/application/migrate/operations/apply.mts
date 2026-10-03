@@ -244,10 +244,13 @@ function inspectCurrent(root: string, targetVersion: string): string[] {
     changes.push('upgrade config.yaml');
   }
   const workItems = path.join(flow, 'work-items');
+  const completedHistory = completedHistoricalWorkItemIds(root);
   if (!migrationPathExists(workItems)) changes.push('restore work-items directory');
   else
     for (const entry of migrationDirectoryEntries(workItems)) {
       if (!entry.isDirectory) continue;
+      const workItemId = entry.name.match(/^(W\d{3,})-/)?.[1];
+      if (workItemId && completedHistory.has(workItemId)) continue;
       const tasks = path.join(workItems, entry.name, 'tasks.yaml');
       if (!migrationPathExists(tasks)) {
         changes.push(`restore work-items/${entry.name}/tasks.yaml`);
@@ -455,9 +458,12 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
 function upgradeCanonicalStaged(root: string, targetVersion: string): void {
   const flow = path.join(root, '_flow');
   const workItems = path.join(flow, 'work-items');
+  const completedHistory = completedHistoricalWorkItemIds(root);
   if (migrationPathExists(workItems))
     for (const entry of migrationDirectoryEntries(workItems)) {
       if (!entry.isDirectory) continue;
+      const workItemId = entry.name.match(/^(W\d{3,})-/)?.[1];
+      if (workItemId && completedHistory.has(workItemId)) continue;
       const taskPath = path.join(workItems, entry.name, 'tasks.yaml');
       if (!migrationPathExists(taskPath)) continue;
       const value = asRecord(parse(readMigrationText(taskPath)));
@@ -515,6 +521,24 @@ function upgradeExecutionState(root: string, flow: string): void {
   }
 
   writeMigrationText(stateFile, stringifyState(state));
+}
+
+function completedHistoricalWorkItemIds(root: string): Set<string> {
+  try {
+    const items = loadWorkItems(root);
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return new Set(
+      items.filter((item) => deriveWorkItemLifecycle(item, byId).status === 'completed').map((item) => item.id)
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function markMigrationReconciliationPending(root: string): void {
+  const state = loadExecutionState(root);
+  state.migration.status = 'pending_reconciliation';
+  writeExecutionState(root, state);
 }
 
 function recoverExistingCodePolicy(sourceFlow: string): string {
@@ -618,6 +642,7 @@ export function migrateProject(
       if (findings.length)
         throw new Error(`Migration rescue staging validation failed: ${findings.map((x) => x.code).join(', ')}.`);
     }
+    markMigrationReconciliationPending(staging);
     renameMigrationPath(sourceFlow, backup);
     try {
       renameMigrationPath(staged, targetFlow);
