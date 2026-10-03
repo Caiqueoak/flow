@@ -33,7 +33,7 @@ npm run benchmark -- prepare \
   --config <config-id>
 ```
 
-The command prints the new run directory. By default it is created under `.flow-evaluation/runs/`. A run directory is never reused; use a distinct repeat/run ID for every attempt.
+The command prints the new run directory. By default it is created under `.flow-evaluation/runs/`. The run directory is the fixture workspace boundary for benchmark artifacts; the harness does not mutate canonical `_flow` project state. A run directory is never reused; use a distinct repeat/run ID for every attempt.
 
 The manifest preserves:
 
