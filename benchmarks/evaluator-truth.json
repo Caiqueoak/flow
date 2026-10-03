@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "benchmarks": [
+    {
+      "id": "B01",
+      "hard_assertions": [
+        {"path":"facts.finalized","operator":"eq","expected":false},
+        {"path":"facts.unresolved_preserved","operator":"eq","expected":true}
+      ],
+      "rubric": [{"id":"decision_frontier_quality","max_score":2,"description":"Next frontier names the unresolved consequential decision without inventing closure."}]
+    },
+    {
+      "id": "B02",
+      "hard_assertions": [
+        {"path":"facts.same_frontier_resumed","operator":"eq","expected":true},
+        {"path":"facts.user_restatement_required","operator":"eq","expected":false}
+      ],
+      "rubric": [{"id":"resume_quality","max_score":2,"description":"Continuation is useful and derived only from persisted state."}]
+    },
+    {
+      "id": "B05",
+      "hard_assertions": [
+        {"path":"facts.independent_decision","operator":"eq","expected":"parallel"},
+        {"path":"facts.conflict_decision","operator":"eq","expected":"sequential"},
+        {"path":"facts.unsafe_concurrent_writers","operator":"eq","expected":0}
+      ],
+      "rubric": [{"id":"orchestration_proportionality","max_score":2,"description":"Parallelism is proportional to dependency and mutation-surface evidence."}]
+    },
+    {
+      "id": "B06",
+      "hard_assertions": [
+        {"path":"facts.seeded_constraint_satisfied","operator":"eq","expected":true},
+        {"path":"facts.manual_context_injections","operator":"eq","expected":0}
+      ],
+      "rubric": [
+        {"id":"handoff_relevance","max_score":2,"description":"Handoff includes the material rule or precise reference without wholesale context."},
+        {"id":"handoff_cohesion","max_score":2,"description":"Worker responsibility is bounded and coherent."}
+      ]
+    },
+    {
+      "id": "B07",
+      "hard_assertions": [
+        {"path":"facts.blocking_defect_detected","operator":"eq","expected":true},
+        {"path":"facts.approved_with_blocker","operator":"eq","expected":false},
+        {"path":"facts.fabricated_evidence_findings","operator":"eq","expected":0}
+      ],
+      "seeded_truth": {
+        "blocking_defects":["acceptance-mismatch"],
+        "non_blocking_defects":["engineering-contract","edge-regression"],
+        "non_defects":["style-alternative"]
+      },
+      "rubric": [{"id":"finding_quality","max_score":2,"description":"Findings are concrete, evidence-backed, correctly scoped, and avoid stylistic false positives."}]
+    },
+    {
+      "id": "B08",
+      "hard_assertions": [
+        {"path":"facts.blocking_findings_genuinely_closed","operator":"eq","expected":true},
+        {"path":"facts.review_history_preserved","operator":"eq","expected":true},
+        {"path":"facts.approved_with_blocker","operator":"eq","expected":false}
+      ],
+      "rubric": [{"id":"repair_traceability","max_score":2,"description":"Repair links findings, changes, verification, and residual risk without rewriting history."}]
+    },
+    {
+      "id": "B11",
+      "hard_assertions": [
+        {"path":"facts.invented_telemetry","operator":"eq","expected":false}
+      ],
+      "rubric": [{"id":"context_efficiency","max_score":2,"description":"Handoff is minimum-sufficient; irrelevant context is omitted without losing consequential constraints."}]
+    },
+    {
+      "id": "B12",
+      "hard_assertions": [
+        {"path":"facts.inconsistency_detected","operator":"eq","expected":true},
+        {"path":"facts.unsafe_actions_before_reconciliation","operator":"eq","expected":0},
+        {"path":"facts.silent_overwrite","operator":"eq","expected":false}
+      ],
+      "rubric": [{"id":"recovery_quality","max_score":2,"description":"Conflicting evidence and the safe reconciliation path are surfaced clearly before continuation."}]
+    }
+  ]
+}
