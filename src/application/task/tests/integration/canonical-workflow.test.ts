@@ -466,7 +466,7 @@ test('W4 starts independent same-work-item tasks concurrently and routes through
       '--mutation-surfaces',
       'src/a',
       '--mutation-resources',
-      ''
+      'resource-a'
     ]).status,
     0
   );
@@ -480,7 +480,7 @@ test('W4 starts independent same-work-item tasks concurrently and routes through
       '--mutation-surfaces',
       'src/b',
       '--mutation-resources',
-      ''
+      'resource-b'
     ]).status,
     0
   );
@@ -516,9 +516,9 @@ test('W4 blocks second writers without claims and cross-work-item execution', ()
 test('W4 concurrent commit stays inside its claim and outside another active claim', () => {
   const root = project();
   ready(root);
-  for (const [title, surface] of [
-    ['Implement A', 'src/a'],
-    ['Implement B', 'src/b']
+  for (const [title, surface, resource] of [
+    ['Implement A', 'src/a', 'resource-a'],
+    ['Implement B', 'src/b', 'resource-b']
   ]) {
     assert.equal(
       run(root, [
@@ -530,7 +530,7 @@ test('W4 concurrent commit stays inside its claim and outside another active cla
         '--mutation-surfaces',
         surface,
         '--mutation-resources',
-        ''
+        resource
       ]).status,
       0
     );
@@ -600,7 +600,7 @@ test('W4 rejects invalid and traversing mutation surfaces before persistence', (
       '--mutation-surfaces',
       surface,
       '--mutation-resources',
-      ''
+      'resource-invalid'
     ]);
     assert.notEqual(result.status, 0);
   }
