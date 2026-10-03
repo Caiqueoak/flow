@@ -320,6 +320,7 @@ test('upgrades canonical tasks and gates while preserving migrated commit proven
     'schema_version: 1\ngates:\n  - id: names\n    kind: builtin\n    rule: kebab-case-files\n'
   );
 
+  const reviewBefore = fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-item', 'review.yaml'), 'utf8');
   const result = migrateProject(root, { targetVersion: '0.8.0' });
   const tasks = parse(fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-item', 'tasks.yaml'), 'utf8'));
   const gates = parse(fs.readFileSync(path.join(root, '_flow', 'gates.yaml'), 'utf8'));
@@ -336,6 +337,10 @@ test('upgrades canonical tasks and gates while preserving migrated commit proven
   assert.deepEqual(gates.gates[0].scope, {});
   assert.equal(gates.gates[0].stage, 'full');
   assert.equal(gates.gates[0].cost, 'medium');
+  assert.equal(
+    fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-item', 'review.yaml'), 'utf8'),
+    reviewBefore
+  );
   assert.ok(result.backup && fs.existsSync(result.backup));
 });
 
@@ -356,6 +361,35 @@ test('upgrades v2 state without trusting its dormant execution cursor', (t) => {
   assert.equal(state.migration.status, 'completed');
   assert.equal(state.execution, undefined);
   assert.equal(state.stop_reason, undefined);
+});
+
+test('reconstructs active work-item focus from canonical task state without reviving the legacy cursor', (t) => {
+  const root = canonicalProject(t, '0.8.0');
+  canonicalWorkItem(root);
+  fs.writeFileSync(
+    path.join(root, '_flow', 'work-items', 'W101-item', 'tasks.yaml'),
+    JSON.stringify({
+      schema_version: 2,
+      work_item: 'W101',
+      tasks: [{ id: 'T001', title: 'Active', state: 'in_progress', depends_on: [] }]
+    })
+  );
+  fs.writeFileSync(
+    path.join(root, '_flow', 'work-items', 'W101-item', 'review.yaml'),
+    'schema_version: 1\nwork_item: W101\nstatus: pending\n'
+  );
+  fs.writeFileSync(
+    path.join(root, '_flow', 'state.yaml'),
+    'schema_version: 2\nexecution:\n  phase: discovery\n  step: stale_chat_cursor\nactive:\n  work_item: W999\n  task: W999-T999\nmigration:\n  status: completed\n'
+  );
+
+  const result = migrateProject(root, { targetVersion: '0.8.0' });
+  const state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+
+  assert.equal(result.unchanged, false);
+  assert.deepEqual(state.active, { work_item: 'W101', concurrency: null });
+  assert.equal(state.checkpoint, null);
+  assert.equal(state.migration.status, 'completed');
 });
 
 test('adopts existing approved project documents with exact revisions', (t) => {
