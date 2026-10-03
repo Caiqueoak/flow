@@ -95,6 +95,15 @@ function writeWorkItem(root: string, id: WorkItemId = 'W001'): string {
   return specificationRevision(metadata, body);
 }
 
+test('malformed persisted execution state requires reconciliation with a stable code', (t) => {
+  const root = project(t);
+  fs.writeFileSync(path.join(root, '_flow', 'state.yaml'), 'schema_version: [broken');
+
+  const assessment = inspectRecovery(root);
+  assert.equal(assessment.classification, 'requires_reconciliation');
+  assert.equal(assessment.findings[0]?.code, 'RECOVERY_STATE_INVALID');
+});
+
 test('exact-approved target with matching stale approval-ready checkpoint is safely repaired', (t) => {
   const root = project(t);
   const approved = approveProjectDocument(PRD, '2026-10-02T21:00:00Z');
