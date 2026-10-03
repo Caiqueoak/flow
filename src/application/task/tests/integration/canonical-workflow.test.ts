@@ -95,6 +95,7 @@ function ready(root: string, id = 'W101') {
     ]).status,
     0
   );
+  assert.equal(run(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']).status, 0);
   const base = path.join(root, '_flow', 'work-items', `${id}-canonical-item`);
   const spec = path.join(base, 'spec.md');
   const original = fs.readFileSync(spec, 'utf8');
@@ -262,6 +263,7 @@ test('finished projects stay finished until new scope creates new immutable work
     ]).status,
     0
   );
+  assert.equal(run(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']).status, 0);
 
   assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), {
     action: 'continue',
