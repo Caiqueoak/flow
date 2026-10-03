@@ -105,7 +105,12 @@ function checkpoint(input: {
   });
 }
 
-function writeWorkItem(root: string, id: WorkItemId = 'W001', tasks: unknown[] = [], approved = false): { revision: string } {
+function writeWorkItem(
+  root: string,
+  id: WorkItemId = 'W001',
+  tasks: unknown[] = [],
+  approved = false
+): { revision: string } {
   const folder = path.join(root, '_flow', 'work-items', `${id}-sample`);
   fs.mkdirSync(folder, { recursive: true });
   const metadata: WorkItemSpecMetadata = {
@@ -121,9 +126,7 @@ function writeWorkItem(root: string, id: WorkItemId = 'W001', tasks: unknown[] =
   };
   const body = '# Work Item Specification\n\n## Outcome\n\nSample.\n';
   const revision = specificationRevision(metadata, body);
-  const persistedMetadata = approved
-    ? { ...metadata, approval: { at: '2026-10-02T20:15:00Z', revision } }
-    : metadata;
+  const persistedMetadata = approved ? { ...metadata, approval: { at: '2026-10-02T20:15:00Z', revision } } : metadata;
   fs.writeFileSync(path.join(folder, 'spec.md'), serializeWorkItemSpec(persistedMetadata, body));
   fs.writeFileSync(path.join(folder, 'tasks.yaml'), stringify({ schema_version: 3, work_item: id, tasks }));
   fs.writeFileSync(

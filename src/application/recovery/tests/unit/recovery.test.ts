@@ -66,7 +66,10 @@ function writeAuthorizedProjectContracts(
   root: string,
   { experienceRequired = false }: { experienceRequired?: boolean } = {}
 ): { prdRevision: string; experienceRevision?: string; engineeringRevision: string } {
-  const prdDraft = PRD.replace('experience: not_required', `experience: ${experienceRequired ? 'required' : 'not_required'}`);
+  const prdDraft = PRD.replace(
+    'experience: not_required',
+    `experience: ${experienceRequired ? 'required' : 'not_required'}`
+  );
   const prd = approveProjectDocument(prdDraft, '2026-10-02T20:00:00Z');
   fs.writeFileSync(path.join(root, '_flow', 'docs', 'prd.md'), prd.text);
 
@@ -146,9 +149,7 @@ function writeWorkItem(root: string, id: WorkItemId = 'W001', approved = false):
   };
   const body = '# Work Item Specification\n\n## Outcome\n\nSample.\n';
   const revision = specificationRevision(metadata, body);
-  const persistedMetadata = approved
-    ? { ...metadata, approval: { at: '2026-10-02T20:15:00Z', revision } }
-    : metadata;
+  const persistedMetadata = approved ? { ...metadata, approval: { at: '2026-10-02T20:15:00Z', revision } } : metadata;
   fs.writeFileSync(path.join(folder, 'spec.md'), serializeWorkItemSpec(persistedMetadata, body));
   fs.writeFileSync(path.join(folder, 'tasks.yaml'), stringify({ schema_version: 3, work_item: id, tasks: [] }));
   fs.writeFileSync(
