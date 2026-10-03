@@ -98,13 +98,25 @@ function writeWorkItem(root: string, id: WorkItemId = 'W001'): string {
   return specificationRevision(metadata, body);
 }
 
-test('malformed persisted execution state requires reconciliation with a stable code', (t) => {
+test('malformed persisted execution state is consistent across route, validate and Doctor', (t) => {
   const root = project(t);
   fs.writeFileSync(path.join(root, '_flow', 'state.yaml'), 'schema_version: [broken');
 
   const assessment = inspectRecovery(root);
   assert.equal(assessment.classification, 'requires_reconciliation');
   assert.equal(assessment.findings[0]?.code, 'RECOVERY_STATE_INVALID');
+
+  const route = routeProject(root);
+  assert.equal(route.phase, 'reconcile');
+  assert.match(route.details?.join(' ') ?? '', /RECOVERY_STATE_INVALID/);
+
+  const validation = validateProject(root);
+  assert.ok(validation.some((finding) => finding.code === 'RECOVERY_STATE_INVALID'));
+
+  const doctor = diagnoseProject(root, { quick: true, version: 'test', packageRoot: root });
+  const recovery = doctor.checks.find((check) => check.id === 'recovery');
+  assert.equal(recovery?.status, 'fail');
+  assert.match(recovery?.message ?? '', /RECOVERY_STATE_INVALID/);
 });
 
 test('exact-approved target with matching stale approval-ready checkpoint is safely repaired', (t) => {
@@ -128,7 +140,7 @@ test('exact-approved target with matching stale approval-ready checkpoint is saf
   assert.equal(after.checkpoint, null);
 });
 
-test('Doctor clears only a proven-safe stale approval-ready checkpoint', (t) => {
+test('route stops at safe repair until Doctor clears the stale approval checkpoint', (t) => {
   const root = project(t);
   const approved = approveProjectDocument(PRD, '2026-10-02T21:00:00Z');
   fs.writeFileSync(path.join(root, '_flow', 'docs', 'prd.md'), approved.text);
@@ -140,11 +152,24 @@ test('Doctor clears only a proven-safe stale approval-ready checkpoint', (t) => 
     })
   );
 
+  assert.deepEqual(routeProject(root), {
+    action: 'stop',
+    phase: 'recovery',
+    reason: 'safe_repair',
+    instruction: 'Run `flow doctor --quick` to apply the deterministic recovery repair before routing continues.'
+  });
+
   const doctor = diagnoseProject(root, { quick: true, version: 'test', packageRoot: root });
   const recovery = doctor.checks.find((check) => check.id === 'recovery');
   assert.equal(recovery?.status, 'pass');
   assert.match(recovery?.message ?? '', /Cleared stale approval-ready checkpoint/);
   assert.equal(inspectRecovery(root).checkpoint, null);
+
+  assert.deepEqual(routeProject(root), {
+    action: 'continue',
+    phase: 'engineering',
+    instruction: 'engineering/step-02-synthesize.md'
+  });
 });
 
 test('revision-mismatching approval-ready checkpoint is never auto-cleared', (t) => {
@@ -248,6 +273,109 @@ test('approved spec can also prove an exact stale approval-ready checkpoint repa
   );
 
   assert.equal(inspectRecovery(root).classification, 'safely_repairable');
+});
+
+test('unsupported checkpoint phase requires reconciliation', (t) => {
+  const root = project(t);
+  fs.writeFileSync(path.join(root, '_flow', 'docs', 'prd.md'), PRD);
+  setCheckpoint(
+    root,
+    baseCheckpoint({
+      phase: 'unknown_phase'
+    })
+  );
+
+  const assessment = inspectRecovery(root);
+  assert.equal(assessment.classification, 'requires_reconciliation');
+  assert.ok(assessment.findings.some((finding) => finding.code === 'RECOVERY_CHECKPOINT_UNSUPPORTED'));
+  assert.equal(assessment.continuation, null);
+});
+
+test('unsupported phase and target pair requires reconciliation', (t) => {
+  const root = project(t);
+  writeWorkItem(root);
+  setCheckpoint(
+    root,
+    baseCheckpoint({
+      phase: 'planning',
+      target: { kind: 'work_item_spec', ref: 'W001', revision: null }
+    })
+  );
+
+  const assessment = inspectRecovery(root);
+  assert.equal(assessment.classification, 'requires_reconciliation');
+  assert.ok(assessment.findings.some((finding) => finding.code === 'RECOVERY_CHECKPOINT_UNSUPPORTED'));
+  assert.equal(assessment.continuation, null);
+});
+
+test('approval-ready planning checkpoint requires reconciliation', (t) => {
+  const root = project(t);
+  const revision = writeWorkItem(root);
+  setCheckpoint(
+    root,
+    baseCheckpoint({
+      phase: 'planning',
+      step: 'create_tasks',
+      status: 'approval_ready',
+      target: { kind: 'task_plan', ref: 'W001', revision }
+    })
+  );
+
+  const assessment = inspectRecovery(root);
+  assert.equal(assessment.classification, 'requires_reconciliation');
+  assert.ok(assessment.findings.some((finding) => finding.code === 'RECOVERY_CHECKPOINT_UNSUPPORTED'));
+  assert.equal(assessment.continuation, null);
+});
+
+test('supported W3 checkpoint combinations remain resumable', (t) => {
+  const documentCases = [
+    ['discovery', '_flow/docs/prd.md'],
+    ['experience', '_flow/docs/experience.md'],
+    ['engineering', '_flow/docs/engineering.md']
+  ] as const;
+
+  for (const [phase, ref] of documentCases) {
+    const root = project(t);
+    setCheckpoint(
+      root,
+      baseCheckpoint({
+        phase,
+        target: { kind: 'project_document', ref, revision: null }
+      })
+    );
+    assert.equal(inspectRecovery(root).classification, 'resumable');
+  }
+
+  const planningRoot = project(t);
+  setCheckpoint(
+    planningRoot,
+    baseCheckpoint({
+      phase: 'planning',
+      target: { kind: 'work_item_map', ref: '_flow/work-items', revision: null }
+    })
+  );
+  assert.equal(inspectRecovery(planningRoot).classification, 'resumable');
+
+  const workItemRoot = project(t);
+  const revision = writeWorkItem(workItemRoot);
+  setCheckpoint(
+    workItemRoot,
+    baseCheckpoint({
+      phase: 'planning',
+      target: { kind: 'task_plan', ref: 'W001', revision: null },
+      inputs: [{ ref: 'W001', revision }]
+    })
+  );
+  assert.equal(inspectRecovery(workItemRoot).classification, 'resumable');
+
+  setCheckpoint(
+    workItemRoot,
+    baseCheckpoint({
+      phase: 'specification',
+      target: { kind: 'work_item_spec', ref: 'W001', revision: null }
+    })
+  );
+  assert.equal(inspectRecovery(workItemRoot).classification, 'resumable');
 });
 
 test('document revision helper used by recovery matches approved content identity', () => {
