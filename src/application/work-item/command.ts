@@ -34,7 +34,7 @@ const workItemCommands: Record<string, WorkItemCommandHandler> = {
   'blocker-add': ({ root, target, args }) => addWorkItemBlocker(findWorkItem(root, target), args),
   'blocker-resolve': ({ root, target, args }) => resolveWorkItemBlocker(findWorkItem(root, target), args),
   promote: ({ root, target }) => promoteWorkItem(findWorkItem(root, target)),
-  'review-pass': ({ root, target, args }) => persistWorkItemReviewPass(findWorkItem(root, target), args),
+  'review-pass': ({ root, target, args }) => persistWorkItemReviewPass(root, findWorkItem(root, target), args),
   'review-complete': ({ root, target, args }) => completeWorkItemReview(root, findWorkItem(root, target), args)
 };
 
