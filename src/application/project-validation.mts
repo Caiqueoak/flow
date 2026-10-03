@@ -7,6 +7,7 @@ import { validateSpec } from '../domain/work-item/specification.mjs';
 import { generateGraphMarkdown } from '../infrastructure/projections/graph.mjs';
 import { fileExists, readText } from '../infrastructure/filesystem/index.js';
 import { stagedFiles } from '../infrastructure/git/index.js';
+import { inspectRecovery } from './recovery/recovery.mjs';
 
 export interface ValidationFinding {
   level: 'error';
@@ -27,6 +28,11 @@ export function validateProject(
     error('WORK_ITEMS', errorMessage(e));
     return findings;
   }
+  const recovery = inspectRecovery(root);
+  if (recovery.classification === 'requires_reconciliation') {
+    for (const finding of recovery.findings) error(finding.code, finding.message);
+  }
+
   const by = new Map(items.map((i) => [i.id, i]));
   for (const item of items) {
     if (workItem && item.id !== workItem) continue;
