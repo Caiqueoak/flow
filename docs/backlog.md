@@ -12,7 +12,8 @@ Status entries track delivery state, while detailed implementation evidence and 
 - **W2 — Approved project contracts remain trustworthy and experience routes correctly:** completed and merged via PR #56; main commit `9d94a4c24a4d43108c94d3d52c468dca15e8da59`.
 - **W3 — Fresh chats recover the correct next safe action:** completed and merged via PR #59; main commit `5300028a3330d48fe82e78af61fc7d2964169daa`.
 - **W4 — One active work item can execute independent tasks safely in parallel:** in progress on the dedicated W4 implementation branch; W1/W3 prerequisites are merged.
-- **W5–W7:** not started; dependencies remain as defined by the technical design.
+- **W5 — Review and repair history survives interruption and remains traceable:** not started; W1/W3 prerequisites are merged and W5 is ready to start.
+- **W6–W7:** not started; dependencies remain as defined by the technical design.
 
 ## Direction
 
