@@ -108,6 +108,24 @@ function ready(root: string, id = 'W101') {
   return base;
 }
 
+function approveReview(root: string, id = 'W101') {
+  const data = JSON.stringify({
+    pass: {
+      id: 'R001',
+      scope: { kind: 'work_item', ref: id },
+      inspected: [id],
+      parecer: 'Acceptance and verification passed.',
+      disposition: 'approved',
+      findings: [],
+      actions: [],
+      resolutions: [],
+      residual_risk: []
+    }
+  });
+  assert.equal(run(root, ['work-item', 'review-pass', id, '--mode', 'checkpoint', '--data', data]).status, 0);
+  assert.equal(run(root, ['work-item', 'review-pass', id, '--mode', 'finalize']).status, 0);
+}
+
 test('compiled CLI creates canonical shells and sync never mutates them', () => {
   const root = project();
   assert.equal(
@@ -210,6 +228,7 @@ test('task and review use canonical subjects and release dependent work', () => 
   assert.equal(run(root, ['sync']).status, 0);
   const base = path.join(root, '_flow', 'work-items', 'W101-canonical-item');
   fs.writeFileSync(path.join(base, 'notes.md'), 'not review evidence\n');
+  approveReview(root, 'W101');
   assert.equal(run(root, ['work-item', 'review-complete', 'W101', '--domain', 'flow']).status, 0);
   assert.match(
     execFileSync('git', ['log', '-1', '--format=%s'], { cwd: root, encoding: 'utf8' }),
@@ -374,6 +393,7 @@ test('failed task commits preserve the real index and task state', () => {
   fs.writeFileSync(path.join(root, 'implementation.txt'), 'done\n');
   execFileSync('git', ['add', 'implementation.txt'], { cwd: root });
   assert.equal(run(root, ['sync']).status, 0);
+  approveReview(root, 'W101');
   const hook = path.join(root, '.git', 'hooks', 'pre-commit');
   fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n');
   fs.chmodSync(hook, 0o755);
@@ -397,7 +417,7 @@ test('failed task commits preserve the real index and task state', () => {
   );
 });
 
-test('failed review commits preserve the real index and pending review', () => {
+test('failed review commits preserve the real index and finalized review history', () => {
   const root = project();
   ready(root);
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
@@ -426,7 +446,9 @@ test('failed review commits preserve the real index and pending review', () => {
   const review = parse(
     fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-canonical-item', 'review.yaml'), 'utf8')
   );
-  assert.equal(review.status, 'pending');
+  assert.equal(review.disposition, 'approved');
+  assert.equal(review.active_pass, null);
+  assert.equal(review.passes.length, 1);
   assert.equal(execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' }).trim(), '');
 });
 
