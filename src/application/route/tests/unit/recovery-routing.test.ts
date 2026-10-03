@@ -11,6 +11,7 @@ import {
   specificationRevision
 } from '../../../../domain/work-item/specification.mjs';
 import { writeExecutionState } from '../../../../infrastructure/persistence/execution-state.mjs';
+import type { WorkItemId, WorkItemSpecMetadata } from '../../../../domain/work-item/work-item.js';
 import { routeProject } from '../../operations/route.mjs';
 
 function project(t: test.TestContext): string {
@@ -46,10 +47,10 @@ function checkpoint(
   });
 }
 
-function writeWorkItem(root: string, id = 'W001', tasks: unknown[] = []): { revision: string } {
+function writeWorkItem(root: string, id: WorkItemId = 'W001', tasks: unknown[] = []): { revision: string } {
   const folder = path.join(root, '_flow', 'work-items', `${id}-sample`);
   fs.mkdirSync(folder, { recursive: true });
-  const metadata = {
+  const metadata: WorkItemSpecMetadata = {
     schema_version: 1,
     work_item: id,
     title: 'Sample',
@@ -59,7 +60,7 @@ function writeWorkItem(root: string, id = 'W001', tasks: unknown[] = []): { revi
     depends_on: [],
     blockers: [],
     maturity: 'outlined'
-  } as const;
+  };
   const body = '# Work Item Specification\n\n## Outcome\n\nSample.\n';
   fs.writeFileSync(path.join(folder, 'spec.md'), serializeWorkItemSpec(metadata, body));
   fs.writeFileSync(path.join(folder, 'tasks.yaml'), stringify({ schema_version: 3, work_item: id, tasks }));
