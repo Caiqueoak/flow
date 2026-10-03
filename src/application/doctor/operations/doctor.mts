@@ -6,6 +6,7 @@ import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mj
 import { parseState } from '../../../domain/workflow/execution-state.mjs';
 import { validateProject } from '../../project-validation.mjs';
 import { fileExists, readText } from '../../../infrastructure/filesystem/index.js';
+import { inspectRecovery, repairRecovery } from '../../recovery/recovery.mjs';
 
 interface RuntimeConfiguration {
   skills_path: string;
@@ -131,6 +132,8 @@ export function diagnoseProject(
     );
   }
 
+  checkRecovery(root, add);
+
   if (quick) {
     checkQuickStructure(root, flow, add);
   } else {
@@ -169,6 +172,41 @@ export function runDoctor({ args, version, packageRoot }: DoctorCommandContext):
 
   if (!result.healthy) {
     setExitCode(1);
+  }
+}
+
+function checkRecovery(root: string, add: AddCheck): void {
+  try {
+    const assessment = inspectRecovery(root);
+    if (assessment.classification === 'safely_repairable' && assessment.repair) {
+      const repaired = repairRecovery(root);
+      add(
+        'recovery',
+        repaired.classification !== 'requires_reconciliation',
+        `Cleared stale approval-ready checkpoint for ${assessment.repair.target_ref} at exact revision ${assessment.repair.target_revision}.`
+      );
+      return;
+    }
+
+    if (assessment.classification === 'requires_reconciliation') {
+      add(
+        'recovery',
+        false,
+        assessment.findings.map((finding) => `${finding.code}: ${finding.message}`).join(' '),
+        'Run flow route --json and reconcile the reported canonical-state conflict before continuing.'
+      );
+      return;
+    }
+
+    add(
+      'recovery',
+      true,
+      assessment.checkpoint
+        ? `Checkpoint is structurally resumable at ${assessment.checkpoint.phase}/${assessment.checkpoint.step}.`
+        : 'No consequential recovery inconsistency is present.'
+    );
+  } catch (error) {
+    add('recovery', false, errorMessage(error), 'Repair state.yaml or reconcile canonical Flow artifacts.');
   }
 }
 
