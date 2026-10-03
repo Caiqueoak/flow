@@ -8,6 +8,8 @@ The accepted Flow vNext technical design is `docs/research/flow-vnext-technical-
 
 Status entries track delivery state, while detailed implementation evidence and exact reviewed heads remain in the corresponding pull requests.
 
+**Flow vNext implementation status: complete. W1–W8 are merged.**
+
 - **W1 — Decision-heavy work can stop and resume safely from repository state:** completed and merged via PR #53; main commit `2cdc079976829872dbfc759fdbdd0b9ea3e019cd`.
 - **W2 — Approved project contracts remain trustworthy and experience routes correctly:** completed and merged via PR #56; main commit `9d94a4c24a4d43108c94d3d52c468dca15e8da59`.
 - **W3 — Fresh chats recover the correct next safe action:** completed and merged via PR #59; main commit `5300028a3330d48fe82e78af61fc7d2964169daa`.
@@ -15,7 +17,7 @@ Status entries track delivery state, while detailed implementation evidence and 
 - **W5 — Review and repair history survives interruption and remains traceable:** completed and merged via PR #64; main commit `9b688ccfbaeefc6b35eb063449d004bbeccfa4c6`.
 - **W6 — Non-simple execution delegates efficiently using runtime capabilities and minimum-sufficient context:** completed and merged via PR #66; main commit `0e9cad9155cd87691e38d1b281baaccdb8a769e0`.
 - **W7 — Existing projects can adopt vNext and traverse the complete lifecycle safely:** completed and merged via PR #68; main commit `b9ed81f0dc210b4a84f378ae3b54e48a75376e3a`.
-- **W8 — vNext behavior can be regression and benchmark tested:** in progress on the dedicated W8 evaluation branch; B01/B02/B05/B06/B07/B08/B11/B12 now use canonical executable fixtures, evaluator-owned hard evidence, capability-aware B05 evaluation, and focused regressions while live runtime execution remains external.
+- **W8 — vNext behavior can be regression and benchmark tested:** completed and merged via PR #70; main commit `16acf88803817bd22fbd5371cae293eb594ee4dd`. The repeatable B01/B02/B05/B06/B07/B08/B11/B12 harness is in place; live model/runtime execution remains external.
 
 ## Direction
 
