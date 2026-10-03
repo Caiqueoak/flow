@@ -347,22 +347,33 @@ test('review task references must resolve to canonical tasks', () => {
 
   assert.doesNotThrow(() => validateReviewTaskReferences(review, canonical));
 
-  const replacements = [
-    ['scope', (value) => { value.active_pass.scope.ref = 'W001-T999'; }],
-    ['action', (value) => { value.passes[0].actions[0].task = 'W001-T999'; }],
-    ['resolution', (value) => { value.active_pass.resolutions[0].task = 'W001-T999'; }],
-    ['worker run', (value) => { value.worker_runs[0].task = 'W001-T999'; }]
-  ] as const;
+  const invalidScope = JSON.parse(JSON.stringify(review));
+  invalidScope.active_pass.scope.ref = 'W001-T999';
+  assert.throws(
+    () => validateReviewTaskReferences(invalidScope, canonical),
+    /unknown canonical task 'W001-T999'/
+  );
 
-  for (const [label, mutate] of replacements) {
-    const value = JSON.parse(JSON.stringify(review));
-    mutate(value);
-    assert.throws(
-      () => validateReviewTaskReferences(value, canonical),
-      /unknown canonical task 'W001-T999'/,
-      label
-    );
-  }
+  const invalidAction = JSON.parse(JSON.stringify(review));
+  invalidAction.passes[0].actions[0].task = 'W001-T999';
+  assert.throws(
+    () => validateReviewTaskReferences(invalidAction, canonical),
+    /unknown canonical task 'W001-T999'/
+  );
+
+  const invalidResolution = JSON.parse(JSON.stringify(review));
+  invalidResolution.active_pass.resolutions[0].task = 'W001-T999';
+  assert.throws(
+    () => validateReviewTaskReferences(invalidResolution, canonical),
+    /unknown canonical task 'W001-T999'/
+  );
+
+  const invalidWorkerRun = JSON.parse(JSON.stringify(review));
+  invalidWorkerRun.worker_runs[0].task = 'W001-T999';
+  assert.throws(
+    () => validateReviewTaskReferences(invalidWorkerRun, canonical),
+    /unknown canonical task 'W001-T999'/
+  );
 
   const wrongWorkItem = JSON.parse(JSON.stringify(review));
   wrongWorkItem.passes[0].actions[0].task = 'W002-T001';
