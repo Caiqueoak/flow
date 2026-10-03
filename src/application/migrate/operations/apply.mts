@@ -3,10 +3,7 @@ import { parse, stringify } from 'yaml';
 import { projectRoot, recordOutput as info } from '../../command-runtime.js';
 import { emptyState, parseState, stringifyState } from '../../../domain/workflow/execution-state.mjs';
 import { UserInputError } from '../../../domain/errors.js';
-import {
-  loadExecutionState,
-  writeExecutionState
-} from '../../../infrastructure/persistence/execution-state.mjs';
+import { loadExecutionState, writeExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 import { parseBacklog } from '../../../domain/work-item/backlog.mjs';
 import { parseGates } from '../../../domain/gate/gate-definition.mjs';
 import { syncProject } from '../../../infrastructure/projections/project.mjs';
@@ -659,7 +656,9 @@ export function completeMigrationReconciliation(root: string): void {
   const findings = validateProject(root);
   if (findings.length)
     throw new UserInputError(
-      `Migration reconciliation remains pending: ${findings.map((finding) => `${finding.code}: ${finding.message}`).join(' ')}`
+      `Migration reconciliation remains pending: ${findings
+        .map((finding) => `${finding.code}: ${finding.message}`)
+        .join(' ')}`
     );
 
   state.migration.status = 'completed';

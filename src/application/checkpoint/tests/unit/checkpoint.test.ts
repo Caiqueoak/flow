@@ -66,7 +66,6 @@ test('approval-ready transition rejects unresolved required dimensions', (t) => 
   assert.throws(() => markCheckpointApprovalReady(root, 'prd-rev-1'), /unresolved/);
 });
 
-
 test('new-scope checkpoint cannot become approval-ready while consequential dimensions remain unresolved', (t) => {
   const root = project(t);
   beginCheckpoint(

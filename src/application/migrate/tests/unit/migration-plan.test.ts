@@ -6,12 +6,7 @@ import test from 'node:test';
 import { parse } from 'yaml';
 import { captureCommandOutcome } from '../../../command-runtime.js';
 import { emptyState, stringifyState } from '../../../../domain/workflow/execution-state.mjs';
-import {
-  completeMigrationReconciliation,
-  migrateProject,
-  migrationPlan,
-  runMigrate
-} from '../../operations/apply.mjs';
+import { completeMigrationReconciliation, migrateProject, migrationPlan, runMigrate } from '../../operations/apply.mjs';
 import { routeProject } from '../../../route/operations/route.mjs';
 import { documentMetadata, isProjectDocumentApproved } from '../../../../domain/project/document.mjs';
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
@@ -491,7 +486,6 @@ test('rolls the source directory back when the final staged swap fails', (t) => 
     []
   );
 });
-
 
 test('completes pending migration reconciliation through a supported transition and resumes normal routing', (t) => {
   const root = legacyProject(t, [legacyItem]);

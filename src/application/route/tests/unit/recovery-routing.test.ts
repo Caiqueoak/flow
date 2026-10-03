@@ -123,7 +123,7 @@ function writeWorkItem(
     priority: 1,
     depends_on: [],
     blockers: [],
-    maturity: 'outlined'
+    maturity: approved ? 'ready' : 'outlined'
   };
   const body = '# Work Item Specification\n\n## Outcome\n\nSample.\n';
   const revision = specificationRevision(metadata, body);
@@ -318,7 +318,6 @@ test('stale checkpoint input routes to reconciliation with a stable recovery cod
   assert.equal(result.reason, 'recovery_conflict');
   assert.match(result.details?.[0] ?? '', /^RECOVERY_INPUT_REVISION_MISMATCH:/);
 });
-
 
 test('finished project with substantive new scope resumes its PRD discovery checkpoint in a fresh route', (t) => {
   const root = project(t);
