@@ -133,6 +133,7 @@ export function diagnoseProject(
   }
 
   checkRecovery(root, add);
+  checkMigrationState(flow, add);
 
   if (quick) {
     checkQuickStructure(root, flow, add);
@@ -224,6 +225,9 @@ function checkQuickStructure(root: string, flow: string, add: AddCheck): void {
     add('work-items', false, errorMessage(error), 'Repair the canonical work-item artifacts or run migration.');
   }
 
+}
+
+function checkMigrationState(flow: string, add: AddCheck): void {
   const stateFile = path.join(flow, 'state.yaml');
   if (!fileExists(stateFile)) {
     add('migration-state', true, 'No migration reconciliation state is present.');
@@ -232,11 +236,17 @@ function checkQuickStructure(root: string, flow: string, add: AddCheck): void {
 
   try {
     const state = parseState(readText(stateFile));
-    const message =
-      state.migration.status === 'pending_reconciliation'
-        ? 'Pending migration reconciliation is recognized.'
-        : `Migration state is ${state.migration.status}.`;
-    add('migration-state', true, message);
+    if (state.migration.status === 'pending_reconciliation') {
+      add(
+        'migration-state',
+        false,
+        'Migration reconciliation is pending; normal lifecycle execution remains blocked.',
+        'Run flow route --json, reconcile the preserved semantics, then run flow migrate --complete-reconciliation.'
+      );
+      return;
+    }
+
+    add('migration-state', true, `Migration state is ${state.migration.status}.`);
   } catch (error) {
     add('migration-state', false, errorMessage(error), 'Repair state.yaml or rerun migration recovery.');
   }
