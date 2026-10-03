@@ -61,6 +61,29 @@ function projectDocument(headings: readonly string[], metadata = '') {
   return `---\nschema_version: 2\nstatus: draft\n${metadata}---\n\n${body}\n`;
 }
 
+function approvalCheckpoint(target: { kind: string; ref: string }, phase: string) {
+  return JSON.stringify({
+    phase,
+    step: 'await_approval',
+    target: { ...target, revision: null },
+    inputs: [],
+    dimensions: [{ id: 'D001', state: 'resolved', summary: 'Approval target is complete.' }],
+    assumptions: [],
+    latest_authorized_direction: 'Present this exact revision for approval.',
+    next_frontier: []
+  });
+}
+
+function approveTarget(root: string, target: string, kind: string, phase: string) {
+  assert.equal(
+    run(root, ['checkpoint', 'begin', '--data', approvalCheckpoint({ kind, ref: target }, phase)]).status,
+    0
+  );
+  assert.equal(run(root, ['checkpoint', 'ready']).status, 0);
+  const approval = run(root, ['approval', 'record', target]);
+  assert.equal(approval.status, 0, approval.stderr);
+}
+
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-canonical-'));
   temporaryRoots.add(root);
@@ -78,8 +101,8 @@ function project() {
       'baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: incremental\n'
     )
   );
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/prd.md']).status, 0);
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/engineering.md']).status, 0);
+  approveTarget(root, '_flow/docs/prd.md', 'project_document', 'discovery');
+  approveTarget(root, '_flow/docs/engineering.md', 'project_document', 'engineering');
   return root;
 }
 function ready(root: string, id = 'W101') {
@@ -104,7 +127,8 @@ function ready(root: string, id = 'W101') {
   const original = fs.readFileSync(spec, 'utf8');
   fs.writeFileSync(spec, `${original}\n${headings.map((heading) => `${heading}\nText.`).join('\n\n')}\n`);
   assert.equal(run(root, ['work-item', 'promote', id]).status, 0);
-  assert.equal(run(root, ['approval', 'record', path.relative(root, spec)]).status, 0);
+  const target = path.relative(root, spec).replaceAll('\\', '/');
+  approveTarget(root, target, 'work_item_spec', 'specification');
   return base;
 }
 
