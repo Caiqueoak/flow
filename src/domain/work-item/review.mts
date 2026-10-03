@@ -141,7 +141,7 @@ export const stringifyReview = (value: SerializedWorkItemReview): string =>
   stringify(parseReview(stringify(value)), { lineWidth: 0 });
 
 export function isReviewApproved(review: SerializedWorkItemReview): boolean {
-  return review.schema_version === 1 ? review.status === 'approved' : review.disposition === 'approved';
+  return review.schema_version === 1 ? review.status === 'approved' : reviewReadyForCompletion(review);
 }
 
 export function upgradePendingLegacyReview(review: SerializedWorkItemReview): WorkItemReviewV2 {
@@ -181,6 +181,32 @@ export function reviewReadyForCompletion(review: SerializedWorkItemReview): bool
   return (
     review.active_pass === null && review.disposition === 'approved' && unresolvedBlockingFindings(review).length === 0
   );
+}
+
+export function validateReviewTaskReferences(
+  review: SerializedWorkItemReview,
+  canonicalTaskRefs: ReadonlySet<string>,
+  source = 'review.yaml'
+): void {
+  if (review.schema_version === 1) return;
+
+  const assertTask = (task: string, location: string): void => {
+    if (!canonicalTaskRefs.has(task))
+      throw new ArtifactValidationError(`${location} references unknown canonical task '${task}'.`);
+  };
+  const validatePass = (pass: ActiveReviewPass | ReviewPass, location: string): void => {
+    if (pass.scope.kind === 'task') assertTask(pass.scope.ref, `${location}.scope.ref`);
+    for (const [index, action] of (pass.actions ?? []).entries())
+      assertTask(action.task, `${location}.actions[${index}].task`);
+    for (const [index, resolution] of (pass.resolutions ?? []).entries())
+      if (resolution.task) assertTask(resolution.task, `${location}.resolutions[${index}].task`);
+  };
+
+  review.passes.forEach((pass, index) => validatePass(pass, `${source}.passes[${index}]`));
+  if (review.active_pass) validatePass(review.active_pass, `${source}.active_pass`);
+  review.worker_runs.forEach((run, index) => {
+    if (run.task) assertTask(run.task, `${source}.worker_runs[${index}].task`);
+  });
 }
 
 export function completeActivePass(activePass: ActiveReviewPass, finalizedAt: string): ReviewPass {
