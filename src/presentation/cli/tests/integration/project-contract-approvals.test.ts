@@ -166,11 +166,7 @@ test('approval rejects an approval-ready checkpoint for another target', (t) => 
   const root = project(t);
   writePrd(root, 'not_required');
   writeEngineering(root);
-  beginApprovalReadyCheckpoint(
-    root,
-    { kind: 'project_document', ref: '_flow/docs/engineering.md' },
-    'engineering'
-  );
+  beginApprovalReadyCheckpoint(root, { kind: 'project_document', ref: '_flow/docs/engineering.md' }, 'engineering');
   const prdBefore = fs.readFileSync(path.join(root, '_flow', 'docs', 'prd.md'), 'utf8');
   const stateBefore = fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8');
 
