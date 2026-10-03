@@ -166,6 +166,12 @@ test('greenfield bootstrap routes discovery, approvals, engineering, then backlo
   ]);
   assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
     action: 'continue',
+    phase: 'planning',
+    instruction: 'planning/step-01-plan-work-item.md'
+  });
+  await flow(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']);
+  assert.deepEqual(JSON.parse(await flow(root, ['route', '--json'])), {
+    action: 'continue',
     phase: 'specification',
     instruction: 'specification/step-01-deepen-spec.md',
     work_item: 'W001'
@@ -265,6 +271,7 @@ test('source CLI lifecycle has observable, deterministic transitions', async (t)
     const spec = path.join(base, 'spec.md');
     assert.match(fs.readFileSync(spec, 'utf8'), /priority: 2[\s\S]*status: resolved/);
     fs.appendFileSync(spec, `\n${headings.map((heading) => `${heading}\nText.`).join('\n\n')}\n`);
+    await flow(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']);
     assert.equal(await flow(root, ['work-item', 'promote', 'W101']), 'W101 updated.');
     assert.match(fs.readFileSync(spec, 'utf8'), /maturity: ready/);
   });
