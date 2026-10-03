@@ -640,8 +640,7 @@ export function migrateProject(
       if (findings.length)
         throw new Error(`Migration rescue staging validation failed: ${findings.map((x) => x.code).join(', ')}.`);
     }
-    const pendingReconciliation =
-      loadExecutionState(staging).migration.status === 'pending_reconciliation';
+    const pendingReconciliation = loadExecutionState(staging).migration.status === 'pending_reconciliation';
     renameMigrationPath(sourceFlow, backup);
     try {
       renameMigrationPath(staged, targetFlow);
