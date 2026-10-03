@@ -5,7 +5,10 @@ import { emptyState, parseState, stringifyState, type ExecutionState } from '../
 test('execution state round-trips canonical v3 state', () => {
   const state: ExecutionState = {
     ...emptyState(),
-    active: { work_item: 'W101' },
+    active: {
+      work_item: 'W101',
+      concurrency: { tasks: ['W101-T001', 'W101-T002'], workspace: 'isolated' }
+    },
     checkpoint: {
       phase: 'planning',
       step: 'create_tasks',
@@ -37,7 +40,7 @@ migration:
 `);
   assert.deepEqual(parsed, {
     schema_version: 3,
-    active: { work_item: null },
+    active: { work_item: null, concurrency: null },
     checkpoint: null,
     migration: { status: 'completed' }
   });
@@ -59,5 +62,12 @@ test('execution state rejects malformed v3 structure and migration state', () =>
     () =>
       parseState('schema_version: 3\nactive:\n  work_item: null\ncheckpoint: null\nmigration:\n  status: running\n'),
     /migration.status/
+  );
+  assert.throws(
+    () =>
+      parseState(
+        'schema_version: 3\nactive:\n  work_item: W101\n  concurrency:\n    workspace: worktree\n    tasks: [W101-T001, W101-T002]\ncheckpoint: null\nmigration:\n  status: completed\n'
+      ),
+    /active.concurrency.workspace/
   );
 });

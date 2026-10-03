@@ -99,6 +99,7 @@ function persistReviewCommit(
     const filesToStage = [reviewFile];
     if (activeState) {
       activeState.state.active.work_item = null;
+      activeState.state.active.concurrency = null;
       writeExecutionState(root, activeState.state);
       filesToStage.push(activeState.stateFile);
     }

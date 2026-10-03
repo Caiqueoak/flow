@@ -85,7 +85,8 @@ export function inspectRecovery(root: string): RecoveryAssessment {
   const checkpoint = state.checkpoint;
 
   for (const issue of validateConcurrentTaskState(items, state.active.work_item, {
-    checkpointActive: Boolean(checkpoint)
+    checkpointActive: Boolean(checkpoint),
+    concurrency: state.active.concurrency
   })) {
     findings.push({
       code: 'RECOVERY_CONCURRENT_TASKS_INVALID',
