@@ -6,6 +6,7 @@ import test from 'node:test';
 import { assertWorkItemHistoryMutable } from '../../operations/history.mjs';
 import { runWorkItem } from '../../command.js';
 import { runTask } from '../../../task/command.js';
+import { emptyState, stringifyState } from '../../../../domain/workflow/execution-state.mjs';
 
 function project(t: test.TestContext, taskState: 'pending' | 'completed', reviewStatus: 'pending' | 'approved') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-history-guard-'));
@@ -52,6 +53,23 @@ function project(t: test.TestContext, taskState: 'pending' | 'completed', review
 test('completed work-item history is immutable', (t) => {
   const root = project(t, 'completed', 'approved');
   assert.throws(() => assertWorkItemHistoryMutable(root, 'W001'), /completed and its canonical history is immutable/);
+});
+
+test('approved terminal review may continue only while the work-item remains the active review focus', (t) => {
+  const root = project(t, 'completed', 'approved');
+  const state = emptyState();
+  state.active.work_item = 'W001';
+  fs.writeFileSync(path.join(root, '_flow', 'state.yaml'), stringifyState(state));
+
+  assert.doesNotThrow(() => assertWorkItemHistoryMutable(root, 'W001', { allowActiveReview: true }));
+  assert.throws(() => assertWorkItemHistoryMutable(root, 'W001'), /completed and its canonical history is immutable/);
+
+  state.active.work_item = null;
+  fs.writeFileSync(path.join(root, '_flow', 'state.yaml'), stringifyState(state));
+  assert.throws(
+    () => assertWorkItemHistoryMutable(root, 'W001', { allowActiveReview: true }),
+    /completed and its canonical history is immutable/
+  );
 });
 
 test('non-completed work-item remains mutable', (t) => {
