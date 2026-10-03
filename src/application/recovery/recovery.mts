@@ -23,6 +23,7 @@ export interface RecoveryFinding {
     | 'RECOVERY_TARGET_INVALID'
     | 'RECOVERY_TARGET_REVISION_MISMATCH'
     | 'RECOVERY_TARGET_PHASE_MISMATCH'
+    | 'RECOVERY_CHECKPOINT_UNSUPPORTED'
     | 'RECOVERY_INPUT_MISSING'
     | 'RECOVERY_INPUT_INVALID'
     | 'RECOVERY_INPUT_REVISION_MISMATCH'
@@ -92,6 +93,7 @@ export function inspectRecovery(root: string): RecoveryAssessment {
     };
   }
 
+  validateSupportedCheckpoint(checkpoint, findings);
   validateCheckpointTarget(root, checkpoint, items, findings);
   validateCheckpointPhaseTarget(checkpoint, items, findings);
   validateCheckpointInputs(root, checkpoint, items, findings);
@@ -135,6 +137,35 @@ export function repairRecovery(root: string): RecoveryAssessment {
   state.checkpoint = null;
   writeExecutionState(root, state);
   return inspectRecovery(root);
+}
+
+function validateSupportedCheckpoint(
+  checkpoint: WorkflowCheckpoint,
+  findings: RecoveryFinding[]
+): void {
+  const normalized = normalizeRef(checkpoint.target.ref);
+  const supported =
+    (checkpoint.phase === 'discovery' &&
+      checkpoint.target.kind === 'project_document' &&
+      normalized === '_flow/docs/prd.md') ||
+    (checkpoint.phase === 'experience' &&
+      checkpoint.target.kind === 'project_document' &&
+      normalized === '_flow/docs/experience.md') ||
+    (checkpoint.phase === 'engineering' &&
+      checkpoint.target.kind === 'project_document' &&
+      normalized === '_flow/docs/engineering.md') ||
+    (checkpoint.phase === 'planning' &&
+      checkpoint.status === 'active' &&
+      ((checkpoint.target.kind === 'work_item_map' && normalized === '_flow/work-items') ||
+        checkpoint.target.kind === 'task_plan')) ||
+    (checkpoint.phase === 'specification' && checkpoint.target.kind === 'work_item_spec');
+
+  if (!supported) {
+    findings.push({
+      code: 'RECOVERY_CHECKPOINT_UNSUPPORTED',
+      message: `Checkpoint shape '${checkpoint.phase}/${checkpoint.target.kind}/${checkpoint.status}' is not supported by W3 recovery.`
+    });
+  }
 }
 
 function validateCheckpointTarget(
@@ -373,9 +404,9 @@ function findWorkItem(ref: string, items: ReturnType<typeof loadWorkItems>) {
   return id ? items.find((item) => item.id === id) : undefined;
 }
 
-function checkpointContinuation(checkpoint: WorkflowCheckpoint): RecoveryContinuation {
+function checkpointContinuation(checkpoint: WorkflowCheckpoint): RecoveryContinuation | null {
   const workItem = checkpointWorkItem(checkpoint);
-  if (checkpoint.phase === 'discovery') {
+  if (checkpoint.phase === 'discovery' && checkpoint.target.kind === 'project_document') {
     return {
       phase: 'discovery',
       instruction:
@@ -383,7 +414,7 @@ function checkpointContinuation(checkpoint: WorkflowCheckpoint): RecoveryContinu
       approval_required: checkpoint.status === 'approval_ready'
     };
   }
-  if (checkpoint.phase === 'experience') {
+  if (checkpoint.phase === 'experience' && checkpoint.target.kind === 'project_document') {
     return {
       phase: 'experience',
       instruction:
@@ -393,7 +424,7 @@ function checkpointContinuation(checkpoint: WorkflowCheckpoint): RecoveryContinu
       approval_required: checkpoint.status === 'approval_ready'
     };
   }
-  if (checkpoint.phase === 'engineering') {
+  if (checkpoint.phase === 'engineering' && checkpoint.target.kind === 'project_document') {
     return {
       phase: 'engineering',
       instruction:
@@ -401,7 +432,7 @@ function checkpointContinuation(checkpoint: WorkflowCheckpoint): RecoveryContinu
       approval_required: checkpoint.status === 'approval_ready'
     };
   }
-  if (checkpoint.phase === 'specification') {
+  if (checkpoint.phase === 'specification' && checkpoint.target.kind === 'work_item_spec') {
     return {
       phase: 'specification',
       instruction:
@@ -412,20 +443,24 @@ function checkpointContinuation(checkpoint: WorkflowCheckpoint): RecoveryContinu
       approval_required: checkpoint.status === 'approval_ready'
     };
   }
-  if (checkpoint.phase === 'planning' && checkpoint.target.kind === 'task_plan') {
-    return {
-      phase: 'planning',
-      instruction: 'planning/step-01-create-tasks.md',
-      ...(workItem ? { work_item: workItem } : {}),
-      approval_required: false
-    };
+  if (checkpoint.phase === 'planning' && checkpoint.status === 'active') {
+    if (checkpoint.target.kind === 'task_plan') {
+      return {
+        phase: 'planning',
+        instruction: 'planning/step-01-create-tasks.md',
+        ...(workItem ? { work_item: workItem } : {}),
+        approval_required: false
+      };
+    }
+    if (checkpoint.target.kind === 'work_item_map') {
+      return {
+        phase: 'planning',
+        instruction: 'planning/step-01-plan-work-item.md',
+        approval_required: false
+      };
+    }
   }
-  return {
-    phase: checkpoint.phase,
-    instruction: 'planning/step-01-plan-work-item.md',
-    ...(workItem ? { work_item: workItem } : {}),
-    approval_required: false
-  };
+  return null;
 }
 
 function checkpointWorkItem(checkpoint: WorkflowCheckpoint): string | undefined {
