@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { Task } from '../../domain/task/task.js';
 import { foldFindingState, parseReview, type WorkItemReviewV2 } from '../../domain/work-item/review.mjs';
@@ -118,16 +119,11 @@ export function deriveEvaluatorFacts({
     const defectPresent = readWorkspaceFile(workspace, defectFile).includes(
       seededString(seededTruth, 'defect_fragment', benchmarkId)
     );
+    const semanticMarkers = seededStrings(seededTruth, 'semantic_markers', benchmarkId);
     const output = readOptionalJson(path.join(workspace, 'review-output.json'));
     const findings = isRecord(output) && Array.isArray(output.findings) ? output.findings : [];
-    const findingId = seededString(seededTruth, 'finding_id', benchmarkId);
-    const blockerReported = findings.some(
-      (finding) =>
-        isRecord(finding) &&
-        finding.id === findingId &&
-        finding.blocking === true &&
-        Array.isArray(finding.evidence) &&
-        finding.evidence.includes(defectFile)
+    const blockerReported = findings.some((finding) =>
+      findingMatchesSeededBlocker(finding, defectFile, semanticMarkers)
     );
     return {
       seeded_blocker_present_in_repository: defectPresent,
@@ -174,27 +170,109 @@ export function deriveEvaluatorFacts({
   if (benchmarkId === 'B12') {
     const recovery = inspectRecovery(workspace);
     const route = routeProject(workspace);
+    const state = loadExecutionState(workspace);
     const baseline = baselineHashes['_flow/state.yaml'];
     const current = hashFile(path.join(workspace, '_flow', 'state.yaml'));
-    const authorized = (readEvaluatorEvents(runRoot) ?? []).some((event) => event.type === 'reconciliation_authorized');
+    const events = readEvaluatorEvents(runRoot) ?? [];
+    const authorization = events.find((event) => event.type === 'reconciliation_authorized');
+    const guardedEvents = events.filter(
+      (event) => event.type === 'workspace_mutation' || event.type === 'unsafe_action'
+    );
+    const mutationAfterAuthorization = Boolean(
+      authorization &&
+        events.some(
+          (event) =>
+            event.type === 'workspace_mutation' &&
+            event.id === '_flow/state.yaml' &&
+            event.sequence > authorization.sequence
+        )
+    );
+    const stateChanged = Boolean(baseline && baseline !== current);
+    const expectedActiveWorkItem = seededString(seededTruth, 'expected_active_work_item', benchmarkId);
+    const unsafeBeforeAuthorization = guardedEvents.some(
+      (event) => !authorization || event.sequence < authorization.sequence
+    );
+
     return {
-      reconciliation_required: recovery.classification === 'requires_reconciliation',
-      route_requires_reconciliation: route.phase === 'reconcile' && route.reason === 'recovery_conflict',
-      silent_state_overwrite: Boolean(baseline && baseline !== current && !authorized)
+      initial_reconciliation_detected: initialReconciliationDetected(repoRoot, benchmarkId, baselineHashes),
+      reconciliation_authorized: Boolean(authorization),
+      mutation_or_unsafe_action_before_authorization:
+        unsafeBeforeAuthorization || (stateChanged && !authorization),
+      authorized_repair_applied:
+        stateChanged &&
+        mutationAfterAuthorization &&
+        state.active.work_item === expectedActiveWorkItem,
+      final_recovery_safe: recovery.classification !== 'requires_reconciliation',
+      route_safe_continuation: route.phase !== 'reconcile' && route.reason !== 'recovery_conflict',
+      silent_state_overwrite: stateChanged && !authorization
     };
   }
 
   throw new Error(`Unsupported benchmark evaluator: ${benchmarkId}`);
 }
 
+function findingMatchesSeededBlocker(
+  value: unknown,
+  defectFile: string,
+  semanticMarkers: string[]
+): boolean {
+  if (!isRecord(value) || typeof value.id !== 'string' || !value.id || value.blocking !== true) return false;
+  const evidence =
+    Array.isArray(value.evidence) &&
+    value.evidence.some((entry) => typeof entry === 'string' && normalize(entry) === normalize(defectFile));
+  if (!evidence) return false;
+
+  const semanticText = ['claim', 'message', 'description', 'summary']
+    .map((key) => value[key])
+    .filter((entry): entry is string => typeof entry === 'string')
+    .join(' ')
+    .toLowerCase();
+  return semanticMarkers.some((marker) => semanticText.includes(marker.toLowerCase()));
+}
+
+function initialReconciliationDetected(
+  repoRoot: string,
+  benchmarkId: string,
+  baselineHashes: Record<string, string>
+): boolean {
+  const workspaceFiles = loadFixtureWorkspaceFiles(repoRoot, benchmarkId);
+  if (!workspaceFiles) return false;
+  const baselineMatchesFixture = Object.entries(workspaceFiles).every(
+    ([relativePath, content]) => baselineHashes[normalize(relativePath)] === hashContent(content)
+  );
+  if (!baselineMatchesFixture) return false;
+
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), `flow-${benchmarkId}-baseline-`));
+  try {
+    for (const [relativePath, content] of Object.entries(workspaceFiles)) {
+      const destination = path.join(workspace, relativePath);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.writeFileSync(destination, content);
+    }
+    const recovery = inspectRecovery(workspace);
+    const route = routeProject(workspace);
+    return (
+      recovery.classification === 'requires_reconciliation' &&
+      route.phase === 'reconcile' &&
+      route.reason === 'recovery_conflict'
+    );
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+}
+
 function loadFixtureReview(repoRoot: string, benchmarkId: string) {
-  const fixtures = JSON.parse(fs.readFileSync(path.join(repoRoot, 'benchmarks', 'fixtures.json'), 'utf8')) as {
-    benchmarks: Array<{ id: string; workspace_files?: Record<string, string> }>;
-  };
-  const text = fixtures.benchmarks.find((item) => item.id === benchmarkId)?.workspace_files?.[
+  const text = loadFixtureWorkspaceFiles(repoRoot, benchmarkId)?.[
     '_flow/work-items/W001-benchmark/review.yaml'
   ];
   return typeof text === 'string' ? parseReview(text, { expectedWorkItem: 'W001' }) : null;
+}
+
+function loadFixtureWorkspaceFiles(repoRoot: string, benchmarkId: string): Record<string, string> | null {
+  const fixtures = JSON.parse(fs.readFileSync(path.join(repoRoot, 'benchmarks', 'fixtures.json'), 'utf8')) as {
+    benchmarks: Array<{ id: string; workspace_files?: Record<string, string> }>;
+  };
+  return fixtures.benchmarks.find((item) => item.id === benchmarkId)?.workspace_files ?? null;
 }
 
 function readEvaluatorEvents(runRoot: string): EvaluatorEvent[] | null {
@@ -279,6 +357,10 @@ function hashFile(file: string): string {
   return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
+function hashContent(content: string): string {
+  return createHash('sha256').update(content).digest('hex');
+}
+
 function jsonContainsString(value: unknown, expected: string): boolean {
   if (typeof value === 'string') return value.includes(expected);
   if (Array.isArray(value)) return value.some((entry) => jsonContainsString(entry, expected));
@@ -290,6 +372,13 @@ function seededString(seed: Record<string, unknown>, key: string, benchmarkId: s
   const value = seed[key];
   if (typeof value !== 'string' || !value) throw new Error(`${benchmarkId} seeded_truth.${key} must be a string.`);
   return value;
+}
+
+function seededStrings(seed: Record<string, unknown>, key: string, benchmarkId: string): string[] {
+  const value = seed[key];
+  if (!Array.isArray(value) || value.length === 0 || value.some((entry) => typeof entry !== 'string' || !entry))
+    throw new Error(`${benchmarkId} seeded_truth.${key} must be a non-empty string array.`);
+  return value as string[];
 }
 
 function normalize(value: string): string {
