@@ -451,3 +451,157 @@ test('packaged workflow instructions use the canonical task and review commands'
   assert.match(review, /flow work-item review-complete W### --domain domain/);
   assert.match(readme, /flow task commit W015-T001 --message "feat\(search\): add customer query \[W015-T001\]"/);
 });
+
+
+test('W4 starts independent same-work-item tasks concurrently and routes through active work-item focus', () => {
+  const root = project();
+  ready(root);
+  assert.equal(
+    run(root, [
+      'task',
+      'create',
+      'W101',
+      '--title',
+      'Implement A',
+      '--mutation-surfaces',
+      'src/a',
+      '--mutation-resources',
+      ''
+    ]).status,
+    0
+  );
+  assert.equal(
+    run(root, [
+      'task',
+      'create',
+      'W101',
+      '--title',
+      'Implement B',
+      '--mutation-surfaces',
+      'src/b',
+      '--mutation-resources',
+      ''
+    ]).status,
+    0
+  );
+
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T002']).status, 0);
+
+  const state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
+  assert.equal(state.active.work_item, 'W101');
+  const route = JSON.parse(run(root, ['route', '--json']).stdout);
+  assert.equal(route.work_item, 'W101');
+  assert.match(route.details?.join(' ') ?? '', /W101-T001, W101-T002/);
+});
+
+test('W4 blocks second writers without claims and cross-work-item execution', () => {
+  const root = project();
+  ready(root, 'W101');
+  ready(root, 'W102');
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Legacy single task']).status, 0);
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Second task']).status, 0);
+  assert.equal(run(root, ['task', 'create', 'W102', '--title', 'Other item task']).status, 0);
+
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  const missingClaims = run(root, ['task', 'start', 'W101-T002']);
+  assert.notEqual(missingClaims.status, 0);
+  assert.match(missingClaims.stderr, /requires mutation\.surfaces and mutation\.resources/);
+
+  const crossItem = run(root, ['task', 'start', 'W102-T001']);
+  assert.notEqual(crossItem.status, 0);
+  assert.match(crossItem.stderr, /multiple work items|state\.active\.work_item/);
+});
+
+test('W4 concurrent commit stays inside its claim and outside another active claim', () => {
+  const root = project();
+  ready(root);
+  for (const [title, surface] of [
+    ['Implement A', 'src/a'],
+    ['Implement B', 'src/b']
+  ]) {
+    assert.equal(
+      run(root, [
+        'task',
+        'create',
+        'W101',
+        '--title',
+        title,
+        '--mutation-surfaces',
+        surface,
+        '--mutation-resources',
+        ''
+      ]).status,
+      0
+    );
+  }
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T002']).status, 0);
+  assert.equal(run(root, ['sync']).status, 0);
+
+  fs.mkdirSync(path.join(root, 'src', 'b'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'src', 'b', 'foreign.ts'), 'foreign\n');
+  execFileSync('git', ['add', 'src/b/foreign.ts'], { cwd: root });
+  const otherClaim = run(root, [
+    'task',
+    'commit',
+    'W101-T001',
+    '--message',
+    'feat(flow): reject other claim [W101-T001]',
+    '--files',
+    'src/b/foreign.ts'
+  ]);
+  assert.notEqual(otherClaim.status, 0);
+  assert.match(otherClaim.stderr, /another active task's mutation surface/);
+  execFileSync('git', ['reset'], { cwd: root });
+
+  fs.writeFileSync(path.join(root, 'outside.txt'), 'outside\n');
+  execFileSync('git', ['add', 'outside.txt'], { cwd: root });
+  const outsideClaim = run(root, [
+    'task',
+    'commit',
+    'W101-T001',
+    '--message',
+    'feat(flow): reject outside claim [W101-T001]',
+    '--files',
+    'outside.txt'
+  ]);
+  assert.notEqual(outsideClaim.status, 0);
+  assert.match(outsideClaim.stderr, /outside T001's declared mutation surfaces/);
+  execFileSync('git', ['reset'], { cwd: root });
+
+  fs.mkdirSync(path.join(root, 'src', 'a'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'src', 'a', 'inside.ts'), 'inside\n');
+  execFileSync('git', ['add', 'src/a/inside.ts'], { cwd: root });
+  assert.equal(
+    run(root, [
+      'task',
+      'commit',
+      'W101-T001',
+      '--message',
+      'feat(flow): commit inside claim [W101-T001]',
+      '--files',
+      'src/a/inside.ts'
+    ]).status,
+    0
+  );
+});
+
+test('W4 rejects invalid and traversing mutation surfaces before persistence', () => {
+  const root = project();
+  ready(root);
+  for (const surface of ['/absolute/path', '../escape', 'src/**']) {
+    const result = run(root, [
+      'task',
+      'create',
+      'W101',
+      '--title',
+      'Invalid claim',
+      '--mutation-surfaces',
+      surface,
+      '--mutation-resources',
+      ''
+    ]);
+    assert.notEqual(result.status, 0);
+  }
+});
