@@ -452,7 +452,6 @@ test('packaged workflow instructions use the canonical task and review commands'
   assert.match(readme, /flow task commit W015-T001 --message "feat\(search\): add customer query \[W015-T001\]"/);
 });
 
-
 test('W4 starts independent same-work-item tasks concurrently and routes through active work-item focus', () => {
   const root = project();
   ready(root);

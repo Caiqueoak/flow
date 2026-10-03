@@ -167,10 +167,7 @@ export function routeProject(root: string): RouteResult {
     };
   return routeWorkItem(candidate, by);
 }
-function routeWorkItem(
-  candidate: LoadedWorkItem,
-  by: ReadonlyMap<LoadedWorkItem['id'], LoadedWorkItem>
-): RouteResult {
+function routeWorkItem(candidate: LoadedWorkItem, by: ReadonlyMap<LoadedWorkItem['id'], LoadedWorkItem>): RouteResult {
   const state = lifecycle(candidate, by);
   if (state.status === 'outlined')
     return step('specification', 'specification/step-01-deepen-spec.md', { work_item: candidate.id });
@@ -182,7 +179,8 @@ function routeWorkItem(
       instruction: 'specification/step-02-await-approval.md',
       work_item: candidate.id
     };
-  if (state.status === 'review') return step('review', 'review/step-01-review-work-item.md', { work_item: candidate.id });
+  if (state.status === 'review')
+    return step('review', 'review/step-01-review-work-item.md', { work_item: candidate.id });
 
   const activeTasks = candidate.tasks.tasks.filter((task) => task.state === 'in_progress');
   if (activeTasks.length) {
@@ -190,7 +188,9 @@ function routeWorkItem(
       work_item: candidate.id,
       task: `${candidate.id}-${activeTasks[0]!.id}`,
       ...(activeTasks.length > 1
-        ? { details: [`Concurrent active tasks: ${activeTasks.map((task) => `${candidate.id}-${task.id}`).join(', ')}`] }
+        ? {
+            details: [`Concurrent active tasks: ${activeTasks.map((task) => `${candidate.id}-${task.id}`).join(', ')}`]
+          }
         : {})
     });
   }
@@ -201,8 +201,9 @@ function routeWorkItem(
   const task = candidate.tasks.tasks.find(
     (task) =>
       task.state === 'pending' &&
-      task.depends_on.every((dependency) =>
-        candidate.tasks.tasks.find((candidateTask) => candidateTask.id === dependency)?.state === 'completed'
+      task.depends_on.every(
+        (dependency) =>
+          candidate.tasks.tasks.find((candidateTask) => candidateTask.id === dependency)?.state === 'completed'
       )
   );
   return task

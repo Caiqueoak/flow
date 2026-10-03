@@ -95,9 +95,13 @@ function parseMutation(value: unknown, label: string): Task['mutation'] | undefi
   if (value === undefined) return undefined;
   const mutation = requireObject(value, label);
   const surfaces =
-    mutation.surfaces === undefined ? undefined : normalizeStringList(mutation.surfaces, `${label}.surfaces`, normalizeMutationSurfaces);
+    mutation.surfaces === undefined
+      ? undefined
+      : normalizeStringList(mutation.surfaces, `${label}.surfaces`, normalizeMutationSurfaces);
   const resources =
-    mutation.resources === undefined ? undefined : normalizeStringList(mutation.resources, `${label}.resources`, normalizeMutationResources);
+    mutation.resources === undefined
+      ? undefined
+      : normalizeStringList(mutation.resources, `${label}.resources`, normalizeMutationResources);
   return {
     ...(surfaces !== undefined ? { surfaces } : {}),
     ...(resources !== undefined ? { resources } : {})

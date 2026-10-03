@@ -22,7 +22,6 @@ export function runCreate(target: string | undefined, args: readonly string[]): 
   writeOutput(`${context.item.id}-${taskId} created.`);
 }
 
-
 function mutationFromArgs(args: readonly string[]): { mutation?: TaskMutation } {
   const surfaceValue = optionValue(args, '--mutation-surfaces');
   const resourceValue = optionValue(args, '--mutation-resources');

@@ -24,15 +24,14 @@ const task = (
   state,
   depends_on,
   ...(surfaces !== undefined || resources !== undefined
-    ? { mutation: { ...(surfaces !== undefined ? { surfaces } : {}), ...(resources !== undefined ? { resources } : {}) } }
+    ? {
+        mutation: { ...(surfaces !== undefined ? { surfaces } : {}), ...(resources !== undefined ? { resources } : {}) }
+      }
     : {})
 });
 
 test('first active task remains valid without mutation claims', () => {
-  const issues = validateConcurrentTaskState(
-    [{ id: 'W001', tasks: collection('W001', [task('T001')]) }],
-    'W001'
-  );
+  const issues = validateConcurrentTaskState([{ id: 'W001', tasks: collection('W001', [task('T001')]) }], 'W001');
   assert.deepEqual(issues, []);
 });
 
@@ -161,6 +160,8 @@ test('concurrent commit files must stay in the task claim and out of other activ
   assert.deepEqual(validateConcurrentCommitFiles(current, [other], ['src/a/file.ts']), []);
   assert.ok(validateConcurrentCommitFiles(current, [other], ['README.md']).some((message) => /outside/.test(message)));
   assert.ok(
-    validateConcurrentCommitFiles(current, [other], ['src/b/file.ts']).some((message) => /another active task/.test(message))
+    validateConcurrentCommitFiles(current, [other], ['src/b/file.ts']).some((message) =>
+      /another active task/.test(message)
+    )
   );
 });

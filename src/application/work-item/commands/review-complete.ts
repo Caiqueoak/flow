@@ -6,7 +6,11 @@ import { fail, recordOutput as writeOutput, requiredOption } from '../../command
 import { REVIEW_FILE, SPEC_FILE } from '../../../domain/project/project.js';
 import type { LoadedWorkItem, WorkItemReview } from '../../../domain/work-item/work-item.js';
 import { projectRelativePath, readText, writeText, writeYaml } from '../../../infrastructure/filesystem/index.js';
-import { loadExecutionState, writeExecutionState, executionStateFile } from '../../../infrastructure/persistence/execution-state.mjs';
+import {
+  loadExecutionState,
+  writeExecutionState,
+  executionStateFile
+} from '../../../infrastructure/persistence/execution-state.mjs';
 import {
   assertOnlyStagedFiles,
   createCommit,

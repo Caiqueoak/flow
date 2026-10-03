@@ -39,7 +39,8 @@ export function normalizeMutationSurface(surface: string): string {
 
 export function normalizeMutationSurfaces(surfaces: readonly string[]): string[] {
   const normalized = surfaces.map(normalizeMutationSurface);
-  if (new Set(normalized).size !== normalized.length) throw new Error('Mutation surfaces must be unique after normalization.');
+  if (new Set(normalized).size !== normalized.length)
+    throw new Error('Mutation surfaces must be unique after normalization.');
   return normalized;
 }
 
