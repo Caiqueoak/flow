@@ -14,7 +14,7 @@ Status entries track delivery state, while detailed implementation evidence and 
 - **W4 — One active work item can execute independent tasks safely in parallel:** completed and merged via PR #61; main commit `c08d8c8d422ec1c51d769e9b37ed5483c5b5d1e4`.
 - **W5 — Review and repair history survives interruption and remains traceable:** completed and merged via PR #64; main commit `9b688ccfbaeefc6b35eb063449d004bbeccfa4c6`.
 - **W6 — Non-simple execution delegates efficiently using runtime capabilities and minimum-sufficient context:** completed and merged via PR #66; main commit `0e9cad9155cd87691e38d1b281baaccdb8a769e0`.
-- **W7 — Existing projects can adopt vNext and traverse the complete lifecycle safely:** not started; W2–W6 prerequisites are merged and W7 is ready to start.
+- **W7 — Existing projects can adopt vNext and traverse the complete lifecycle safely:** in progress on the dedicated W7 lifecycle/adoption branch; W2–W6 prerequisites are merged.
 - **W8 — vNext behavior can be regression and benchmark tested:** not started; depends on W3–W7 and becomes ready after W7.
 
 ## Direction
