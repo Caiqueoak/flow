@@ -35,6 +35,14 @@ test('first active task remains valid without mutation claims', () => {
   assert.deepEqual(issues, []);
 });
 
+test('orphaned concurrency intent is invalid with zero active tasks', () => {
+  const items = [{ id: 'W001' as const, tasks: collection('W001', [task('T001', 'pending')]) }];
+  const issues = validateConcurrentTaskState(items, 'W001', {
+    concurrency: { tasks: ['W001-T001', 'W001-T002'], workspace: 'shared' }
+  });
+  assert.ok(issues.some((issue) => issue.code === 'CONCURRENCY_STATE_CONFLICT'));
+});
+
 test('one active task requires matching active work-item focus', () => {
   const items = [{ id: 'W001' as const, tasks: collection('W001', [task('T001')]) }];
   assert.ok(validateConcurrentTaskState(items, null).some((issue) => issue.code === 'ACTIVE_WORK_ITEM_REQUIRED'));
