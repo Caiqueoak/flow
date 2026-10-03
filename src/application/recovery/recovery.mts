@@ -139,10 +139,7 @@ export function repairRecovery(root: string): RecoveryAssessment {
   return inspectRecovery(root);
 }
 
-function validateSupportedCheckpoint(
-  checkpoint: WorkflowCheckpoint,
-  findings: RecoveryFinding[]
-): void {
+function validateSupportedCheckpoint(checkpoint: WorkflowCheckpoint, findings: RecoveryFinding[]): void {
   const normalized = normalizeRef(checkpoint.target.ref);
   const supported =
     (checkpoint.phase === 'discovery' &&
