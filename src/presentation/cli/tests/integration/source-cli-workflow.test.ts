@@ -62,6 +62,7 @@ async function approveReview(root: string, id = 'W101') {
   });
   await flow(root, ['work-item', 'review-pass', id, '--mode', 'checkpoint', '--data', data]);
   await flow(root, ['work-item', 'review-pass', id, '--mode', 'finalize']);
+  await flow(root, ['sync']);
 }
 
 function project(t: test.TestContext) {
