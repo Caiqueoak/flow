@@ -71,7 +71,6 @@ function runNpm(args, cwd) {
   return execFileSync(process.execPath, [npmCli, ...args], { cwd, encoding: 'utf8' });
 }
 
-
 function assertW6OrchestrationContract(installedRoot) {
   const orchestration = fs.readFileSync(path.join(installedRoot, 'skills/flow/core/orchestration.md'), 'utf8');
 
@@ -104,7 +103,8 @@ function assertW6OrchestrationContract(installedRoot) {
   ];
 
   for (const fragment of requiredFragments) {
-    if (!orchestration.includes(fragment)) throw new Error(`W6 orchestration contract missing ${JSON.stringify(fragment)}.`);
+    if (!orchestration.includes(fragment))
+      throw new Error(`W6 orchestration contract missing ${JSON.stringify(fragment)}.`);
   }
 
   for (const capability of [

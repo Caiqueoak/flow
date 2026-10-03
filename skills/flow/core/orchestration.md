@@ -75,14 +75,14 @@ Choose the cheapest historically capable runtime-resolved option for the bounded
 
 Use W5 review history plus current verification/retry evidence to classify failures before changing routing:
 
-| Cause | Response |
-| --- | --- |
-| `missing_context` | add the missing reference/slice; do not raise model/effort first |
-| `worker_quality` | retry/repair; raise model or effort only when evidence supports insufficiency |
-| `integration_conflict` | serialize, repartition, or improve isolation |
-| `scope_leak` | tighten ownership and non-goals |
-| `verification_gap` | strengthen expected checks/evidence |
-| `orchestration_error` | change delegation, decomposition, or parallelism |
+| Cause                  | Response                                                                      |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `missing_context`      | add the missing reference/slice; do not raise model/effort first              |
+| `worker_quality`       | retry/repair; raise model or effort only when evidence supports insufficiency |
+| `integration_conflict` | serialize, repartition, or improve isolation                                  |
+| `scope_leak`           | tighten ownership and non-goals                                               |
+| `verification_gap`     | strengthen expected checks/evidence                                           |
+| `orchestration_error`  | change delegation, decomposition, or parallelism                              |
 
 One unusual failure does not permanently change the routing baseline.
 

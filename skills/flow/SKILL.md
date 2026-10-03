@@ -41,5 +41,4 @@ Do not treat a derived plan as an approval or traceability artifact. Important a
 
 Preserve completed history. Never reopen or rewrite completed work-items when new scope arrives. While work is active, corrections become tasks; after completion, corrections become maintenance work-items. See `maintenance/corrections.md`.
 
-
 For implementation orchestration, runtime capability names are facts, not vendor policy. Non-simple implementation must delegate through an available worker mechanism; when no worker mechanism is available, block/defer and surface the limitation rather than silently implementing directly. Genuinely simple bounded changes may remain with the orchestrator. See `core/orchestration.md`.
