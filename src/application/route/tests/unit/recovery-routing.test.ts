@@ -182,6 +182,26 @@ test('task-planning checkpoint wins over non-empty tasks.yaml', (t) => {
   });
 });
 
+test('task-planning checkpoint reconciles when task execution already started', (t) => {
+  const root = project(t);
+  const { revision } = writeWorkItem(root, 'W001', [
+    { id: 'T001', title: 'Started too early', state: 'in_progress', depends_on: [] }
+  ]);
+  setCheckpoint(
+    root,
+    checkpoint({
+      phase: 'planning',
+      step: 'create_tasks',
+      target: { kind: 'task_plan', ref: 'W001', revision: null },
+      inputs: [{ ref: 'W001', revision }]
+    })
+  );
+
+  const result = routeProject(root);
+  assert.equal(result.phase, 'reconcile');
+  assert.match(result.details?.join(' ') ?? '', /RECOVERY_PLANNING_STATE_CONFLICT/);
+});
+
 test('specification checkpoint resumes the referenced work item', (t) => {
   const root = project(t);
   writeWorkItem(root, 'W001');
