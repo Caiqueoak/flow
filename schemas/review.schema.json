@@ -2,42 +2,104 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://flow.local/schemas/review.schema.json",
   "oneOf": [
-    { "$ref": "#/$defs/legacy" },
-    { "$ref": "#/$defs/v2" }
+    {
+      "$ref": "#/$defs/legacy"
+    },
+    {
+      "$ref": "#/$defs/v2"
+    }
   ],
   "$defs": {
-    "workItem": { "type": "string", "pattern": "^W\\d{3,}$" },
-    "passId": { "type": "string", "pattern": "^R\\d{3,}$" },
-    "findingId": { "type": "string", "pattern": "^F\\d{3,}$" },
-    "taskRef": { "type": "string", "pattern": "^W\\d{3,}-T\\d{3,}$" },
+    "workItem": {
+      "type": "string",
+      "pattern": "^W\\d{3,}$"
+    },
+    "passId": {
+      "type": "string",
+      "pattern": "^R\\d{3,}$"
+    },
+    "findingId": {
+      "type": "string",
+      "pattern": "^F\\d{3,}$"
+    },
+    "taskRef": {
+      "type": "string",
+      "pattern": "^W\\d{3,}-T\\d{3,}$"
+    },
     "legacy": {
       "type": "object",
-      "required": ["schema_version", "work_item", "status"],
+      "required": [
+        "schema_version",
+        "work_item",
+        "status"
+      ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "work_item": { "$ref": "#/$defs/workItem" },
-        "status": { "enum": ["pending", "approved"] },
-        "reviewed_at": { "type": "string", "format": "date-time" }
+        "schema_version": {
+          "const": 1
+        },
+        "work_item": {
+          "$ref": "#/$defs/workItem"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "approved"
+          ]
+        },
+        "reviewed_at": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
       "additionalProperties": false
     },
     "scope": {
       "type": "object",
-      "required": ["kind", "ref"],
+      "required": [
+        "kind",
+        "ref"
+      ],
       "properties": {
-        "kind": { "enum": ["work_item", "task"] },
-        "ref": { "type": "string", "minLength": 1 }
+        "kind": {
+          "enum": [
+            "work_item",
+            "task"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
     "finding": {
       "type": "object",
-      "required": ["id", "blocking", "claim", "evidence", "cause"],
+      "required": [
+        "id",
+        "blocking",
+        "claim",
+        "evidence",
+        "cause"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/findingId" },
-        "blocking": { "type": "boolean" },
-        "claim": { "type": "string", "minLength": 1 },
-        "evidence": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "id": {
+          "$ref": "#/$defs/findingId"
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "claim": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
         "cause": {
           "enum": [
             "missing_context",
@@ -53,45 +115,126 @@
     },
     "action": {
       "type": "object",
-      "required": ["type", "finding", "task"],
+      "required": [
+        "type",
+        "finding",
+        "task"
+      ],
       "properties": {
-        "type": { "enum": ["repair_task_created", "repair_task_reopened"] },
-        "finding": { "$ref": "#/$defs/findingId" },
-        "task": { "$ref": "#/$defs/taskRef" }
+        "type": {
+          "enum": [
+            "repair_task_created",
+            "repair_task_reopened"
+          ]
+        },
+        "finding": {
+          "$ref": "#/$defs/findingId"
+        },
+        "task": {
+          "$ref": "#/$defs/taskRef"
+        }
       },
       "additionalProperties": false
     },
     "resolution": {
       "type": "object",
-      "required": ["finding", "state", "evidence"],
+      "required": [
+        "finding",
+        "state",
+        "evidence"
+      ],
       "properties": {
-        "finding": { "$ref": "#/$defs/findingId" },
-        "state": { "enum": ["resolved", "reopened", "superseded", "accepted_residual_risk"] },
-        "evidence": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "task": { "$ref": "#/$defs/taskRef" },
-        "note": { "type": "string", "minLength": 1 }
+        "finding": {
+          "$ref": "#/$defs/findingId"
+        },
+        "state": {
+          "enum": [
+            "resolved",
+            "reopened",
+            "superseded",
+            "accepted_residual_risk"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "task": {
+          "$ref": "#/$defs/taskRef"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
     "passBase": {
       "type": "object",
-      "required": ["id", "scope"],
+      "required": [
+        "id",
+        "scope"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/passId" },
-        "scope": { "$ref": "#/$defs/scope" },
-        "inspected": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "parecer": { "type": "string", "minLength": 1 },
-        "disposition": { "enum": ["approved", "changes_required", "blocked"] },
-        "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
-        "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
-        "resolutions": { "type": "array", "items": { "$ref": "#/$defs/resolution" } },
-        "residual_risk": { "type": "array", "items": { "type": "string", "minLength": 1 } }
-      },
-      "additionalProperties": false
+        "id": {
+          "$ref": "#/$defs/passId"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "inspected": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "parecer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "enum": [
+            "approved",
+            "changes_required",
+            "blocked"
+          ]
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "resolutions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resolution"
+          }
+        },
+        "residual_risk": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
     },
     "finalizedPass": {
       "allOf": [
-        { "$ref": "#/$defs/passBase" },
+        {
+          "$ref": "#/$defs/passBase"
+        },
         {
           "type": "object",
           "required": [
@@ -105,30 +248,68 @@
             "finalized_at"
           ],
           "properties": {
-            "finalized_at": { "type": "string", "format": "date-time" }
+            "finalized_at": {
+              "type": "string",
+              "format": "date-time"
+            }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "workerRun": {
       "type": "object",
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
-        "id": { "type": "string", "pattern": "^E\\d{3,}$" },
-        "task": { "$ref": "#/$defs/taskRef" },
-        "runtime": { "type": "string", "minLength": 1 },
-        "runtime_version": { "type": "string", "minLength": 1 },
-        "surface": { "type": "string", "minLength": 1 },
-        "model": { "type": "string", "minLength": 1 },
-        "effort": { "type": "string", "minLength": 1 },
-        "context_mode": { "type": "string", "minLength": 1 },
-        "workspace_isolation": { "type": "string", "minLength": 1 },
+        "id": {
+          "type": "string",
+          "pattern": "^E\\d{3,}$"
+        },
+        "task": {
+          "$ref": "#/$defs/taskRef"
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runtime_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "surface": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effort": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspace_isolation": {
+          "type": "string",
+          "minLength": 1
+        },
         "usage": {
           "type": "object",
           "minProperties": 1,
           "properties": {
-            "input_tokens": { "type": "integer", "minimum": 0 },
-            "output_tokens": { "type": "integer", "minimum": 0 }
+            "input_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output_tokens": {
+              "type": "integer",
+              "minimum": 0
+            }
           },
           "additionalProperties": false
         }
@@ -137,19 +318,51 @@
     },
     "v2": {
       "type": "object",
-      "required": ["schema_version", "work_item", "disposition", "active_pass", "worker_runs", "passes"],
+      "required": [
+        "schema_version",
+        "work_item",
+        "disposition",
+        "active_pass",
+        "worker_runs",
+        "passes"
+      ],
       "properties": {
-        "schema_version": { "const": 2 },
-        "work_item": { "$ref": "#/$defs/workItem" },
-        "disposition": { "enum": ["pending", "approved", "changes_required", "blocked"] },
-        "active_pass": {
-          "anyOf": [
-            { "type": "null" },
-            { "$ref": "#/$defs/passBase" }
+        "schema_version": {
+          "const": 2
+        },
+        "work_item": {
+          "$ref": "#/$defs/workItem"
+        },
+        "disposition": {
+          "enum": [
+            "pending",
+            "approved",
+            "changes_required",
+            "blocked"
           ]
         },
-        "worker_runs": { "type": "array", "items": { "$ref": "#/$defs/workerRun" } },
-        "passes": { "type": "array", "items": { "$ref": "#/$defs/finalizedPass" } }
+        "active_pass": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/passBase"
+            }
+          ]
+        },
+        "worker_runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/workerRun"
+          }
+        },
+        "passes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/finalizedPass"
+          }
+        }
       },
       "additionalProperties": false
     }
