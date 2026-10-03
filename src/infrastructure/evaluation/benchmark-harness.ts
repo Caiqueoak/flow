@@ -78,18 +78,14 @@ export function validateBenchmarkDefinitions(root: string): string[] {
   for (const truth of truths.benchmarks) {
     if (truth.hard_assertions.length === 0) issues.push(`${truth.id} must define at least one hard assertion.`);
     for (const item of truth.rubric) {
-      if (!Number.isInteger(item.max_score) || item.max_score <= 0) issues.push(`${truth.id} rubric max_score is invalid.`);
+      if (!Number.isInteger(item.max_score) || item.max_score <= 0)
+        issues.push(`${truth.id} rubric max_score is invalid.`);
     }
   }
   return issues;
 }
 
-export function prepareRun(
-  repoRoot: string,
-  runsRoot: string,
-  runId: string,
-  identity: RunIdentity
-): string {
+export function prepareRun(repoRoot: string, runsRoot: string, runId: string, identity: RunIdentity): string {
   const { fixture } = loadBenchmark(repoRoot, identity.benchmark_id);
   const runRoot = path.resolve(runsRoot, runId);
   const resolvedRunsRoot = path.resolve(runsRoot);
@@ -169,7 +165,8 @@ export function evaluateRun(repoRoot: string, runRoot: string): Record<string, u
     evaluator_notes: observation.evaluator_notes ?? null
   };
   const resultFile = path.join(runRoot, 'result.json');
-  if (fs.existsSync(resultFile)) throw new Error('result.json already exists; repeated runs must use a new run directory.');
+  if (fs.existsSync(resultFile))
+    throw new Error('result.json already exists; repeated runs must use a new run directory.');
   fs.writeFileSync(resultFile, JSON.stringify(result, null, 2) + '\n');
   return result;
 }

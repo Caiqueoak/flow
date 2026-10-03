@@ -70,10 +70,7 @@
       "agent_context": {
         "objective": "Delegate a bounded implementation using minimum-sufficient context.",
         "task": "Add a parser under the ingestion application slice.",
-        "project_references": [
-          "AGENTS.md",
-          "docs/architecture.md#dependency-direction"
-        ],
+        "project_references": ["AGENTS.md", "docs/architecture.md#dependency-direction"],
         "instructions": [
           "Pass the worker only the task, owned surface, acceptance criteria, relevant project rule or precise reference, and verification.",
           "Do not copy whole project documents.",

@@ -3,11 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import {
-  evaluateRun,
-  prepareRun,
-  validateBenchmarkDefinitions
-} from '../../benchmark-harness.js';
+import { evaluateRun, prepareRun, validateBenchmarkDefinitions } from '../../benchmark-harness.js';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../../../..');
 

@@ -38,7 +38,9 @@ if (command === 'check') {
   const result = evaluateRun(repoRoot, runRoot);
   console.log(JSON.stringify(result, null, 2));
 } else {
-  console.error('Usage: npm run benchmark -- check | prepare --benchmark B01 --flow-revision <sha> --repeat 1 [--runtime id --model id --config id --run-id id --runs-root dir] | evaluate --run <run-dir>');
+  console.error(
+    'Usage: npm run benchmark -- check | prepare --benchmark B01 --flow-revision <sha> --repeat 1 [--runtime id --model id --config id --run-id id --runs-root dir] | evaluate --run <run-dir>'
+  );
   process.exitCode = 1;
 }
 
