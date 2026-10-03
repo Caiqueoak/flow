@@ -75,6 +75,25 @@ test('allows forward migration across package major versions', (t) => {
   assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).flow_version, '2.0.1');
 });
 
+test('canonical migration requiring semantic reconciliation blocks normal routing until completion', (t) => {
+  const root = canonicalProject(t, '0.7.0');
+
+  const result = migrateProject(root, { targetVersion: '0.8.0' });
+
+  assert.deepEqual(result.unresolved, ['semantic reconciliation']);
+  assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status, 'pending_reconciliation');
+  assert.deepEqual(routeProject(root), {
+    action: 'continue',
+    phase: 'reconcile',
+    instruction: 'migration/step-01-reconcile.md'
+  });
+
+  completeMigrationReconciliation(root);
+
+  assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status, 'completed');
+  assert.notEqual(routeProject(root).phase, 'reconcile');
+});
+
 test('rejects malformed recorded Flow versions', (t) => {
   const root = canonicalProject(t, 'future');
 
@@ -313,7 +332,7 @@ function canonicalWorkItem(root: string) {
   fs.writeFileSync(path.join(base, 'review.yaml'), 'schema_version: 1\nwork_item: W101\nstatus: approved\n');
 }
 
-test('upgrades canonical tasks and gates while preserving migrated commit provenance', (t) => {
+test('preserves completed canonical task and review history verbatim during migration', (t) => {
   const root = canonicalProject(t, '0.7.0');
   canonicalWorkItem(root);
   fs.writeFileSync(
@@ -321,30 +340,26 @@ test('upgrades canonical tasks and gates while preserving migrated commit proven
     'schema_version: 1\ngates:\n  - id: names\n    kind: builtin\n    rule: kebab-case-files\n'
   );
 
-  const reviewBefore = fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-item', 'review.yaml'), 'utf8');
+  const tasksFile = path.join(root, '_flow', 'work-items', 'W101-item', 'tasks.yaml');
+  const reviewFile = path.join(root, '_flow', 'work-items', 'W101-item', 'review.yaml');
+  const tasksBefore = fs.readFileSync(tasksFile, 'utf8');
+  const reviewBefore = fs.readFileSync(reviewFile, 'utf8');
+  const plan = migrationPlan(root, '0.8.0');
+
+  assert.equal(plan.changes.some((change) => change.includes('work-items/W101-item/tasks.yaml')), false);
+
   const result = migrateProject(root, { targetVersion: '0.8.0' });
-  const tasks = parse(fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-item', 'tasks.yaml'), 'utf8'));
   const gates = parse(fs.readFileSync(path.join(root, '_flow', 'gates.yaml'), 'utf8'));
 
   assert.equal(result.unchanged, false);
-  assert.deepEqual(tasks.tasks[0], {
-    id: 'T001',
-    title: 'Done',
-    state: 'completed',
-    depends_on: [],
-    legacy_commit: 'abc',
-    provenance: 'legacy_migration'
-  });
+  assert.equal(fs.readFileSync(tasksFile, 'utf8'), tasksBefore);
+  assert.equal(fs.readFileSync(reviewFile, 'utf8'), reviewBefore);
   assert.deepEqual(gates.gates[0].scope, {});
   assert.equal(gates.gates[0].stage, 'full');
   assert.equal(gates.gates[0].cost, 'medium');
-  assert.equal(
-    fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-item', 'review.yaml'), 'utf8'),
-    reviewBefore
-  );
+  assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status, 'pending_reconciliation');
   assert.ok(result.backup && fs.existsSync(result.backup));
 });
-
 test('upgrades v2 state without trusting its dormant execution cursor', (t) => {
   const root = canonicalProject(t, '0.8.0');
   fs.writeFileSync(
@@ -448,6 +463,7 @@ test('returns a true no-op for a current canonical project', (t) => {
   const before = fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8');
 
   assert.deepEqual(migrateProject(root, { targetVersion: '0.8.0' }), { unresolved: [], unchanged: true });
+  assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status, 'not_required');
   assert.equal(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8'), before);
   assert.equal(fs.existsSync(path.join(root, '_flow-backups')), false);
 });
