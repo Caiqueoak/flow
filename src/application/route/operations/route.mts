@@ -29,10 +29,14 @@ const step = (phase: string, instruction: string, extra: Partial<RouteResult> = 
 function migrationRoute(root: string): RouteResult | null {
   const file = path.join(root, '_flow', 'state.yaml');
   if (!fileExists(file)) return null;
-  const state = parseState(readText(file));
-  return state.migration.status === 'pending_reconciliation'
-    ? step('reconcile', 'migration/step-01-reconcile.md')
-    : null;
+  try {
+    const state = parseState(readText(file));
+    return state.migration.status === 'pending_reconciliation'
+      ? step('reconcile', 'migration/step-01-reconcile.md')
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function recoveryRoute(root: string): RouteResult | null {
