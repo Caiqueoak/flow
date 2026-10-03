@@ -50,9 +50,7 @@ export function beginTaskDecomposition(root: string, workItemId: LoadedWorkItem[
 
   const state = loadExecutionState(root);
   if (state.active.work_item && state.active.work_item !== workItemId) {
-    fail(
-      `Task decomposition for ${workItemId} is blocked while state.active.work_item is ${state.active.work_item}.`
-    );
+    fail(`Task decomposition for ${workItemId} is blocked while state.active.work_item is ${state.active.work_item}.`);
   }
   if (state.active.work_item === workItemId) return () => {};
 

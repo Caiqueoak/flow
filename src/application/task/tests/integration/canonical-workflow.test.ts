@@ -507,14 +507,7 @@ test('W4 preserves the persisted workspace strategy for additional concurrent wr
   assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
   assert.equal(run(root, ['task', 'start', 'W101-T002', '--concurrent', '--workspace', 'shared']).status, 0);
 
-  const changedWorkspace = run(root, [
-    'task',
-    'start',
-    'W101-T003',
-    '--concurrent',
-    '--workspace',
-    'isolated'
-  ]);
+  const changedWorkspace = run(root, ['task', 'start', 'W101-T003', '--concurrent', '--workspace', 'isolated']);
   assert.notEqual(changedWorkspace.status, 0);
   assert.match(changedWorkspace.stderr, /already uses workspace 'shared'/);
 
