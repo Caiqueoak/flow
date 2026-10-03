@@ -11,6 +11,7 @@ import {
   type TaskId
 } from './task.js';
 import { WORK_ITEM_ID, type WorkItemId } from '../work-item/work-item.js';
+import { normalizeMutationResources, normalizeMutationSurfaces } from '../work-item/concurrency.mjs';
 
 const STATES = new Set(LIFECYCLE_STATES);
 const TASK_ID = TASK_ID_PATTERN;
@@ -61,6 +62,7 @@ export function parseTasks(
       if (!TASK_ID.test(dependency)) fail(`${id} depends on invalid task ID '${dependency}'.`);
       if (dependency === id) fail(`${id} cannot depend on itself.`);
     }
+    const mutation = parseMutation(task.mutation, `${id}.mutation`);
     if (
       Object.hasOwn(task, 'traceability') ||
       Object.hasOwn(task, 'implementation') ||
@@ -76,6 +78,7 @@ export function parseTasks(
       title,
       state: state as LifecycleState,
       depends_on: dependencies as TaskId[],
+      ...(mutation ? { mutation } : {}),
       ...(task.provenance ? { provenance: 'legacy_migration' as const } : {}),
       ...(task.legacy_commit ? { legacy_commit: task.legacy_commit as string } : {})
     };
@@ -85,9 +88,37 @@ export function parseTasks(
     for (const dependency of task.depends_on)
       if (!byId.has(dependency)) fail(`${task.id} depends on unknown task '${dependency}'.`);
   validateTaskDag(tasks);
-  if (tasks.filter((task) => task.state === 'in_progress').length > 1)
-    fail('Only one mutating task may be in_progress.');
   return { schema_version: TASKS_SCHEMA_VERSION, work_item: workItem as WorkItemId, tasks };
+}
+
+function parseMutation(value: unknown, label: string): Task['mutation'] | undefined {
+  if (value === undefined) return undefined;
+  const mutation = requireObject(value, label);
+  const surfaces =
+    mutation.surfaces === undefined ? undefined : normalizeStringList(mutation.surfaces, `${label}.surfaces`, normalizeMutationSurfaces);
+  const resources =
+    mutation.resources === undefined ? undefined : normalizeStringList(mutation.resources, `${label}.resources`, normalizeMutationResources);
+  return {
+    ...(surfaces !== undefined ? { surfaces } : {}),
+    ...(resources !== undefined ? { resources } : {})
+  };
+}
+
+function normalizeStringList(
+  value: unknown,
+  label: string,
+  normalize: (values: readonly string[]) => string[]
+): string[] {
+  if (!Array.isArray(value)) fail(`${label} must be a list.`);
+  const values = value.map((entry) => {
+    if (typeof entry !== 'string') fail(`${label} entries must be strings.`);
+    return entry;
+  });
+  try {
+    return normalize(values);
+  } catch (error) {
+    fail(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function validateTaskDag(tasks: Task[]): void {
