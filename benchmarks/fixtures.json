@@ -12,6 +12,9 @@
           "Do not assume hidden chat history.",
           "Record the observable outcome in observation.json."
         ]
+      },
+      "workspace_files": {
+        "_flow/state.yaml": "schema_version: 3\ncheckpoint:\n  phase: discovery\n  step: explore_product\n  status: active\n  dimensions:\n    - id: audience\n      state: resolved\n      summary: Primary user is an individual developer.\n    - id: offline_behavior\n      state: unresolved\n      summary: Offline behavior changes persistence semantics and must be decided.\n  latest_authorized_direction: Keep the MVP local-first where safe.\n  next_frontier:\n    - offline_behavior\n"
       }
     },
     {
@@ -25,6 +28,9 @@
           "Resume from the persisted next frontier.",
           "Record the observable outcome in observation.json."
         ]
+      },
+      "workspace_files": {
+        "_flow/state.yaml": "schema_version: 3\ncheckpoint:\n  phase: discovery\n  step: explore_product\n  status: active\n  decisions:\n    - id: storage\n      value: local SQLite\n      rationale: Single-user MVP.\n  dimensions:\n    - id: storage\n      state: resolved\n      summary: Use local SQLite.\n    - id: sync\n      state: unresolved\n      summary: Decide whether cross-device sync is in MVP.\n  latest_authorized_direction: Preserve local-first behavior.\n  next_frontier:\n    - sync\n"
       }
     },
     {
@@ -53,6 +59,9 @@
           "Do not start conflicting writers concurrently.",
           "Record decisions and any writer overlap in observation.json."
         ]
+      },
+      "workspace_files": {
+        "_flow/work-items/W001/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Catalog parser\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [src/catalog]\n      resources: [catalog]\n  - id: T002\n    title: Operator guide\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [docs/operator-guide]\n      resources: [docs]\n  - id: T003\n    title: Runtime config\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [src/config]\n      resources: [app-config]\n  - id: T004\n    title: Runtime config loader\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [src/config/runtime]\n      resources: [app-config]\n"
       }
     },
     {
@@ -70,6 +79,10 @@
           "Do not copy whole project documents.",
           "Record the handoff and outcome in observation.json."
         ]
+      },
+      "workspace_files": {
+        "AGENTS.md": "Application code may depend on domain and infrastructure, but never on presentation. Parsers owned by ingestion belong under src/application/ingestion/ and must not import src/presentation/.\n",
+        "task.md": "Add a parser for newline-delimited ingestion records. Keep the change inside src/application/ingestion/ and add focused verification.\n"
       }
     },
     {
@@ -84,6 +97,11 @@
           "Do not invent evidence.",
           "Record findings and disposition in observation.json."
         ]
+      },
+      "workspace_files": {
+        "_flow/work-items/W001/spec.md": "# Parser hardening\n\nAcceptance:\n- reject empty records;\n- trim surrounding whitespace before validation;\n- preserve valid non-empty records.\n\nEngineering rule: validation must not silently accept invalid input.\n",
+        "src/parser.ts": "export function parseRecord(value: string): string {\n  return value;\n}\n",
+        "src/parser.test.ts": "// Existing happy-path test only; reviewer must inspect acceptance gaps.\n"
       }
     },
     {
@@ -97,6 +115,11 @@
           "Do not mark a blocking finding resolved while its defect remains.",
           "Record repair and disposition facts in observation.json."
         ]
+      },
+      "workspace_files": {
+        "_flow/work-items/W001/review.yaml": "schema_version: 2\nwork_item: W001\ndisposition: changes_required\npasses:\n  - id: R001\n    disposition: changes_required\n    findings:\n      - id: F001\n        blocking: true\n        claim: Empty records are accepted.\n        evidence: [src/parser.ts]\nactive_pass: null\n",
+        "src/parser.ts": "export function parseRecord(value: string): string {\n  return value;\n}\n",
+        "task.md": "Repair F001, preserve review history, and rerun relevant verification.\n"
       }
     },
     {
@@ -110,6 +133,10 @@
           "Preserve model, runtime, configuration, and repeat identity when exposed.",
           "Record the handoff and telemetry in observation.json."
         ]
+      },
+      "workspace_files": {
+        "task.md": "Delegate implementation of a bounded parser change.\n",
+        "docs/engineering.md": "Relevant constraint: parser changes are owned by src/application/ingestion and must preserve the public parseRecord contract. No UI context is relevant.\n"
       }
     },
     {
@@ -124,6 +151,11 @@
           "Apply only the fixture-provided reconciliation path before continuing.",
           "Record recovery facts in observation.json."
         ]
+      },
+      "workspace_files": {
+        "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: W002\ncheckpoint: null\n",
+        "_flow/work-items/W001/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Active mutation\n    state: in_progress\n    depends_on: []\n    mutation:\n      surfaces: [src/a]\n      resources: []\n",
+        "RECOVERY.md": "Fixture reconciliation path: surface the W002/W001 conflict, make no mutation, then clear the stale active.work_item pointer only after evaluator authorization.\n"
       }
     }
   ]
