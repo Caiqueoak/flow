@@ -10,6 +10,7 @@ import { serializeWorkItemSpec, specificationRevision } from '../../../../domain
 import { writeExecutionState } from '../../../../infrastructure/persistence/execution-state.mjs';
 import type { WorkItemId, WorkItemSpecMetadata } from '../../../../domain/work-item/work-item.js';
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
+import { approveProjectDocument } from '../../../../domain/project/document.mjs';
 import { routeProject } from '../../operations/route.mjs';
 
 function project(t: test.TestContext): string {
@@ -18,6 +19,65 @@ function project(t: test.TestContext): string {
   fs.mkdirSync(path.join(root, '_flow', 'docs'), { recursive: true });
   fs.mkdirSync(path.join(root, '_flow', 'work-items'), { recursive: true });
   return root;
+}
+
+function authorizeProjectContracts(
+  root: string,
+  { experienceRequired = false }: { experienceRequired?: boolean } = {}
+): void {
+  const prd = approveProjectDocument(
+    `---
+schema_version: 2
+status: draft
+experience: ${experienceRequired ? 'required' : 'not_required'}
+---
+
+# Product Requirements
+
+## Purpose
+Purpose.
+
+## Users
+Users.
+
+## Scope
+Scope.
+
+## Requirements
+Requirements.
+
+## Constraints
+Constraints.
+
+## Non-goals
+Non-goals.
+`,
+    '2026-10-02T20:00:00Z'
+  );
+  fs.writeFileSync(path.join(root, '_flow', 'docs', 'prd.md'), prd.text);
+
+  if (experienceRequired) {
+    const experience = approveProjectDocument(
+      '---\\nschema_version: 2\\nstatus: draft\\n---\\n\\n# Experience\\n\\nConcrete experience contract.\\n',
+      '2026-10-02T20:05:00Z'
+    );
+    fs.writeFileSync(path.join(root, '_flow', 'docs', 'experience.md'), experience.text);
+  }
+
+  const engineering = approveProjectDocument(
+    `---
+schema_version: 2
+status: draft
+baseline:
+  profile: flow/readability-first@2
+  existing_code_policy: not_applicable
+---
+
+${ENGINEERING_HEADINGS.map((heading) => `${heading}\\nConcrete contract.`).join('\\n\\n')}
+`,
+    '2026-10-02T20:10:00Z'
+  );
+  fs.writeFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), engineering.text);
 }
 
 function setCheckpoint(root: string, checkpoint: ReturnType<typeof parseCheckpoint>): void {
@@ -45,7 +105,7 @@ function checkpoint(input: {
   });
 }
 
-function writeWorkItem(root: string, id: WorkItemId = 'W001', tasks: unknown[] = []): { revision: string } {
+function writeWorkItem(root: string, id: WorkItemId = 'W001', tasks: unknown[] = [], approved = false): { revision: string } {
   const folder = path.join(root, '_flow', 'work-items', `${id}-sample`);
   fs.mkdirSync(folder, { recursive: true });
   const metadata: WorkItemSpecMetadata = {
@@ -60,13 +120,17 @@ function writeWorkItem(root: string, id: WorkItemId = 'W001', tasks: unknown[] =
     maturity: 'outlined'
   };
   const body = '# Work Item Specification\n\n## Outcome\n\nSample.\n';
-  fs.writeFileSync(path.join(folder, 'spec.md'), serializeWorkItemSpec(metadata, body));
+  const revision = specificationRevision(metadata, body);
+  const persistedMetadata = approved
+    ? { ...metadata, approval: { at: '2026-10-02T20:15:00Z', revision } }
+    : metadata;
+  fs.writeFileSync(path.join(folder, 'spec.md'), serializeWorkItemSpec(persistedMetadata, body));
   fs.writeFileSync(path.join(folder, 'tasks.yaml'), stringify({ schema_version: 3, work_item: id, tasks }));
   fs.writeFileSync(
     path.join(folder, 'review.yaml'),
     stringify({ schema_version: 1, work_item: id, status: 'pending' })
   );
-  return { revision: specificationRevision(metadata, body) };
+  return { revision };
 }
 
 test('active discovery checkpoint resumes even before PRD materialization', (t) => {
@@ -89,6 +153,7 @@ test('active discovery checkpoint resumes even before PRD materialization', (t) 
 
 test('active experience checkpoint wins over a valid-looking draft artifact', (t) => {
   const root = project(t);
+  authorizeProjectContracts(root, { experienceRequired: true });
   fs.writeFileSync(
     path.join(root, '_flow', 'docs', 'experience.md'),
     '---\nschema_version: 2\nstatus: draft\n---\n\n# Experience\n\nConcrete draft.\n'
@@ -111,6 +176,7 @@ test('active experience checkpoint wins over a valid-looking draft artifact', (t
 
 test('active engineering checkpoint wins over a valid-looking partial artifact', (t) => {
   const root = project(t);
+  authorizeProjectContracts(root);
   fs.writeFileSync(
     path.join(root, '_flow', 'docs', 'engineering.md'),
     `---
@@ -142,6 +208,7 @@ ${ENGINEERING_HEADINGS.map((heading) => `${heading}\nConcrete draft.`).join('\n\
 
 test('backlog-mapping checkpoint wins over existing work-item shells', (t) => {
   const root = project(t);
+  authorizeProjectContracts(root);
   writeWorkItem(root);
   setCheckpoint(
     root,
@@ -161,9 +228,13 @@ test('backlog-mapping checkpoint wins over existing work-item shells', (t) => {
 
 test('task-planning checkpoint wins over non-empty tasks.yaml', (t) => {
   const root = project(t);
-  const { revision } = writeWorkItem(root, 'W001', [
-    { id: 'T001', title: 'Partial task', state: 'pending', depends_on: [] }
-  ]);
+  authorizeProjectContracts(root);
+  const { revision } = writeWorkItem(
+    root,
+    'W001',
+    [{ id: 'T001', title: 'Partial task', state: 'pending', depends_on: [] }],
+    true
+  );
   setCheckpoint(
     root,
     checkpoint({
@@ -184,6 +255,7 @@ test('task-planning checkpoint wins over non-empty tasks.yaml', (t) => {
 
 test('task-planning checkpoint reconciles when task execution already started', (t) => {
   const root = project(t);
+  authorizeProjectContracts(root);
   const { revision } = writeWorkItem(root, 'W001', [
     { id: 'T001', title: 'Started too early', state: 'in_progress', depends_on: [] }
   ]);
@@ -204,6 +276,7 @@ test('task-planning checkpoint reconciles when task execution already started', 
 
 test('specification checkpoint resumes the referenced work item', (t) => {
   const root = project(t);
+  authorizeProjectContracts(root);
   writeWorkItem(root, 'W001');
   setCheckpoint(
     root,
@@ -224,6 +297,7 @@ test('specification checkpoint resumes the referenced work item', (t) => {
 
 test('stale checkpoint input routes to reconciliation with a stable recovery code', (t) => {
   const root = project(t);
+  authorizeProjectContracts(root);
   writeWorkItem(root, 'W001');
   setCheckpoint(
     root,
