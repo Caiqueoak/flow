@@ -2,6 +2,7 @@ import path from 'node:path';
 import { stringify, parseDocument } from 'yaml';
 import { loadWorkItems } from '../infrastructure/persistence/work-items.mjs';
 import { lifecycle } from '../domain/work-item/lifecycle.js';
+import { isReviewApproved } from '../domain/work-item/review.mjs';
 import { derivedBacklog } from '../infrastructure/projections/backlog.js';
 import { validateSpec } from '../domain/work-item/specification.mjs';
 import { generateGraphMarkdown } from '../infrastructure/projections/graph.mjs';
@@ -41,7 +42,7 @@ export function validateProject(
     for (const message of spec.errors) error('SPEC', `${item.id}: ${message}`);
     if (item.maturity === 'outlined' && item.tasks.tasks.length)
       error('TASKS', `${item.id}: outlined work cannot have tasks.`);
-    if (lifecycle(item, by).status === 'completed' && item.review.status !== 'approved')
+    if (lifecycle(item, by).status === 'completed' && !isReviewApproved(item.review))
       error('REVIEW', `${item.id}: completed work requires approved review.`);
   }
   if (preCommitTask) {
