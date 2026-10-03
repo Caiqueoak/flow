@@ -4,7 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { stringify } from 'yaml';
-import { foldFindingState, parseReview, reviewReadyForCompletion } from '../../../../domain/work-item/review.mjs';
+import {
+  foldFindingState,
+  isReviewApproved,
+  parseReview,
+  reviewReadyForCompletion,
+  validateReviewTaskReferences
+} from '../../../../domain/work-item/review.mjs';
 import { checkpointReviewPass, finalizeReviewPass } from '../../operations/review-history.mjs';
 
 function tempReview(t: test.TestContext, initial: unknown): string {
@@ -259,4 +265,106 @@ test('inconsistent active pass is rejected before interruption recovery can resu
       ),
     /active_pass resolves unknown or same-pass finding 'F999'/
   );
+});
+
+
+test('approved v2 review remains incomplete while a later pass is active', () => {
+  const review = parseReview(
+    stringify({
+      schema_version: 2,
+      work_item: 'W001',
+      disposition: 'approved',
+      active_pass: {
+        id: 'R002',
+        scope: { kind: 'work_item', ref: 'W001' },
+        parecer: 'Interrupted follow-up review.'
+      },
+      worker_runs: [],
+      passes: [
+        {
+          id: 'R001',
+          scope: { kind: 'work_item', ref: 'W001' },
+          inspected: ['src/a.ts'],
+          parecer: 'Clean.',
+          disposition: 'approved',
+          findings: [],
+          actions: [],
+          resolutions: [],
+          residual_risk: [],
+          finalized_at: '2026-10-03T17:00:00Z'
+        }
+      ]
+    })
+  );
+
+  assert.equal(reviewReadyForCompletion(review), false);
+  assert.equal(isReviewApproved(review), false);
+});
+
+test('review task references must resolve to canonical tasks', () => {
+  const canonical = new Set(['W001-T001']);
+  const review = parseReview(
+    stringify({
+      schema_version: 2,
+      work_item: 'W001',
+      disposition: 'changes_required',
+      active_pass: {
+        id: 'R002',
+        scope: { kind: 'task', ref: 'W001-T001' },
+        inspected: ['W001-T001'],
+        parecer: 'Repair verified.',
+        disposition: 'approved',
+        findings: [],
+        actions: [],
+        resolutions: [{ finding: 'F001', state: 'resolved', evidence: ['W001-T001'], task: 'W001-T001' }],
+        residual_risk: []
+      },
+      worker_runs: [{ id: 'E001', task: 'W001-T001', runtime: 'codex' }],
+      passes: [
+        {
+          id: 'R001',
+          scope: { kind: 'task', ref: 'W001-T001' },
+          inspected: ['W001-T001'],
+          parecer: 'Repair required.',
+          disposition: 'changes_required',
+          findings: [
+            {
+              id: 'F001',
+              blocking: true,
+              claim: 'Defect.',
+              evidence: ['src/a.ts'],
+              cause: 'verification_gap'
+            }
+          ],
+          actions: [{ type: 'repair_task_created', finding: 'F001', task: 'W001-T001' }],
+          resolutions: [],
+          residual_risk: [],
+          finalized_at: '2026-10-03T17:00:00Z'
+        }
+      ]
+    })
+  );
+
+  assert.doesNotThrow(() => validateReviewTaskReferences(review, canonical));
+
+  const replacements = [
+    ['scope', (value) => { value.active_pass.scope.ref = 'W001-T999'; }],
+    ['action', (value) => { value.passes[0].actions[0].task = 'W001-T999'; }],
+    ['resolution', (value) => { value.active_pass.resolutions[0].task = 'W001-T999'; }],
+    ['worker run', (value) => { value.worker_runs[0].task = 'W001-T999'; }]
+  ] as const;
+
+  for (const [label, mutate] of replacements) {
+    const value = JSON.parse(JSON.stringify(review));
+    mutate(value);
+    assert.throws(
+      () => validateReviewTaskReferences(value, canonical),
+      /unknown canonical task 'W001-T999'/,
+      label
+    );
+  }
+
+  const wrongWorkItem = JSON.parse(JSON.stringify(review));
+  wrongWorkItem.passes[0].actions[0].task = 'W002-T001';
+  assert.throws(() => validateReviewTaskReferences(wrongWorkItem, canonical), /unknown canonical task 'W002-T001'/);
 });
