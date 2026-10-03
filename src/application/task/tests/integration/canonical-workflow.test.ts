@@ -540,7 +540,7 @@ test('W4 rejects a second concurrent start when the work-item SPEC is no longer 
 
   const second = run(root, ['task', 'start', 'W101-T002']);
   assert.notEqual(second.status, 0);
-  assert.match(second.stderr, /specification is not authorized for concurrent task execution/);
+  assert.match(second.stderr, /requires an approved specification/);
 });
 
 test('W4 concurrent commit stays inside its claim and outside another active claim', () => {
