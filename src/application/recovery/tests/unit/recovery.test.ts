@@ -180,6 +180,37 @@ test('malformed persisted execution state is consistent across route, validate a
   assert.match(recovery?.message ?? '', /RECOVERY_STATE_INVALID/);
 });
 
+test('orphaned concurrency intent is inconsistent across recovery, route, validate and Doctor', (t) => {
+  const root = project(t);
+  writeWorkItem(root, 'W001', true);
+  const state = emptyState();
+  state.active.work_item = 'W001';
+  state.active.concurrency = { tasks: ['W001-T001', 'W001-T002'], workspace: 'shared' };
+  writeExecutionState(root, state);
+
+  const assessment = inspectRecovery(root);
+  assert.equal(assessment.classification, 'requires_reconciliation');
+  assert.match(assessment.findings.map((finding) => finding.message).join(' '), /CONCURRENCY_STATE_CONFLICT/);
+
+  const route = routeProject(root);
+  assert.equal(route.phase, 'reconcile');
+  assert.match(route.details?.join(' ') ?? '', /CONCURRENCY_STATE_CONFLICT/);
+
+  const validation = validateProject(root);
+  assert.ok(validation.some((finding) => /CONCURRENCY_STATE_CONFLICT/.test(finding.message)));
+
+  const doctor = diagnoseProject(root, { quick: true, version: 'test', packageRoot: root });
+  const recovery = doctor.checks.find((check) => check.id === 'recovery');
+  assert.equal(recovery?.status, 'fail');
+  assert.match(recovery?.message ?? '', /CONCURRENCY_STATE_CONFLICT/);
+
+  state.active.concurrency = null;
+  writeExecutionState(root, state);
+  const focusedWithoutActiveTasks = inspectRecovery(root);
+  assert.equal(focusedWithoutActiveTasks.classification, 'resumable');
+  assert.equal(focusedWithoutActiveTasks.findings.length, 0);
+});
+
 test('exact-approved target with matching stale approval-ready checkpoint is safely repaired', (t) => {
   const root = project(t);
   const approved = approveProjectDocument(PRD, '2026-10-02T21:00:00Z');
