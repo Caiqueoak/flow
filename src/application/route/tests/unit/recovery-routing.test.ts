@@ -12,6 +12,7 @@ import {
 } from '../../../../domain/work-item/specification.mjs';
 import { writeExecutionState } from '../../../../infrastructure/persistence/execution-state.mjs';
 import type { WorkItemId, WorkItemSpecMetadata } from '../../../../domain/work-item/work-item.js';
+import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
 import { routeProject } from '../../operations/route.mjs';
 
 function project(t: test.TestContext): string {
@@ -90,7 +91,16 @@ test('active engineering checkpoint wins over a valid-looking partial artifact',
   const root = project(t);
   fs.writeFileSync(
     path.join(root, '_flow', 'docs', 'engineering.md'),
-    '---\nschema_version: 2\nstatus: draft\nbaseline:\n  profile: flow/readability-first@2\n  existing_code_policy: not_applicable\n---\n\n# Engineering\n'
+    `---
+schema_version: 2
+status: draft
+baseline:
+  profile: flow/readability-first@2
+  existing_code_policy: not_applicable
+---
+
+${ENGINEERING_HEADINGS.map((heading) => `${heading}\nConcrete draft.`).join('\n\n')}
+`
   );
   setCheckpoint(
     root,
