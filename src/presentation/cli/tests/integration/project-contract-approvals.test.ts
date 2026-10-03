@@ -85,6 +85,17 @@ function beginApprovalReadyCheckpoint(root: string, target: { kind: string; ref:
   assert.equal(run(root, ['checkpoint', 'ready']).status, 0);
 }
 
+function approveTarget(
+  root: string,
+  target: string,
+  { kind = 'project_document', phase = 'discovery' }: { kind?: string; phase?: string } = {}
+) {
+  beginApprovalReadyCheckpoint(root, { kind, ref: target }, phase);
+  const approved = run(root, ['approval', 'record', target]);
+  assert.equal(approved.status, 0, approved.stderr);
+  return approved;
+}
+
 function writeReadySpec(root: string): string {
   assert.equal(run(root, ['work-item', 'create', 'W101', '--title', 'Item', '--outcome', 'Outcome']).status, 0);
   const spec = path.join(root, '_flow', 'work-items', 'W101-item', 'spec.md');
@@ -96,20 +107,67 @@ function writeReadySpec(root: string): string {
   return spec;
 }
 
-test('approval without a checkpoint remains supported for explicit manual workflows', (t) => {
+test('approval rejects a missing approval-ready checkpoint without mutation', (t) => {
   const root = project(t);
   writePrd(root, 'not_required');
+  const documentBefore = fs.readFileSync(path.join(root, '_flow', 'docs', 'prd.md'), 'utf8');
+  const stateBefore = fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8');
 
   const approved = run(root, ['approval', 'record', '_flow/docs/prd.md']);
-  assert.equal(approved.status, 0, approved.stderr);
-  assert.match(fs.readFileSync(path.join(root, '_flow', 'docs', 'prd.md'), 'utf8'), /status: approved/);
-  assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).checkpoint, null);
+
+  assert.notEqual(approved.status, 0);
+  assert.match(approved.stderr, /matching approval_ready checkpoint is required/);
+  assert.equal(fs.readFileSync(path.join(root, '_flow', 'docs', 'prd.md'), 'utf8'), documentBefore);
+  assert.equal(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'), stateBefore);
+});
+
+test('approval rejects an active checkpoint without mutation', (t) => {
+  const root = project(t);
+  writePrd(root, 'not_required');
+  assert.equal(
+    run(root, [
+      'checkpoint',
+      'begin',
+      '--data',
+      approvalCheckpoint({ kind: 'project_document', ref: '_flow/docs/prd.md' })
+    ]).status,
+    0
+  );
+  const documentBefore = fs.readFileSync(path.join(root, '_flow', 'docs', 'prd.md'), 'utf8');
+  const stateBefore = fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8');
+
+  const approved = run(root, ['approval', 'record', '_flow/docs/prd.md']);
+
+  assert.notEqual(approved.status, 0);
+  assert.match(approved.stderr, /checkpoint is active, not approval_ready/);
+  assert.equal(fs.readFileSync(path.join(root, '_flow', 'docs', 'prd.md'), 'utf8'), documentBefore);
+  assert.equal(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'), stateBefore);
+});
+
+test('approval rejects an approval-ready checkpoint for another target', (t) => {
+  const root = project(t);
+  writePrd(root, 'not_required');
+  writeEngineering(root);
+  beginApprovalReadyCheckpoint(
+    root,
+    { kind: 'project_document', ref: '_flow/docs/engineering.md' },
+    'engineering'
+  );
+  const prdBefore = fs.readFileSync(path.join(root, '_flow', 'docs', 'prd.md'), 'utf8');
+  const stateBefore = fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8');
+
+  const approved = run(root, ['approval', 'record', '_flow/docs/prd.md']);
+
+  assert.notEqual(approved.status, 0);
+  assert.match(approved.stderr, /approval-ready checkpoint targets project_document _flow\/docs\/engineering\.md/);
+  assert.equal(fs.readFileSync(path.join(root, '_flow', 'docs', 'prd.md'), 'utf8'), prdBefore);
+  assert.equal(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'), stateBefore);
 });
 
 test('not-required experience skips directly to engineering after exact PRD approval', (t) => {
   const root = project(t);
   writePrd(root, 'not_required');
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/prd.md']).status, 0);
+  approveTarget(root, '_flow/docs/prd.md');
 
   assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), {
     action: 'continue',
@@ -127,7 +185,7 @@ test('not-required experience skips directly to engineering after exact PRD appr
 test('required experience must exist and be exactly approved before engineering', (t) => {
   const root = project(t);
   writePrd(root, 'required');
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/prd.md']).status, 0);
+  approveTarget(root, '_flow/docs/prd.md');
 
   assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), {
     action: 'continue',
@@ -140,7 +198,7 @@ test('required experience must exist and be exactly approved before engineering'
   assert.equal(route.action, 'stop');
   assert.equal(route.phase, 'experience');
 
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/experience.md']).status, 0);
+  approveTarget(root, '_flow/docs/experience.md', { phase: 'experience' });
   route = JSON.parse(run(root, ['route', '--json']).stdout);
   assert.equal(route.phase, 'engineering');
 
@@ -185,8 +243,8 @@ test('work-item spec approval rejects edits after checkpoint ready without parti
   const root = project(t);
   writePrd(root, 'not_required');
   writeEngineering(root);
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/prd.md']).status, 0);
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/engineering.md']).status, 0);
+  approveTarget(root, '_flow/docs/prd.md');
+  approveTarget(root, '_flow/docs/engineering.md', { phase: 'engineering' });
 
   const spec = writeReadySpec(root);
   assert.equal(run(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']).status, 0);
@@ -208,11 +266,13 @@ test('stale engineering approval cannot authorize task mutation', (t) => {
   const root = project(t);
   writePrd(root, 'not_required');
   writeEngineering(root);
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/prd.md']).status, 0);
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/engineering.md']).status, 0);
+  approveTarget(root, '_flow/docs/prd.md');
+  approveTarget(root, '_flow/docs/engineering.md', { phase: 'engineering' });
 
   const spec = writeReadySpec(root);
-  assert.equal(run(root, ['approval', 'record', path.relative(root, spec)]).status, 0);
+  assert.equal(run(root, ['checkpoint', 'clear', '--target-ref', '_flow/work-items']).status, 0);
+  const target = path.relative(root, spec).replaceAll('\\', '/');
+  approveTarget(root, target, { kind: 'work_item_spec', phase: 'specification' });
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
 
   fs.appendFileSync(path.join(root, '_flow', 'docs', 'engineering.md'), '\narchitecture changed\n');
