@@ -59,14 +59,14 @@ interface ResolvedRevision {
 
 export function inspectRecovery(root: string): RecoveryAssessment {
   const findings: RecoveryFinding[] = [];
-  let state;
+  let state: ReturnType<typeof loadExecutionState>;
   try {
     state = loadExecutionState(root);
   } catch (error) {
     return reconciliation('RECOVERY_STATE_INVALID', errorMessage(error));
   }
 
-  let items;
+  let items: ReturnType<typeof loadWorkItems>;
   try {
     items = loadWorkItems(root);
   } catch (error) {
