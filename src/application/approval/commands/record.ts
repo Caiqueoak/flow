@@ -48,7 +48,7 @@ export function recordApproval({
 
   spec.metadata.approval = { at: approvedAt, revision };
   writeText(file, serializeWorkItemSpec(spec.metadata, spec.body));
-  clearMatchingCheckpoint(root, targetRef, revision);
+  clearMatchingCheckpoint(root, 'work_item_spec', targetRef, revision);
   return { label: `${item.id} specification`, revision };
 }
 
@@ -74,7 +74,7 @@ function recordProjectDocumentApproval(
   }
 
   writeText(file, approved.text);
-  clearMatchingCheckpoint(root, targetRef, approved.revision);
+  clearMatchingCheckpoint(root, 'project_document', targetRef, approved.revision);
   return { label: targetRef, revision: approved.revision };
 }
 
@@ -103,10 +103,16 @@ function assertApprovalReadyRevision(
   }
 }
 
-function clearMatchingCheckpoint(root: string, targetRef: string, targetRevision: string): void {
+function clearMatchingCheckpoint(
+  root: string,
+  targetKind: 'project_document' | 'work_item_spec',
+  targetRef: string,
+  targetRevision: string
+): void {
   const checkpoint = loadExecutionState(root).checkpoint;
   if (
     checkpoint?.status !== 'approval_ready' ||
+    checkpoint.target.kind !== targetKind ||
     normalizeTargetRef(checkpoint.target.ref) !== targetRef ||
     checkpoint.target.revision !== targetRevision
   ) {
