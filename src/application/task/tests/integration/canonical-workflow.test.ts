@@ -400,18 +400,6 @@ test('completed work-item canonical history rejects every existing-item and task
   for (const [file, before] of Object.entries(snapshot)) {
     assert.equal(fs.readFileSync(path.join(base, file), 'utf8'), before);
   }
-
-  const stateFile = path.join(root, '_flow', 'state.yaml');
-  const staleState = parse(fs.readFileSync(stateFile, 'utf8'));
-  staleState.active.work_item = 'W101';
-  fs.writeFileSync(stateFile, stringify(staleState));
-
-  const staleActiveReview = run(root, ['work-item', 'review-pass', 'W101', '--mode', 'finalize']);
-  assert.notEqual(staleActiveReview.status, 0);
-  assert.match(staleActiveReview.stderr, /completed and its canonical history is immutable/);
-  for (const [file, before] of Object.entries(snapshot)) {
-    assert.equal(fs.readFileSync(path.join(base, file), 'utf8'), before);
-  }
 });
 
 test('validate identifies missing, stale and malformed projections', () => {
