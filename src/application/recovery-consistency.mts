@@ -1,6 +1,5 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { UserInputError } from '../domain/errors.js';
 import {
   documentRevision,
   isProjectDocumentApproved
