@@ -120,6 +120,35 @@ test('approval without a matching approval-ready checkpoint is rejected without 
   assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).checkpoint, null);
 });
 
+test('approval rejects an active checkpoint that is not approval-ready', (t) => {
+  const root = project(t);
+  writePrd(root, 'not_required');
+  assert.equal(
+    run(root, [
+      'checkpoint',
+      'begin',
+      '--data',
+      approvalCheckpoint({ kind: 'project_document', ref: '_flow/docs/prd.md' })
+    ]).status,
+    0
+  );
+
+  const approved = run(root, ['approval', 'record', '_flow/docs/prd.md']);
+  assert.notEqual(approved.status, 0);
+  assert.match(approved.stderr, /is not approval-ready/);
+});
+
+test('approval rejects an approval-ready checkpoint for another target', (t) => {
+  const root = project(t);
+  writePrd(root, 'not_required');
+  fs.writeFileSync(path.join(root, '_flow', 'docs', 'experience.md'), document(['# Experience']));
+  beginApprovalReadyCheckpoint(root, { kind: 'project_document', ref: '_flow/docs/prd.md' });
+
+  const approved = run(root, ['approval', 'record', '_flow/docs/experience.md']);
+  assert.notEqual(approved.status, 0);
+  assert.match(approved.stderr, /approval-ready checkpoint targets '_flow\/docs\/prd\.md'/);
+});
+
 test('not-required experience skips directly to engineering after exact PRD approval', (t) => {
   const root = project(t);
   writePrd(root, 'not_required');
