@@ -338,11 +338,11 @@ test('canonical migration preserves completed work-item history verbatim while u
   assert.deepEqual(gates.gates[0].scope, {});
   assert.equal(gates.gates[0].stage, 'full');
   assert.equal(gates.gates[0].cost, 'medium');
-  assert.equal(state.migration.status, 'completed');
-  assert.deepEqual(routeProject(root), {
+  assert.equal(state.migration.status, 'not_required');
+  assert.notDeepEqual(routeProject(root), {
     action: 'continue',
-    phase: 'discovery',
-    instruction: 'discovery/step-01-project.md'
+    phase: 'reconcile',
+    instruction: 'migration/step-01-reconcile.md'
   });
   assert.ok(result.backup && fs.existsSync(result.backup));
 });
