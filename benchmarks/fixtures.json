@@ -1,20 +1,20 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "benchmarks": [
     {
       "id": "B01",
       "title": "Unresolved discovery decisions",
       "agent_context": {
         "objective": "Continue discovery without finalizing while a consequential product decision remains unresolved.",
-        "repository_state": "A discovery checkpoint contains one resolved dimension and one unresolved consequential dimension.",
+        "repository_state": "A canonical discovery checkpoint has one unresolved consequential dimension.",
         "instructions": [
-          "Use only the persisted fixture state.",
+          "Use only persisted fixture state.",
           "Do not assume hidden chat history.",
-          "Record the observable outcome in observation.json."
+          "Do not author evaluator hard-pass facts."
         ]
       },
       "workspace_files": {
-        "_flow/state.yaml": "schema_version: 3\ncheckpoint:\n  phase: discovery\n  step: explore_product\n  status: active\n  dimensions:\n    - id: audience\n      state: resolved\n      summary: Primary user is an individual developer.\n    - id: offline_behavior\n      state: unresolved\n      summary: Offline behavior changes persistence semantics and must be decided.\n  latest_authorized_direction: Keep the MVP local-first where safe.\n  next_frontier:\n    - offline_behavior\n"
+        "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: null\n  concurrency: null\ncheckpoint:\n  phase: discovery\n  step: project\n  target:\n    kind: project_document\n    ref: _flow/docs/prd.md\n    revision: null\n  status: active\n  inputs: []\n  dimensions:\n    - id: audience\n      state: resolved\n      summary: Primary user is an individual developer.\n    - id: offline_behavior\n      state: unresolved\n      summary: Offline behavior changes persistence semantics and must be decided.\n  assumptions: []\n  latest_authorized_direction: Keep the MVP local-first where safe.\n  next_frontier:\n    - offline_behavior\n  updated_at: 2026-10-03T12:00:00.000Z\nmigration:\n  status: not_required\n"
       }
     },
     {
@@ -22,46 +22,49 @@
       "title": "Fresh-chat discovery resume",
       "agent_context": {
         "objective": "Resume discovery from a fresh context using repository state only.",
-        "repository_state": "Prior decisions and the next frontier are persisted in the checkpoint.",
+        "repository_state": "Prior decisions and the next frontier are persisted in a canonical checkpoint.",
         "instructions": [
           "Do not ask the user to restate persisted decisions.",
           "Resume from the persisted next frontier.",
-          "Record the observable outcome in observation.json."
+          "Do not author evaluator hard-pass facts."
         ]
       },
       "workspace_files": {
-        "_flow/state.yaml": "schema_version: 3\ncheckpoint:\n  phase: discovery\n  step: explore_product\n  status: active\n  decisions:\n    - id: storage\n      value: local SQLite\n      rationale: Single-user MVP.\n  dimensions:\n    - id: storage\n      state: resolved\n      summary: Use local SQLite.\n    - id: sync\n      state: unresolved\n      summary: Decide whether cross-device sync is in MVP.\n  latest_authorized_direction: Preserve local-first behavior.\n  next_frontier:\n    - sync\n"
+        "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: null\n  concurrency: null\ncheckpoint:\n  phase: discovery\n  step: project\n  target:\n    kind: project_document\n    ref: _flow/docs/prd.md\n    revision: null\n  status: active\n  inputs: []\n  dimensions:\n    - id: storage\n      state: resolved\n      summary: Use local SQLite.\n    - id: sync\n      state: unresolved\n      summary: Decide whether cross-device sync is in MVP.\n  assumptions: []\n  latest_authorized_direction: Preserve local-first behavior.\n  next_frontier:\n    - sync\n  updated_at: 2026-10-03T12:00:00.000Z\nmigration:\n  status: not_required\n"
       }
     },
     {
       "id": "B05",
       "title": "Safe parallel versus sequential writer selection",
       "agent_context": {
-        "objective": "Choose execution mode for two task pairs.",
+        "objective": "Choose safe execution mode for independent and conflicting task pairs.",
         "cases": [
           {
             "name": "independent",
             "tasks": [
-              "T001 changes src/catalog only and claims resource catalog.",
-              "T002 changes docs/operator-guide only and claims resource docs."
+              "W001-T001",
+              "W001-T002"
             ]
           },
           {
             "name": "conflict",
             "tasks": [
-              "T003 changes src/config and claims resource app-config.",
-              "T004 changes src/config/runtime and claims resource app-config."
+              "W001-T003",
+              "W001-T004"
             ]
           }
         ],
         "instructions": [
-          "Choose parallel or sequential execution for each case.",
-          "Do not start conflicting writers concurrently.",
-          "Record decisions and any writer overlap in observation.json."
+          "Parallelism is optional and capability/proportionality-aware.",
+          "Never overlap conflicting writers.",
+          "Evaluator/runtime adapter records writer lifecycle events."
         ]
       },
       "workspace_files": {
-        "_flow/work-items/W001/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Catalog parser\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [src/catalog]\n      resources: [catalog]\n  - id: T002\n    title: Operator guide\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [docs/operator-guide]\n      resources: [docs]\n  - id: T003\n    title: Runtime config\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [src/config]\n      resources: [app-config]\n  - id: T004\n    title: Runtime config loader\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [src/config/runtime]\n      resources: [app-config]\n"
+        "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: W001\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n",
+        "_flow/work-items/W001-benchmark/spec.md": "---\nschema_version: 1\nwork_item: W001\ntitle: Benchmark fixture\nkind: technical\npriority: 1\ndepends_on: []\nblockers: []\nmaturity: ready\n---\n# Work Item Specification\n## Problem\nBenchmark fixture.\n## Scope\nExercise the intended W8 behavior.\n## Non-goals\nNo unrelated production changes.\n## Requirements\nPreserve canonical Flow structure.\n## Acceptance criteria\nFixture is parseable.\n## Contracts\nUse canonical state, tasks, and review artifacts.\n## Data and APIs\nNone beyond the fixture surface.\n## Edge cases\nFixture-specific edge cases are explicit above.\n## Risks\nFalse-positive benchmark evidence.\n## Decisions\nUse canonical Flow artifacts.\n## Gates\nFixture must remain structurally valid.\n",
+        "_flow/work-items/W001-benchmark/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Catalog parser\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [src/catalog]\n      resources: [catalog]\n  - id: T002\n    title: Operator guide\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [docs/operator-guide]\n      resources: [docs]\n  - id: T003\n    title: Runtime config\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [src/config]\n      resources: [app-config]\n  - id: T004\n    title: Runtime config loader\n    state: pending\n    depends_on: []\n    mutation:\n      surfaces: [src/config/runtime]\n      resources: [app-config]\n",
+        "_flow/work-items/W001-benchmark/review.yaml": "schema_version: 2\nwork_item: W001\ndisposition: pending\nactive_pass: null\nworker_runs: []\npasses: []\n"
       }
     },
     {
@@ -70,70 +73,80 @@
       "agent_context": {
         "objective": "Delegate a bounded implementation using minimum-sufficient context.",
         "task": "Add a parser under the ingestion application slice.",
-        "project_references": ["AGENTS.md", "docs/architecture.md#dependency-direction"],
+        "project_references": [
+          "AGENTS.md",
+          "task.md"
+        ],
         "instructions": [
-          "Pass the worker only the task, owned surface, acceptance criteria, relevant project rule or precise reference, and verification.",
-          "Do not copy whole project documents.",
-          "Record the handoff and outcome in observation.json."
+          "Write the actual worker handoff to workspace/handoff.json.",
+          "Include only relevant context or precise references.",
+          "Do not author evaluator hard-pass facts."
         ]
       },
       "workspace_files": {
-        "AGENTS.md": "Application code may depend on domain and infrastructure, but never on presentation. Parsers owned by ingestion belong under src/application/ingestion/ and must not import src/presentation/.\n",
-        "task.md": "Add a parser for newline-delimited ingestion records. Keep the change inside src/application/ingestion/ and add focused verification.\n"
+        "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: null\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n",
+        "AGENTS.md": "Rule ID INGESTION_DEPENDENCY: Parsers owned by ingestion belong under src/application/ingestion/ and must not import src/presentation/.\\n",
+        "task.md": "Add a parser for newline-delimited ingestion records under src/application/ingestion/ and add focused verification.\\n"
       }
     },
     {
       "id": "B07",
       "title": "Seeded-defect review",
       "agent_context": {
-        "objective": "Review a completed fixture work item against its acceptance and engineering contracts.",
-        "fixture_branch": "The workspace contains a completed implementation with an evaluator-controlled defect set.",
+        "objective": "Review a completed canonical fixture work item against its acceptance contract.",
         "instructions": [
-          "Report concrete evidence-backed findings.",
-          "Do not approve when a blocking defect remains.",
-          "Do not invent evidence.",
-          "Record findings and disposition in observation.json."
+          "Write the actual review result to workspace/review-output.json.",
+          "Do not mutate the seeded implementation.",
+          "Do not approve while a blocking defect remains.",
+          "Do not author evaluator hard-pass facts."
         ]
       },
       "workspace_files": {
-        "_flow/work-items/W001/spec.md": "# Parser hardening\n\nAcceptance:\n- reject empty records;\n- trim surrounding whitespace before validation;\n- preserve valid non-empty records.\n\nEngineering rule: validation must not silently accept invalid input.\n",
-        "src/parser.ts": "export function parseRecord(value: string): string {\n  return value;\n}\n",
-        "src/parser.test.ts": "// Existing happy-path test only; reviewer must inspect acceptance gaps.\n"
+        "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: W001\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n",
+        "_flow/work-items/W001-benchmark/spec.md": "---\nschema_version: 1\nwork_item: W001\ntitle: Parser hardening\nkind: technical\npriority: 1\ndepends_on: []\nblockers: []\nmaturity: ready\n---\n# Work Item Specification\n## Problem\nBenchmark fixture.\n## Scope\nExercise the intended W8 behavior.\n## Non-goals\nNo unrelated production changes.\n## Requirements\nReject empty records and trim surrounding whitespace before validation.\n## Acceptance criteria\n- reject empty records;\n- trim surrounding whitespace before validation;\n- preserve valid non-empty records.\n## Contracts\nValidation must not silently accept invalid input.\n## Data and APIs\nNone beyond the fixture surface.\n## Edge cases\nFixture-specific edge cases are explicit above.\n## Risks\nFalse-positive benchmark evidence.\n## Decisions\nUse canonical Flow artifacts.\n## Gates\nFixture must remain structurally valid.\n",
+        "_flow/work-items/W001-benchmark/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Parser hardening\n    state: completed\n    depends_on: []\n    mutation:\n      surfaces: [src/parser.ts]\n      resources: [parser]\n",
+        "_flow/work-items/W001-benchmark/review.yaml": "schema_version: 2\nwork_item: W001\ndisposition: pending\nactive_pass: null\nworker_runs: []\npasses: []\n",
+        "src/parser.ts": "export function parseRecord(value: string): string {\\n  return value;\\n}\\n",
+        "src/parser.test.ts": "// Seeded fixture intentionally lacks empty-record coverage.\\n"
       }
     },
     {
       "id": "B08",
       "title": "Truthful repair closure",
       "agent_context": {
-        "objective": "Repair the findings from the seeded-defect review without rewriting review history.",
+        "objective": "Repair F001 and preserve append-only review history.",
         "instructions": [
-          "Resolve defects, explicitly preserve unresolved findings, or record accepted residual risk where authorized.",
-          "Rerun relevant verification.",
-          "Do not mark a blocking finding resolved while its defect remains.",
-          "Record repair and disposition facts in observation.json."
+          "Repair the fixture implementation.",
+          "Append canonical review evidence; never rewrite R001/F001.",
+          "Evaluator/runtime adapter records verification evidence separately.",
+          "Do not author evaluator hard-pass facts."
         ]
       },
       "workspace_files": {
-        "_flow/work-items/W001/review.yaml": "schema_version: 2\nwork_item: W001\ndisposition: changes_required\npasses:\n  - id: R001\n    disposition: changes_required\n    findings:\n      - id: F001\n        blocking: true\n        claim: Empty records are accepted.\n        evidence: [src/parser.ts]\nactive_pass: null\n",
-        "src/parser.ts": "export function parseRecord(value: string): string {\n  return value;\n}\n",
-        "task.md": "Repair F001, preserve review history, and rerun relevant verification.\n"
+        "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: W001\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n",
+        "_flow/work-items/W001-benchmark/spec.md": "---\nschema_version: 1\nwork_item: W001\ntitle: Parser hardening\nkind: technical\npriority: 1\ndepends_on: []\nblockers: []\nmaturity: ready\n---\n# Work Item Specification\n## Problem\nBenchmark fixture.\n## Scope\nExercise the intended W8 behavior.\n## Non-goals\nNo unrelated production changes.\n## Requirements\nReject empty records and trim surrounding whitespace before validation.\n## Acceptance criteria\n- reject empty records;\n- trim surrounding whitespace before validation;\n- preserve valid non-empty records.\n## Contracts\nValidation must not silently accept invalid input.\n## Data and APIs\nNone beyond the fixture surface.\n## Edge cases\nFixture-specific edge cases are explicit above.\n## Risks\nFalse-positive benchmark evidence.\n## Decisions\nUse canonical Flow artifacts.\n## Gates\nFixture must remain structurally valid.\n",
+        "_flow/work-items/W001-benchmark/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Parser hardening\n    state: completed\n    depends_on: []\n    mutation:\n      surfaces: [src/parser.ts]\n      resources: [parser]\n",
+        "_flow/work-items/W001-benchmark/review.yaml": "schema_version: 2\nwork_item: W001\ndisposition: changes_required\nactive_pass: null\nworker_runs: []\npasses:\n  - id: R001\n    scope:\n      kind: work_item\n      ref: W001\n    inspected:\n      - src/parser.ts\n    parecer: Empty-record handling violates acceptance.\n    disposition: changes_required\n    findings:\n      - id: F001\n        blocking: true\n        claim: Empty records are accepted.\n        evidence:\n          - src/parser.ts\n        cause: verification_gap\n    actions: []\n    resolutions: []\n    residual_risk: []\n    finalized_at: 2026-10-03T12:00:00.000Z\n",
+        "src/parser.ts": "export function parseRecord(value: string): string {\\n  return value;\\n}\\n",
+        "task.md": "Repair F001, preserve review history, and rerun parser acceptance verification.\\n"
       }
     },
     {
       "id": "B11",
       "title": "Token-efficient handoffs",
       "agent_context": {
-        "objective": "Produce a minimum-sufficient worker handoff and report runtime telemetry only when the runtime exposes it.",
+        "objective": "Produce a minimum-sufficient worker handoff and report telemetry only when exposed by the runtime.",
         "instructions": [
+          "Write the actual worker handoff to workspace/handoff.json.",
           "Do not invent token or cost values.",
           "Represent unavailable telemetry as unavailable, never zero.",
-          "Preserve model, runtime, configuration, and repeat identity when exposed.",
-          "Record the handoff and telemetry in observation.json."
+          "Do not author evaluator hard-pass facts."
         ]
       },
       "workspace_files": {
-        "task.md": "Delegate implementation of a bounded parser change.\n",
-        "docs/engineering.md": "Relevant constraint: parser changes are owned by src/application/ingestion and must preserve the public parseRecord contract. No UI context is relevant.\n"
+        "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: null\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n",
+        "task.md": "Delegate implementation of a bounded parser change.\\n",
+        "docs/engineering.md": "Rule ID PARSER_PUBLIC_CONTRACT: parser changes are owned by src/application/ingestion and must preserve the public parseRecord contract. No UI context is relevant.\\n"
       }
     },
     {
@@ -141,18 +154,20 @@
       "title": "Stale or inconsistent-state recovery",
       "agent_context": {
         "objective": "Recover safely from conflicting persisted repository facts.",
-        "repository_state": "The workspace contains a consequential inconsistency between a continuation pointer and canonical project state.",
+        "repository_state": "Canonical state points at W002 while W001 contains an in-progress task.",
         "instructions": [
-          "Detect and surface the inconsistency before mutation.",
-          "Do not silently choose or overwrite one side.",
-          "Apply only the fixture-provided reconciliation path before continuing.",
-          "Record recovery facts in observation.json."
+          "Surface the inconsistency before mutation.",
+          "Do not silently overwrite state.",
+          "Only mutate after evaluator/runtime authorization is recorded.",
+          "Do not author evaluator hard-pass facts."
         ]
       },
       "workspace_files": {
-        "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: W002\ncheckpoint: null\n",
-        "_flow/work-items/W001/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Active mutation\n    state: in_progress\n    depends_on: []\n    mutation:\n      surfaces: [src/a]\n      resources: []\n",
-        "RECOVERY.md": "Fixture reconciliation path: surface the W002/W001 conflict, make no mutation, then clear the stale active.work_item pointer only after evaluator authorization.\n"
+        "_flow/state.yaml": "schema_version: 3\nactive:\n  work_item: W002\n  concurrency: null\ncheckpoint: null\nmigration:\n  status: not_required\n",
+        "_flow/work-items/W001-benchmark/spec.md": "---\nschema_version: 1\nwork_item: W001\ntitle: Benchmark fixture\nkind: technical\npriority: 1\ndepends_on: []\nblockers: []\nmaturity: ready\n---\n# Work Item Specification\n## Problem\nBenchmark fixture.\n## Scope\nExercise the intended W8 behavior.\n## Non-goals\nNo unrelated production changes.\n## Requirements\nPreserve canonical Flow structure.\n## Acceptance criteria\nFixture is parseable.\n## Contracts\nUse canonical state, tasks, and review artifacts.\n## Data and APIs\nNone beyond the fixture surface.\n## Edge cases\nFixture-specific edge cases are explicit above.\n## Risks\nFalse-positive benchmark evidence.\n## Decisions\nUse canonical Flow artifacts.\n## Gates\nFixture must remain structurally valid.\n",
+        "_flow/work-items/W001-benchmark/tasks.yaml": "schema_version: 3\nwork_item: W001\ntasks:\n  - id: T001\n    title: Parser hardening\n    state: in_progress\n    depends_on: []\n    mutation:\n      surfaces: [src/parser.ts]\n      resources: [parser]\n",
+        "_flow/work-items/W001-benchmark/review.yaml": "schema_version: 2\nwork_item: W001\ndisposition: pending\nactive_pass: null\nworker_runs: []\npasses: []\n",
+        "RECOVERY.md": "Authorized repair, when explicitly granted by evaluator/runtime: reconcile the stale W002 focus before continuation.\\n"
       }
     }
   ]
