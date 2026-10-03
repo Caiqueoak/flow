@@ -2,7 +2,6 @@
 
 Working notes and implementation status for Flow vNext. This file is a concise entrypoint for design decisions, open questions, and delivery progress.
 
-
 ## Implementation status
 
 The accepted Flow vNext technical design is `docs/research/flow-vnext-technical-design.md`. It is authoritative for W1–W7 scope and dependencies; this backlog only summarizes delivery status.
