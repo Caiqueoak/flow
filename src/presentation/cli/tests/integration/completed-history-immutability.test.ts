@@ -49,7 +49,7 @@ test('completed work-item canonical history rejects every mutating work-item and
   const commands = [
     ['work-item', 'set', 'W001', '--title', 'Changed'],
     ['work-item', 'priority', 'W001', '--priority', '2'],
-    ['work-item', 'dependencies', 'W001', '--depends-on', ''],
+    ['work-item', 'dependencies', 'W001', '--depends-on', 'W999'],
     ['work-item', 'blocker-add', 'W001', '--id', 'B001', '--type', 'external_action', '--description', 'Later'],
     ['work-item', 'blocker-resolve', 'W001', '--id', 'B001'],
     ['work-item', 'promote', 'W001'],
