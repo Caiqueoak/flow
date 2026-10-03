@@ -61,6 +61,31 @@ function projectDocument(headings: readonly string[], metadata = '') {
   return `---\nschema_version: 2\nstatus: draft\n${metadata}---\n\n${body}\n`;
 }
 
+function approvalCheckpoint(target: string, phase: 'discovery' | 'engineering' | 'specification', kind: string) {
+  return JSON.stringify({
+    phase,
+    step: 'await_approval',
+    target: { kind, ref: target, revision: null },
+    inputs: [],
+    dimensions: [{ id: 'approval', state: 'resolved', summary: 'The exact approval target is complete.' }],
+    assumptions: [],
+    latest_authorized_direction: 'Approve this exact canonical revision.',
+    next_frontier: []
+  });
+}
+
+function approveCanonical(
+  root: string,
+  target: string,
+  phase: 'discovery' | 'engineering' | 'specification',
+  kind = 'project_document'
+) {
+  assert.equal(run(root, ['checkpoint', 'begin', '--data', approvalCheckpoint(target, phase, kind)]).status, 0);
+  assert.equal(run(root, ['checkpoint', 'ready']).status, 0);
+  const approved = run(root, ['approval', 'record', target]);
+  assert.equal(approved.status, 0, approved.stderr);
+}
+
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-canonical-'));
   temporaryRoots.add(root);
@@ -78,8 +103,8 @@ function project() {
       'baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: incremental\n'
     )
   );
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/prd.md']).status, 0);
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/engineering.md']).status, 0);
+  approveCanonical(root, '_flow/docs/prd.md', 'discovery');
+  approveCanonical(root, '_flow/docs/engineering.md', 'engineering');
   return root;
 }
 function ready(root: string, id = 'W101') {
@@ -104,7 +129,8 @@ function ready(root: string, id = 'W101') {
   const original = fs.readFileSync(spec, 'utf8');
   fs.writeFileSync(spec, `${original}\n${headings.map((heading) => `${heading}\nText.`).join('\n\n')}\n`);
   assert.equal(run(root, ['work-item', 'promote', id]).status, 0);
-  assert.equal(run(root, ['approval', 'record', path.relative(root, spec)]).status, 0);
+  const target = path.relative(root, spec).replaceAll('\\\\', '/');
+  approveCanonical(root, target, 'specification', 'work_item_spec');
   return base;
 }
 
