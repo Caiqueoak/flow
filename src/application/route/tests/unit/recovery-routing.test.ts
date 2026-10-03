@@ -87,6 +87,28 @@ test('active discovery checkpoint resumes even before PRD materialization', (t) 
   });
 });
 
+test('active experience checkpoint wins over a valid-looking draft artifact', (t) => {
+  const root = project(t);
+  fs.writeFileSync(
+    path.join(root, '_flow', 'docs', 'experience.md'),
+    '---\nschema_version: 2\nstatus: draft\n---\n\n# Experience\n\nConcrete draft.\n'
+  );
+  setCheckpoint(
+    root,
+    checkpoint({
+      phase: 'experience',
+      step: 'define',
+      target: { kind: 'project_document', ref: '_flow/docs/experience.md', revision: null }
+    })
+  );
+
+  assert.deepEqual(routeProject(root), {
+    action: 'continue',
+    phase: 'experience',
+    instruction: 'experience/step-01-define.md'
+  });
+});
+
 test('active engineering checkpoint wins over a valid-looking partial artifact', (t) => {
   const root = project(t);
   fs.writeFileSync(
