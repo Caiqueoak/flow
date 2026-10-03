@@ -514,7 +514,7 @@ test('W4 blocks second writers without claims and cross-work-item execution', ()
   assert.notEqual(missingClaims.status, 0);
   assert.match(missingClaims.stderr, /requires mutation\.surfaces and mutation\.resources/);
 
-  const crossItem = run(root, ['task', 'start', 'W102-T001']);
+  const crossItem = run(root, ['task', 'start', 'W102-T001', '--concurrent', '--workspace', 'isolated']);
   assert.notEqual(crossItem.status, 0);
   assert.match(crossItem.stderr, /multiple work items|state\.active\.work_item/);
 });
