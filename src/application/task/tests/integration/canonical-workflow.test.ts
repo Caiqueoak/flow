@@ -262,6 +262,7 @@ test('finished projects stay finished until new scope creates new immutable work
     0
   );
   assert.equal(run(root, ['sync']).status, 0);
+  approveReview(root, 'W101');
   assert.equal(run(root, ['work-item', 'review-complete', 'W101', '--domain', 'flow']).status, 0);
 
   assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), { action: 'stop', reason: 'finished' });
@@ -438,6 +439,7 @@ test('failed review commits preserve the real index and finalized review history
     0
   );
   assert.equal(run(root, ['sync']).status, 0);
+  approveReview(root, 'W101');
   const hook = path.join(root, '.git', 'hooks', 'pre-commit');
   fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n');
   fs.chmodSync(hook, 0o755);
