@@ -34,10 +34,9 @@ export function lifecycle(item: LoadedWorkItem, byId: ReadonlyMap<WorkItemId, Lo
 
 export function assertWorkItemHistoryMutable(
   item: LoadedWorkItem,
-  byId: ReadonlyMap<WorkItemId, LoadedWorkItem>,
-  { allowOpenReviewCompletion = false }: { allowOpenReviewCompletion?: boolean } = {}
+  byId: ReadonlyMap<WorkItemId, LoadedWorkItem>
 ): void {
-  if (lifecycle(item, byId).status !== 'completed' || allowOpenReviewCompletion) return;
+  if (lifecycle(item, byId).status !== 'completed') return;
 
   throw new UserInputError(
     `${item.id} is completed and its canonical history is immutable. Create a new maintenance work-item for later fixes.`
