@@ -128,6 +128,13 @@ function validateCheckpointTarget(
   findings: RecoveryFinding[]
 ): void {
   const resolved = resolveReference(root, checkpoint.target.ref, items);
+  if (
+    !resolved.exists &&
+    checkpoint.status === 'active' &&
+    canonicalProjectDocumentKind(normalizeRef(checkpoint.target.ref))
+  ) {
+    return;
+  }
   if (!resolved.exists) {
     findings.push({
       code: 'RECOVERY_TARGET_MISSING',
