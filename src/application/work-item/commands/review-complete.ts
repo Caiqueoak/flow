@@ -1,11 +1,11 @@
 import path from 'node:path';
-import { parseReview } from '../../../domain/work-item/review.mjs';
+import { parseReview, reviewReadyForCompletion } from '../../../domain/work-item/review.mjs';
 import { validateProject } from '../../project-validation.mjs';
 import { evaluateGates } from '../../../infrastructure/process/gate-evaluation.mjs';
 import { fail, recordOutput as writeOutput, requiredOption } from '../../command-runtime.js';
 import { REVIEW_FILE, SPEC_FILE } from '../../../domain/project/project.js';
-import type { LoadedWorkItem, WorkItemReview } from '../../../domain/work-item/work-item.js';
-import { projectRelativePath, readText, writeText, writeYaml } from '../../../infrastructure/filesystem/index.js';
+import type { LoadedWorkItem, WorkItemId } from '../../../domain/work-item/work-item.js';
+import { projectRelativePath, readText, writeText } from '../../../infrastructure/filesystem/index.js';
 import {
   loadExecutionState,
   writeExecutionState,
@@ -30,10 +30,6 @@ interface GateResult {
   status: string;
 }
 
-const parseReviewBoundary = parseReview as unknown as (
-  text: string,
-  options: { expectedWorkItem: string }
-) => WorkItemReview;
 const validateProjectBoundary = validateProject as unknown as (
   root: string,
   options: { workItem: string }
@@ -51,7 +47,9 @@ export function completeWorkItemReview(root: string, item: LoadedWorkItem, args:
   ensureReviewGatesPass(root, item.id);
 
   const reviewFilePath = path.join(item.base, REVIEW_FILE);
-  const review = parseReviewBoundary(readText(reviewFilePath), { expectedWorkItem: item.id });
+  const review = parseReview(readText(reviewFilePath), { expectedWorkItem: item.id });
+  if (!reviewReadyForCompletion(review)) fail(`${item.id} review history is not cleanly approved.`);
+
   const workItemPath = projectRelativePath(root, item.base);
   const reviewFile = `${workItemPath}/${REVIEW_FILE}`;
   const specFile = `${workItemPath}/${SPEC_FILE}`;
@@ -66,8 +64,6 @@ export function completeWorkItemReview(root: string, item: LoadedWorkItem, args:
     root,
     item,
     domain,
-    reviewFilePath,
-    review,
     allowedFiles,
     reviewFile,
     clearsActiveFocus ? { state, stateFilePath, stateFile } : null
@@ -79,8 +75,6 @@ function persistReviewCommit(
   root: string,
   item: LoadedWorkItem,
   domain: string,
-  reviewFilePath: string,
-  review: WorkItemReview,
   allowedFiles: string[],
   reviewFile: string,
   activeState: {
@@ -93,9 +87,6 @@ function persistReviewCommit(
   const originalState = activeState ? readText(activeState.stateFilePath) : null;
 
   try {
-    review.status = 'approved';
-    review.reviewed_at = new Date().toISOString();
-    writeYaml(reviewFilePath, review);
     const filesToStage = [reviewFile];
     if (activeState) {
       activeState.state.active.work_item = null;
@@ -111,12 +102,7 @@ function persistReviewCommit(
     });
     resetFiles(root, allowedFiles);
   } catch (error) {
-    review.status = 'pending';
-    delete review.reviewed_at;
-    writeYaml(reviewFilePath, review);
-    if (activeState && originalState !== null) {
-      writeText(activeState.stateFilePath, originalState);
-    }
+    if (activeState && originalState !== null) writeText(activeState.stateFilePath, originalState);
     throw error;
   } finally {
     removeTemporaryGitIndex(temporaryIndex);
@@ -127,26 +113,20 @@ function ensureReviewCanComplete(item: LoadedWorkItem): void {
   const hasTasks = item.tasks.tasks.length > 0;
   const allTasksCompleted = item.tasks.tasks.every((task) => task.state === 'completed');
 
-  if (item.maturity !== 'ready' || !hasTasks || !allTasksCompleted) {
+  if (item.maturity !== 'ready' || !hasTasks || !allTasksCompleted || !reviewReadyForCompletion(item.review))
     fail(`${item.id} is not ready for review completion.`);
-  }
 }
 
-function ensureReviewValidationPasses(root: string, workItemId: string): void {
+function ensureReviewValidationPasses(root: string, workItemId: WorkItemId): void {
   const findings = validateProjectBoundary(root, { workItem: workItemId });
-
-  if (findings.length) {
-    fail(`Review validation failed: ${findings.map((finding) => finding.code).join(', ')}.`);
-  }
+  if (findings.length) fail(`Review validation failed: ${findings.map((finding) => finding.code).join(', ')}.`);
 }
 
-function ensureReviewGatesPass(root: string, workItemId: string): void {
+function ensureReviewGatesPass(root: string, workItemId: WorkItemId): void {
   const failedGates = evaluateGatesBoundary(root, {
     workItem: workItemId,
     stage: 'work-item-review'
   }).filter((gate) => gate.blocking && gate.status !== 'passed');
 
-  if (failedGates.length) {
-    fail(`Review gates failed: ${failedGates.map((gate) => gate.id).join(', ')}.`);
-  }
+  if (failedGates.length) fail(`Review gates failed: ${failedGates.map((gate) => gate.id).join(', ')}.`);
 }
