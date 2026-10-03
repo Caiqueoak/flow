@@ -10,6 +10,7 @@ import {
   specificationRevision
 } from '../../../../domain/work-item/specification.mjs';
 import { parseCheckpoint } from '../../../../domain/workflow/checkpoint.mjs';
+import type { WorkItemId, WorkItemSpecMetadata } from '../../../../domain/work-item/work-item.js';
 import { emptyState } from '../../../../domain/workflow/execution-state.mjs';
 import { writeExecutionState, loadExecutionState } from '../../../../infrastructure/persistence/execution-state.mjs';
 import { diagnoseProject } from '../../../doctor/operations/doctor.mjs';
@@ -140,9 +141,9 @@ Gate.
 `
       : '# Work Item Specification\n\n## Outcome\n\nExample outcome.\n';
 
-  const metadata: any = {
+  const metadata: WorkItemSpecMetadata = {
     schema_version: 1,
-    work_item: id,
+    work_item: id as WorkItemId,
     title: 'Example',
     outcome: 'Example outcome',
     kind: 'feature',
