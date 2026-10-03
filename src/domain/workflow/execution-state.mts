@@ -86,7 +86,12 @@ function parseActiveConcurrency(value: unknown, source: string): ActiveConcurren
 
   const taskPattern = new RegExp(QUALIFIED_TASK_ID_PATTERN);
   const tasks = concurrency.tasks;
-  if (!Array.isArray(tasks) || tasks.length < 2 || tasks.some((task) => typeof task !== 'string' || !taskPattern.test(task)) || new Set(tasks).size !== tasks.length)
+  if (
+    !Array.isArray(tasks) ||
+    tasks.length < 2 ||
+    tasks.some((task) => typeof task !== 'string' || !taskPattern.test(task)) ||
+    new Set(tasks).size !== tasks.length
+  )
     throw new ArtifactValidationError(`${source} active.concurrency.tasks is invalid.`);
 
   return { tasks: [...tasks].sort() as QualifiedTaskId[], workspace: workspace as WorkspaceStrategy };

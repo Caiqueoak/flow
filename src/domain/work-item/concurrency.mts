@@ -61,7 +61,10 @@ export function hasCompleteMutationClaim(task: Task): boolean {
 export function validateConcurrentTaskState(
   items: readonly WorkItemTaskState[],
   activeWorkItem: WorkItemId | null,
-  { checkpointActive = false, concurrency = null }: { checkpointActive?: boolean; concurrency?: ActiveConcurrency | null } = {}
+  {
+    checkpointActive = false,
+    concurrency = null
+  }: { checkpointActive?: boolean; concurrency?: ActiveConcurrency | null } = {}
 ): ConcurrencyIssue[] {
   const active = items.flatMap((item) =>
     item.tasks.tasks
@@ -108,7 +111,10 @@ export function validateConcurrentTaskState(
       code: 'CONCURRENCY_INTENT_REQUIRED',
       message: 'Concurrent in-progress tasks require explicit state.active.concurrency intent and workspace strategy.'
     });
-  } else if (concurrency.tasks.length !== activeTaskIds.length || concurrency.tasks.some((taskId, index) => taskId !== activeTaskIds[index])) {
+  } else if (
+    concurrency.tasks.length !== activeTaskIds.length ||
+    concurrency.tasks.some((taskId, index) => taskId !== activeTaskIds[index])
+  ) {
     issues.push({
       code: 'CONCURRENCY_STATE_CONFLICT',
       message: `state.active.concurrency tasks must exactly match active tasks: ${activeTaskIds.join(', ')}.`

@@ -6,7 +6,11 @@ import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mj
 import { loadExecutionState, writeExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 import { validateConcurrentTaskState } from '../../../domain/work-item/concurrency.mjs';
-import { WORKSPACE_STRATEGIES, type ActiveConcurrency, type WorkspaceStrategy } from '../../../domain/workflow/execution-state.mjs';
+import {
+  WORKSPACE_STRATEGIES,
+  type ActiveConcurrency,
+  type WorkspaceStrategy
+} from '../../../domain/workflow/execution-state.mjs';
 import { inspectRecovery } from '../../recovery/recovery.mjs';
 import { findTask, loadTaskContext } from '../task-context.js';
 
@@ -63,16 +67,28 @@ function ensureRecoveryAllowsExecution(root: string): void {
   }
 }
 
-function prospectiveConcurrency(args: readonly string[], activeBefore: string[], prospective: readonly LoadedWorkItem[]): ActiveConcurrency | null {
+function prospectiveConcurrency(
+  args: readonly string[],
+  activeBefore: string[],
+  prospective: readonly LoadedWorkItem[]
+): ActiveConcurrency | null {
   if (!activeBefore.length) return null;
-  if (!args.includes('--concurrent')) fail('Starting a second concurrent task requires explicit --concurrent intent and --workspace <shared|isolated>.');
+  if (!args.includes('--concurrent'))
+    fail('Starting a second concurrent task requires explicit --concurrent intent and --workspace <shared|isolated>.');
   const workspace = optionValue(args, '--workspace');
-  if (!workspace || !WORKSPACE_STRATEGIES.includes(workspace as WorkspaceStrategy)) fail('--workspace must be one of: shared, isolated.');
+  if (!workspace || !WORKSPACE_STRATEGIES.includes(workspace as WorkspaceStrategy))
+    fail('--workspace must be one of: shared, isolated.');
   return { tasks: activeTaskIds(prospective) as ActiveConcurrency['tasks'], workspace: workspace as WorkspaceStrategy };
 }
 
 function activeTaskIds(items: readonly LoadedWorkItem[]): string[] {
-  return items.flatMap((item) => item.tasks.tasks.filter((candidate) => candidate.state === 'in_progress').map((candidate) => `${item.id}-${candidate.id}`)).sort();
+  return items
+    .flatMap((item) =>
+      item.tasks.tasks
+        .filter((candidate) => candidate.state === 'in_progress')
+        .map((candidate) => `${item.id}-${candidate.id}`)
+    )
+    .sort();
 }
 
 function prospectiveItems(
