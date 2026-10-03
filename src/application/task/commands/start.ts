@@ -28,7 +28,7 @@ export function runStart(target: string | undefined, args: readonly string[]): v
   const allItems = loadWorkItems(root) as LoadedWorkItem[];
   const activeBefore = activeTaskIds(allItems);
   const prospective = prospectiveItems(allItems, context.item.id, context.tasks, task);
-  const concurrency = prospectiveConcurrency(args, activeBefore, prospective);
+  const concurrency = prospectiveConcurrency(args, activeBefore, prospective, state.active.concurrency);
   const issues = validateConcurrentTaskState(prospective, effectiveWorkItem, { checkpointActive: false, concurrency });
   if (issues.length) {
     fail(`Cannot start ${context.item.id}-${task.id}: ${issues.map((issue) => issue.message).join(' ')}`);
@@ -70,7 +70,8 @@ function ensureRecoveryAllowsExecution(root: string): void {
 function prospectiveConcurrency(
   args: readonly string[],
   activeBefore: string[],
-  prospective: readonly LoadedWorkItem[]
+  prospective: readonly LoadedWorkItem[],
+  existingConcurrency: ActiveConcurrency | null
 ): ActiveConcurrency | null {
   if (!activeBefore.length) return null;
   if (!args.includes('--concurrent'))
@@ -78,7 +79,15 @@ function prospectiveConcurrency(
   const workspace = optionValue(args, '--workspace');
   if (!workspace || !WORKSPACE_STRATEGIES.includes(workspace as WorkspaceStrategy))
     fail('--workspace must be one of: shared, isolated.');
-  return { tasks: activeTaskIds(prospective) as ActiveConcurrency['tasks'], workspace: workspace as WorkspaceStrategy };
+
+  const requestedWorkspace = workspace as WorkspaceStrategy;
+  if (activeBefore.length > 1 && existingConcurrency?.workspace !== requestedWorkspace) {
+    fail(
+      `Concurrent execution already uses workspace '${existingConcurrency?.workspace ?? 'unknown'}'; serialize active tasks before changing workspace strategy.`
+    );
+  }
+
+  return { tasks: activeTaskIds(prospective) as ActiveConcurrency['tasks'], workspace: requestedWorkspace };
 }
 
 function activeTaskIds(items: readonly LoadedWorkItem[]): string[] {
