@@ -65,3 +65,41 @@ test('approval-ready transition rejects unresolved required dimensions', (t) => 
   beginCheckpoint(root, payload(), { now: () => '2026-10-02T12:00:00Z' });
   assert.throws(() => markCheckpointApprovalReady(root, 'prd-rev-1'), /unresolved/);
 });
+
+test('new-scope checkpoint cannot become approval-ready while consequential dimensions remain unresolved', (t) => {
+  const root = project(t);
+  beginCheckpoint(
+    root,
+    {
+      phase: 'discovery',
+      step: 'project',
+      target: { kind: 'project_document', ref: '_flow/docs/prd.md', revision: null },
+      inputs: [],
+      dimensions: [
+        {
+          id: 'product_scope',
+          state: 'resolved',
+          summary: 'Product impact is bounded.'
+        },
+        {
+          id: 'experience_relevance',
+          state: 'unresolved',
+          summary: 'Experience relevance is still being assessed.'
+        },
+        {
+          id: 'engineering_impact',
+          state: 'deferred',
+          summary: 'Engineering impact will be revisited after the integration contract is known.',
+          revisit: 'Revisit before engineering synthesis.'
+        }
+      ],
+      assumptions: [],
+      latest_authorized_direction: 'Keep the new scope bounded.',
+      next_frontier: ['experience_relevance']
+    },
+    { now: () => '2026-10-03T19:10:00Z' }
+  );
+
+  assert.throws(() => markCheckpointApprovalReady(root, 'prd-new-scope-rev'), /unresolved/);
+  assert.equal(loadExecutionState(root).checkpoint?.status, 'active');
+});

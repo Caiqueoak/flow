@@ -74,8 +74,11 @@ export function validateCommandArguments(command: CommandDefinition, args: reado
 
   if (command.arguments?.some((argument) => argument.required) && !positional.length)
     throw new Error(`flow ${command.name} requires ${command.arguments[0]?.name}.`);
-  if (command.name === 'migrate' && args.includes('--plan') === args.includes('--apply'))
-    throw new Error('flow migrate requires exactly one of --plan or --apply.');
+  if (command.name === 'migrate') {
+    const operations = ['--plan', '--apply', '--complete-reconciliation'].filter((flag) => args.includes(flag));
+    if (operations.length !== 1)
+      throw new Error('flow migrate requires exactly one of --plan, --apply or --complete-reconciliation.');
+  }
 }
 
 function renderArgument(argument: NonNullable<CommandDefinition['arguments']>[number]): string {
