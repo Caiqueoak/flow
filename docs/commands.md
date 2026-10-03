@@ -22,6 +22,7 @@ flow task commit      -> application/task/commands/commit.ts
 
 flow work-item create          -> application/work-item/commands/create.ts
 flow work-item blocker-add     -> application/work-item/commands/blocker-add.ts
+flow work-item review-pass     -> application/work-item/commands/review-pass.ts
 flow work-item review-complete -> application/work-item/commands/review-complete.ts
 
 flow checkpoint begin  -> application/checkpoint/commands/begin.ts
