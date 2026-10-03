@@ -1,4 +1,4 @@
-import { fail, projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
+import { fail, optionValue, projectRoot, recordOutput as writeOutput } from '../../command-runtime.js';
 import type { Task, TaskCollection } from '../../../domain/task/task.js';
 import type { LoadedWorkItem } from '../../../domain/work-item/work-item.js';
 import { writeYaml } from '../../../infrastructure/filesystem/index.js';
@@ -6,6 +6,7 @@ import { loadWorkItems } from '../../../infrastructure/persistence/work-items.mj
 import { loadExecutionState, writeExecutionState } from '../../../infrastructure/persistence/execution-state.mjs';
 import { lifecycle } from '../../../domain/work-item/lifecycle.js';
 import { validateConcurrentTaskState } from '../../../domain/work-item/concurrency.mjs';
+import { WORKSPACE_STRATEGIES, type ActiveConcurrency, type WorkspaceStrategy } from '../../../domain/workflow/execution-state.mjs';
 import { inspectRecovery } from '../../recovery/recovery.mjs';
 import { findTask, loadTaskContext } from '../task-context.js';
 
@@ -21,21 +22,24 @@ export function runStart(target: string | undefined, args: readonly string[]): v
   const state = loadExecutionState(root);
   const effectiveWorkItem = state.active.work_item ?? context.item.id;
   const allItems = loadWorkItems(root) as LoadedWorkItem[];
+  const activeBefore = activeTaskIds(allItems);
   const prospective = prospectiveItems(allItems, context.item.id, context.tasks, task);
-  const issues = validateConcurrentTaskState(prospective, effectiveWorkItem, { checkpointActive: false });
+  const concurrency = prospectiveConcurrency(args, activeBefore, prospective);
+  const issues = validateConcurrentTaskState(prospective, effectiveWorkItem, { checkpointActive: false, concurrency });
   if (issues.length) {
     fail(`Cannot start ${context.item.id}-${task.id}: ${issues.map((issue) => issue.message).join(' ')}`);
   }
 
-  const previousWorkItem = state.active.work_item;
+  const previousActive = { ...state.active };
   state.active.work_item = effectiveWorkItem;
+  state.active.concurrency = concurrency;
   writeExecutionState(root, state);
 
   try {
     task.state = 'in_progress';
     writeYaml(context.tasksFile, context.tasks);
   } catch (error) {
-    state.active.work_item = previousWorkItem;
+    state.active = previousActive;
     writeExecutionState(root, state);
     throw error;
   }
@@ -57,6 +61,18 @@ function ensureRecoveryAllowsExecution(root: string): void {
   if (recovery.classification !== 'resumable' || recovery.checkpoint) {
     fail('Task execution is blocked until the active recovery/checkpoint state is resolved.');
   }
+}
+
+function prospectiveConcurrency(args: readonly string[], activeBefore: string[], prospective: readonly LoadedWorkItem[]): ActiveConcurrency | null {
+  if (!activeBefore.length) return null;
+  if (!args.includes('--concurrent')) fail('Starting a second concurrent task requires explicit --concurrent intent and --workspace <shared|isolated>.');
+  const workspace = optionValue(args, '--workspace');
+  if (!workspace || !WORKSPACE_STRATEGIES.includes(workspace as WorkspaceStrategy)) fail('--workspace must be one of: shared, isolated.');
+  return { tasks: activeTaskIds(prospective) as ActiveConcurrency['tasks'], workspace: workspace as WorkspaceStrategy };
+}
+
+function activeTaskIds(items: readonly LoadedWorkItem[]): string[] {
+  return items.flatMap((item) => item.tasks.tasks.filter((candidate) => candidate.state === 'in_progress').map((candidate) => `${item.id}-${candidate.id}`)).sort();
 }
 
 function prospectiveItems(

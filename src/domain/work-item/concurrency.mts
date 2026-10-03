@@ -1,9 +1,12 @@
 import type { Task, TaskCollection, TaskId } from '../task/task.js';
 import type { WorkItemId } from './work-item.js';
+import type { ActiveConcurrency } from '../workflow/execution-state.mjs';
 
 export type ConcurrencyIssueCode =
   | 'ACTIVE_WORK_ITEM_CONFLICT'
   | 'ACTIVE_WORK_ITEM_REQUIRED'
+  | 'CONCURRENCY_INTENT_REQUIRED'
+  | 'CONCURRENCY_STATE_CONFLICT'
   | 'CROSS_WORK_ITEM_ACTIVE_TASKS'
   | 'CHECKPOINT_CONFLICT'
   | 'MISSING_MUTATION_CLAIMS'
@@ -58,7 +61,7 @@ export function hasCompleteMutationClaim(task: Task): boolean {
 export function validateConcurrentTaskState(
   items: readonly WorkItemTaskState[],
   activeWorkItem: WorkItemId | null,
-  { checkpointActive = false }: { checkpointActive?: boolean } = {}
+  { checkpointActive = false, concurrency = null }: { checkpointActive?: boolean; concurrency?: ActiveConcurrency | null } = {}
 ): ConcurrencyIssue[] {
   const active = items.flatMap((item) =>
     item.tasks.tasks
@@ -77,19 +80,38 @@ export function validateConcurrentTaskState(
     });
   }
 
-  if (activeWorkItem && active.some((entry) => entry.workItem !== activeWorkItem)) {
+  if (!activeWorkItem) {
+    issues.push({
+      code: 'ACTIVE_WORK_ITEM_REQUIRED',
+      message: 'Any in-progress task requires state.active.work_item.'
+    });
+  } else if (active.some((entry) => entry.workItem !== activeWorkItem)) {
     issues.push({
       code: 'ACTIVE_WORK_ITEM_CONFLICT',
       message: `In-progress task state conflicts with state.active.work_item '${activeWorkItem}'.`
     });
   }
 
-  if (active.length === 1) return issues;
+  if (active.length === 1) {
+    if (concurrency) {
+      issues.push({
+        code: 'CONCURRENCY_STATE_CONFLICT',
+        message: 'state.active.concurrency must be null when fewer than two tasks are in progress.'
+      });
+    }
+    return issues;
+  }
 
-  if (!activeWorkItem) {
+  const activeTaskIds = active.map((entry) => `${entry.workItem}-${entry.task.id}`).sort();
+  if (!concurrency) {
     issues.push({
-      code: 'ACTIVE_WORK_ITEM_REQUIRED',
-      message: 'Concurrent in-progress tasks require state.active.work_item.'
+      code: 'CONCURRENCY_INTENT_REQUIRED',
+      message: 'Concurrent in-progress tasks require explicit state.active.concurrency intent and workspace strategy.'
+    });
+  } else if (concurrency.tasks.length !== activeTaskIds.length || concurrency.tasks.some((taskId, index) => taskId !== activeTaskIds[index])) {
+    issues.push({
+      code: 'CONCURRENCY_STATE_CONFLICT',
+      message: `state.active.concurrency tasks must exactly match active tasks: ${activeTaskIds.join(', ')}.`
     });
   }
 

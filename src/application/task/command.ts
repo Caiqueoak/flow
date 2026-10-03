@@ -24,6 +24,8 @@ export const command: CommandDefinition = {
     { name: '--depends-on', value: '<T###,...>' },
     { name: '--mutation-surfaces', value: '<path,...>' },
     { name: '--mutation-resources', value: '<token,...>' },
+    { name: '--concurrent' },
+    { name: '--workspace', value: '<shared|isolated>' },
     { name: '--message', value: '<objective commit title>' },
     { name: '--files', value: '<path,...>' }
   ],
