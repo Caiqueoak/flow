@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseWorkItemSpec } from '../../domain/work-item/specification.mjs';
 import { parseTasks } from '../../domain/task/task-list.mjs';
-import { parseReview } from '../../domain/work-item/review.mjs';
+import { parseReview, validateReviewTaskReferences } from '../../domain/work-item/review.mjs';
 import { validateAcyclic, ArtifactValidationError } from '../../domain/work-item/backlog.mjs';
 import type { LoadedWorkItem, WorkItemId } from '../../domain/work-item/work-item.js';
 
@@ -28,6 +28,7 @@ export function loadWorkItems(root: string): LoadedWorkItem[] {
       const spec = parseWorkItemSpec(read(path.join(base, 'spec.md')), { expectedWorkItem: id });
       const tasks = parseTasks(read(path.join(base, 'tasks.yaml')), { expectedWorkItem: id });
       const review = parseReview(read(path.join(base, 'review.yaml')), { expectedWorkItem: id });
+      validateReviewTaskReferences(review, new Set(tasks.tasks.map((task) => `${id}-${task.id}`)), `${id} review.yaml`);
       return { ...spec.metadata, id, folder: entry.name, specBody: spec.body, tasks, review, base };
     })
     .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));

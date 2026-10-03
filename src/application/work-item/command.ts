@@ -13,6 +13,7 @@ import { updateWorkItemDependencies } from './commands/dependencies.js';
 import { updateWorkItemPriority } from './commands/priority.js';
 import { promoteWorkItem } from './commands/promote.js';
 import { completeWorkItemReview } from './commands/review-complete.js';
+import { persistWorkItemReviewPass } from './commands/review-pass.js';
 import { updateWorkItemIdentity } from './commands/set.js';
 import { findWorkItem } from './work-item-context.js';
 import { assertProjectContractsAuthorized } from '../project-contracts.mjs';
@@ -33,13 +34,15 @@ const workItemCommands: Record<string, WorkItemCommandHandler> = {
   'blocker-add': ({ root, target, args }) => addWorkItemBlocker(findWorkItem(root, target), args),
   'blocker-resolve': ({ root, target, args }) => resolveWorkItemBlocker(findWorkItem(root, target), args),
   promote: ({ root, target }) => promoteWorkItem(findWorkItem(root, target)),
+  'review-pass': ({ root, target, args }) => persistWorkItemReviewPass(root, findWorkItem(root, target), args),
   'review-complete': ({ root, target, args }) => completeWorkItemReview(root, findWorkItem(root, target), args)
 };
 
 export const command: CommandDefinition = {
   name: 'work-item',
   description: 'Create or deterministically update backlog work-items.',
-  usage: 'flow work-item <create|set|priority|dependencies|blocker-add|blocker-resolve|promote|review-complete> ...',
+  usage:
+    'flow work-item <create|set|priority|dependencies|blocker-add|blocker-resolve|promote|review-pass|review-complete> ...',
   arguments: [{ name: 'operation', required: true }],
   flags: [
     projectPathOption,
@@ -51,7 +54,9 @@ export const command: CommandDefinition = {
     { name: '--id', value: '<blocker-id>' },
     { name: '--type', value: '<type>', values: ['external_action', 'consequential_decision'] },
     { name: '--description', value: '<text>' },
-    { name: '--domain', value: '<domain>' }
+    { name: '--domain', value: '<domain>' },
+    { name: '--mode', value: '<mode>', values: ['checkpoint', 'finalize'] },
+    { name: '--data', value: '<json>' }
   ],
   effects: 'Writes only artifacts in the target work-item folder.',
   when: 'For deterministic backlog mutations.',
@@ -70,7 +75,7 @@ export function runWorkItem({ args }: { args: string[] }): void {
 
   const execute = resolveSubcommand(workItemCommands, action, `Unknown work-item operation '${action}'.`);
 
-  if (['create', 'set', 'priority', 'dependencies', 'promote', 'review-complete'].includes(action)) {
+  if (['create', 'set', 'priority', 'dependencies', 'promote', 'review-pass', 'review-complete'].includes(action)) {
     assertProjectContractsAuthorized(root);
   }
 

@@ -1,3 +1,4 @@
+import { isReviewApproved } from './review.mjs';
 import type { LoadedWorkItem, WorkItemId } from './work-item.js';
 
 export type WorkItemLifecycleStatus = 'outlined' | 'blocked' | 'in_progress' | 'review' | 'completed' | 'eligible';
@@ -25,7 +26,7 @@ export function lifecycle(item: LoadedWorkItem, byId: ReadonlyMap<WorkItemId, Lo
   }
   if (item.tasks.tasks.some((task) => task.state === 'in_progress')) return { status: 'in_progress', reasons: [] };
   if (item.tasks.tasks.length && item.tasks.tasks.every((task) => task.state === 'completed')) {
-    return { status: item.review.status === 'approved' ? 'completed' : 'review', reasons: [] };
+    return { status: isReviewApproved(item.review) ? 'completed' : 'review', reasons: [] };
   }
   return { status: 'eligible', reasons: [] };
 }

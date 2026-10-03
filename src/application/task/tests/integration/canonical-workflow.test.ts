@@ -108,6 +108,25 @@ function ready(root: string, id = 'W101') {
   return base;
 }
 
+function approveReview(root: string, id = 'W101') {
+  const data = JSON.stringify({
+    pass: {
+      id: 'R001',
+      scope: { kind: 'work_item', ref: id },
+      inspected: [id],
+      parecer: 'Acceptance and verification passed.',
+      disposition: 'approved',
+      findings: [],
+      actions: [],
+      resolutions: [],
+      residual_risk: []
+    }
+  });
+  assert.equal(run(root, ['work-item', 'review-pass', id, '--mode', 'checkpoint', '--data', data]).status, 0);
+  assert.equal(run(root, ['work-item', 'review-pass', id, '--mode', 'finalize']).status, 0);
+  assert.equal(run(root, ['sync']).status, 0);
+}
+
 test('compiled CLI creates canonical shells and sync never mutates them', () => {
   const root = project();
   assert.equal(
@@ -210,6 +229,7 @@ test('task and review use canonical subjects and release dependent work', () => 
   assert.equal(run(root, ['sync']).status, 0);
   const base = path.join(root, '_flow', 'work-items', 'W101-canonical-item');
   fs.writeFileSync(path.join(base, 'notes.md'), 'not review evidence\n');
+  approveReview(root, 'W101');
   assert.equal(run(root, ['work-item', 'review-complete', 'W101', '--domain', 'flow']).status, 0);
   assert.match(
     execFileSync('git', ['log', '-1', '--format=%s'], { cwd: root, encoding: 'utf8' }),
@@ -243,6 +263,7 @@ test('finished projects stay finished until new scope creates new immutable work
     0
   );
   assert.equal(run(root, ['sync']).status, 0);
+  approveReview(root, 'W101');
   assert.equal(run(root, ['work-item', 'review-complete', 'W101', '--domain', 'flow']).status, 0);
 
   assert.deepEqual(JSON.parse(run(root, ['route', '--json']).stdout), { action: 'stop', reason: 'finished' });
@@ -397,7 +418,7 @@ test('failed task commits preserve the real index and task state', () => {
   );
 });
 
-test('failed review commits preserve the real index and pending review', () => {
+test('failed review commits preserve the real index and finalized review history', () => {
   const root = project();
   ready(root);
   assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
@@ -418,6 +439,7 @@ test('failed review commits preserve the real index and pending review', () => {
     0
   );
   assert.equal(run(root, ['sync']).status, 0);
+  approveReview(root, 'W101');
   const hook = path.join(root, '.git', 'hooks', 'pre-commit');
   fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n');
   fs.chmodSync(hook, 0o755);
@@ -426,7 +448,9 @@ test('failed review commits preserve the real index and pending review', () => {
   const review = parse(
     fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-canonical-item', 'review.yaml'), 'utf8')
   );
-  assert.equal(review.status, 'pending');
+  assert.equal(review.disposition, 'approved');
+  assert.equal(review.active_pass, null);
+  assert.equal(review.passes.length, 1);
   assert.equal(execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, encoding: 'utf8' }).trim(), '');
 });
 
@@ -739,4 +763,96 @@ test('W4 rejects invalid and traversing mutation surfaces before persistence', (
     ]);
     assert.notEqual(result.status, 0);
   }
+});
+
+test('W5 routes an approved review back to review while a later pass is active', () => {
+  const root = project();
+  ready(root);
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Implement']).status, 0);
+  assert.equal(run(root, ['task', 'start', 'W101-T001']).status, 0);
+  fs.writeFileSync(path.join(root, 'implementation.txt'), 'done\n');
+  execFileSync('git', ['add', 'implementation.txt'], { cwd: root });
+  assert.equal(run(root, ['sync']).status, 0);
+  assert.equal(
+    run(root, [
+      'task',
+      'commit',
+      'W101-T001',
+      '--message',
+      'feat(flow): implement item [W101-T001]',
+      '--files',
+      'implementation.txt'
+    ]).status,
+    0
+  );
+  assert.equal(run(root, ['sync']).status, 0);
+  approveReview(root, 'W101');
+
+  const followUp = JSON.stringify({
+    pass: {
+      id: 'R002',
+      scope: { kind: 'work_item', ref: 'W101' },
+      parecer: 'Interrupted follow-up review.'
+    }
+  });
+  assert.equal(run(root, ['work-item', 'review-pass', 'W101', '--mode', 'checkpoint', '--data', followUp]).status, 0);
+
+  const route = JSON.parse(run(root, ['route', '--json']).stdout);
+  assert.equal(route.phase, 'review');
+  assert.equal(route.work_item, 'W101');
+
+  const review = parse(
+    fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-canonical-item', 'review.yaml'), 'utf8')
+  );
+  assert.equal(review.disposition, 'approved');
+  assert.equal(review.active_pass.id, 'R002');
+});
+
+test('W5 review mutations reject a different active work item', () => {
+  const root = project();
+  ready(root, 'W101');
+  ready(root, 'W102');
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Focused task']).status, 0);
+
+  const checkpoint = JSON.stringify({
+    pass: {
+      id: 'R001',
+      scope: { kind: 'work_item', ref: 'W102' },
+      parecer: 'Cross-focus review.'
+    }
+  });
+  const pass = run(root, ['work-item', 'review-pass', 'W102', '--mode', 'checkpoint', '--data', checkpoint]);
+  assert.notEqual(pass.status, 0);
+  assert.match(pass.stderr, /state\.active\.work_item is W101/);
+
+  const complete = run(root, ['work-item', 'review-complete', 'W102', '--domain', 'flow']);
+  assert.notEqual(complete.status, 0);
+  assert.match(complete.stderr, /state\.active\.work_item is W101/);
+});
+
+test('W5 review-pass accepts canonical task refs and rejects nonexistent task refs', () => {
+  const root = project();
+  ready(root);
+  assert.equal(run(root, ['task', 'create', 'W101', '--title', 'Repair task']).status, 0);
+
+  const valid = JSON.stringify({
+    pass: {
+      id: 'R001',
+      scope: { kind: 'task', ref: 'W101-T001' },
+      parecer: 'Inspecting canonical task.'
+    },
+    worker_runs: [{ id: 'E001', task: 'W101-T001', runtime: 'codex' }]
+  });
+  assert.equal(run(root, ['work-item', 'review-pass', 'W101', '--mode', 'checkpoint', '--data', valid]).status, 0);
+
+  const invalid = JSON.stringify({
+    pass: {
+      id: 'R001',
+      scope: { kind: 'task', ref: 'W101-T999' },
+      parecer: 'Invalid task ref.'
+    }
+  });
+  const rejected = run(root, ['work-item', 'review-pass', 'W101', '--mode', 'checkpoint', '--data', invalid]);
+  assert.notEqual(rejected.status, 0);
+  assert.match(rejected.stderr, /unknown canonical task 'W101-T999'/);
 });

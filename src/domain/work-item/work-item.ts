@@ -1,7 +1,8 @@
 import type { TaskCollection } from '../task/task.js';
+import type { SerializedWorkItemReview } from './review.mjs';
 
 export const BACKLOG_SCHEMA_VERSION = 4;
-export const REVIEW_SCHEMA_VERSION = 1;
+export const REVIEW_SCHEMA_VERSION = 2;
 export const WORK_ITEM_ID_PREFIX = 'W';
 export const WORK_ITEM_ID_PATTERN = '^W\\d{3,}$';
 export const WORK_ITEM_ID = new RegExp(WORK_ITEM_ID_PATTERN);
@@ -47,16 +48,11 @@ export interface WorkItemSpecMetadata {
   approval?: { at: string; revision: string };
 }
 
-export interface WorkItemReview {
-  status: 'pending' | 'approved';
-  reviewed_at?: string;
-}
-
 export interface LoadedWorkItem extends WorkItemSpecMetadata {
   id: WorkItemId;
   folder: string;
   base: string;
   specBody: string;
   tasks: TaskCollection;
-  review: WorkItemReview;
+  review: SerializedWorkItemReview;
 }

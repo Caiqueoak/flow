@@ -605,3 +605,58 @@ test('document revision helper used by recovery matches approved content identit
   const approved = approveProjectDocument(PRD, '2026-10-02T21:00:00Z');
   assert.equal(documentRevision(approved.text), approved.revision);
 });
+
+test('malformed W5 review history is inconsistent across recovery, route, validate and Doctor', (t) => {
+  const root = project(t);
+  writeWorkItem(root, 'W001', true);
+  const reviewFile = path.join(root, '_flow', 'work-items', 'W001-sample', 'review.yaml');
+  fs.writeFileSync(
+    reviewFile,
+    stringify({
+      schema_version: 2,
+      work_item: 'W001',
+      disposition: 'approved',
+      active_pass: null,
+      worker_runs: [],
+      passes: [
+        {
+          id: 'R001',
+          scope: { kind: 'work_item', ref: 'W001' },
+          inspected: [],
+          parecer: 'Invalid approval.',
+          disposition: 'approved',
+          findings: [
+            {
+              id: 'F001',
+              blocking: true,
+              claim: 'Blocking defect remains open.',
+              evidence: ['src/example.ts'],
+              cause: 'verification_gap'
+            }
+          ],
+          actions: [],
+          resolutions: [],
+          residual_risk: [],
+          finalized_at: '2026-10-03T18:00:00Z'
+        }
+      ]
+    })
+  );
+
+  const assessment = inspectRecovery(root);
+  assert.equal(assessment.classification, 'requires_reconciliation');
+  assert.equal(assessment.findings[0]?.code, 'RECOVERY_WORK_ITEMS_INVALID');
+  assert.match(assessment.findings[0]?.message ?? '', /unresolved blocking findings/);
+
+  const route = routeProject(root);
+  assert.equal(route.phase, 'reconcile');
+  assert.match(route.details?.join(' ') ?? '', /RECOVERY_WORK_ITEMS_INVALID/);
+
+  const validation = validateProject(root);
+  assert.ok(validation.some((finding) => finding.code === 'RECOVERY_WORK_ITEMS_INVALID'));
+
+  const doctor = diagnoseProject(root, { quick: true, version: 'test', packageRoot: root });
+  const recoveryCheck = doctor.checks.find((check) => check.id === 'recovery');
+  assert.equal(recoveryCheck?.status, 'fail');
+  assert.match(recoveryCheck?.message ?? '', /RECOVERY_WORK_ITEMS_INVALID/);
+});
