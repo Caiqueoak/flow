@@ -1,3 +1,4 @@
+import { UserInputError } from '../errors.js';
 import { isReviewApproved } from './review.mjs';
 import type { LoadedWorkItem, WorkItemId } from './work-item.js';
 
@@ -29,4 +30,16 @@ export function lifecycle(item: LoadedWorkItem, byId: ReadonlyMap<WorkItemId, Lo
     return { status: isReviewApproved(item.review) ? 'completed' : 'review', reasons: [] };
   }
   return { status: 'eligible', reasons: [] };
+}
+
+
+export function assertWorkItemHistoryMutable(
+  item: LoadedWorkItem,
+  byId: ReadonlyMap<WorkItemId, LoadedWorkItem>
+): void {
+  if (lifecycle(item, byId).status !== 'completed') return;
+
+  throw new UserInputError(
+    `${item.id} is completed and its canonical history is immutable. Create a new maintenance work-item for later fixes.`
+  );
 }
