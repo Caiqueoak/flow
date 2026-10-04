@@ -10,6 +10,7 @@ import { completeMigrationReconciliation, migrateProject, migrationPlan, runMigr
 import { routeProject } from '../../../route/operations/route.mjs';
 import { documentMetadata, isProjectDocumentApproved } from '../../../../domain/project/document.mjs';
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
+import { SPEC_HEADINGS } from '../../../../domain/work-item/specification.mjs';
 
 function temporaryProject(t: test.TestContext, prefix: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -149,6 +150,63 @@ test('migrates the .flow layout transactionally and preserves legacy artifacts i
   );
   assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).flow_version, '0.8.0');
   assert.equal(fs.existsSync(path.join(result.backup!, 'backlog.yaml')), true);
+});
+
+test('legacy backlog migration preserves proven completed canonical history verbatim', (t) => {
+  const root = legacyProject(t, [{ ...legacyItem, status: 'done' }]);
+  const legacyBase = path.join(root, '.flow', 'work-items', 'old-feature');
+  fs.mkdirSync(legacyBase);
+
+  const spec = [
+    '---',
+    'schema_version: 1',
+    'work_item: W001',
+    'title: Old Feature',
+    'kind: feature',
+    'priority: 2',
+    'depends_on: []',
+    'blockers: []',
+    'maturity: ready',
+    '---',
+    '',
+    ...SPEC_HEADINGS.flatMap((heading) => [heading, 'Preserved legacy contract.', ''])
+  ].join('\n');
+  const tasks = JSON.stringify({
+    schema_version: 2,
+    work_item: 'W001',
+    tasks: [
+      {
+        id: 'T001',
+        title: 'Completed legacy task',
+        state: 'completed',
+        depends_on: [],
+        commit_sha: 'abc123',
+        traceability: []
+      }
+    ]
+  });
+  const review = 'schema_version: 1\nwork_item: W001\nstatus: approved\nreviewed_at: 2026-01-01T00:00:00.000Z\n';
+
+  fs.writeFileSync(path.join(legacyBase, 'spec.md'), spec);
+  fs.writeFileSync(path.join(legacyBase, 'tasks.yaml'), tasks);
+  fs.writeFileSync(path.join(legacyBase, 'review.yaml'), review);
+  const before = { spec, tasks, review };
+
+  const result = migrateProject(root, { targetVersion: '0.8.0' });
+
+  assert.equal(result.rescued, false);
+  const canonicalBase = path.join(root, '_flow', 'work-items', 'W001-old-feature');
+  assert.equal(fs.readFileSync(path.join(canonicalBase, 'spec.md'), 'utf8'), before.spec);
+  assert.equal(fs.readFileSync(path.join(canonicalBase, 'tasks.yaml'), 'utf8'), before.tasks);
+  assert.equal(fs.readFileSync(path.join(canonicalBase, 'review.yaml'), 'utf8'), before.review);
+  assert.equal(
+    parse(fs.readFileSync(path.join(root, '_flow', 'generated', 'backlog.yaml'), 'utf8')).work_items[0].state,
+    'completed'
+  );
+
+  const archivedBase = path.join(root, '_flow', 'docs', 'legacy-work-items', 'W001-old-feature');
+  assert.equal(fs.readFileSync(path.join(archivedBase, 'tasks.yaml'), 'utf8'), before.tasks);
+  assert.equal(fs.readFileSync(path.join(archivedBase, 'review.yaml'), 'utf8'), before.review);
 });
 
 test('migrates a legacy backlog already stored in _flow', (t) => {
@@ -313,7 +371,7 @@ function canonicalWorkItem(root: string) {
   fs.writeFileSync(path.join(base, 'review.yaml'), 'schema_version: 1\nwork_item: W101\nstatus: approved\n');
 }
 
-test('upgrades canonical tasks and gates while preserving migrated commit provenance', (t) => {
+test('canonical migration preserves completed work-item history verbatim while upgrading mutable project state', (t) => {
   const root = canonicalProject(t, '0.7.0');
   canonicalWorkItem(root);
   fs.writeFileSync(
@@ -321,27 +379,29 @@ test('upgrades canonical tasks and gates while preserving migrated commit proven
     'schema_version: 1\ngates:\n  - id: names\n    kind: builtin\n    rule: kebab-case-files\n'
   );
 
-  const reviewBefore = fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-item', 'review.yaml'), 'utf8');
+  const base = path.join(root, '_flow', 'work-items', 'W101-item');
+  const historyBefore = Object.fromEntries(
+    ['spec.md', 'tasks.yaml', 'review.yaml'].map((file) => [file, fs.readFileSync(path.join(base, file), 'utf8')])
+  );
+
   const result = migrateProject(root, { targetVersion: '0.8.0' });
-  const tasks = parse(fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-item', 'tasks.yaml'), 'utf8'));
   const gates = parse(fs.readFileSync(path.join(root, '_flow', 'gates.yaml'), 'utf8'));
+  const state = parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8'));
 
   assert.equal(result.unchanged, false);
-  assert.deepEqual(tasks.tasks[0], {
-    id: 'T001',
-    title: 'Done',
-    state: 'completed',
-    depends_on: [],
-    legacy_commit: 'abc',
-    provenance: 'legacy_migration'
-  });
+  assert.deepEqual(result.unresolved, []);
+  for (const [file, before] of Object.entries(historyBefore)) {
+    assert.equal(fs.readFileSync(path.join(base, file), 'utf8'), before);
+  }
   assert.deepEqual(gates.gates[0].scope, {});
   assert.equal(gates.gates[0].stage, 'full');
   assert.equal(gates.gates[0].cost, 'medium');
-  assert.equal(
-    fs.readFileSync(path.join(root, '_flow', 'work-items', 'W101-item', 'review.yaml'), 'utf8'),
-    reviewBefore
-  );
+  assert.equal(state.migration.status, 'not_required');
+  assert.notDeepEqual(routeProject(root), {
+    action: 'continue',
+    phase: 'reconcile',
+    instruction: 'migration/step-01-reconcile.md'
+  });
   assert.ok(result.backup && fs.existsSync(result.backup));
 });
 
@@ -487,9 +547,21 @@ test('rolls the source directory back when the final staged swap fails', (t) => 
   );
 });
 
-test('completes pending migration reconciliation through a supported transition and resumes normal routing', (t) => {
-  const root = legacyProject(t, [legacyItem]);
-  migrateProject(root, { targetVersion: '0.8.0' });
+test('migration requiring semantic reconciliation cannot enter normal lifecycle until supported completion', (t) => {
+  const root = legacyProject(t, [legacyItem], '_flow');
+  const result = migrateProject(root, { targetVersion: '0.8.0' });
+
+  assert.equal(result.rescued, false);
+  assert.deepEqual(result.unresolved, ['semantic reconciliation']);
+  assert.equal(
+    parse(fs.readFileSync(path.join(root, '_flow', 'state.yaml'), 'utf8')).migration.status,
+    'pending_reconciliation'
+  );
+  assert.deepEqual(routeProject(root), {
+    action: 'continue',
+    phase: 'reconcile',
+    instruction: 'migration/step-01-reconcile.md'
+  });
 
   completeMigrationReconciliation(root);
 

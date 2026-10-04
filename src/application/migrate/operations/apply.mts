@@ -27,6 +27,9 @@ import { validateEngineeringDocument } from '../../../domain/project/engineering
 import { BACKLOG_SCHEMA_VERSION } from '../../../domain/work-item/work-item.js';
 import { GATES_SCHEMA_VERSION } from '../../../domain/gate/gate.js';
 import { TASKS_SCHEMA_VERSION } from '../../../domain/task/task.js';
+import { parseTasks } from '../../../domain/task/task-list.mjs';
+import { isReviewApproved, parseReview, validateReviewTaskReferences } from '../../../domain/work-item/review.mjs';
+import { validateSpec } from '../../../domain/work-item/specification.mjs';
 import type { LifecycleState } from '../../../domain/task/task.js';
 import {
   copyMigrationDirectory,
@@ -120,6 +123,33 @@ function number(value: unknown): string {
   if (!match) throw new Error(`Cannot normalize ID '${value}'.`);
   return match[0].padStart(3, '0');
 }
+function hasPreservableCompletedHistory(base: string, workItemId: string): boolean {
+  const specFile = path.join(base, 'spec.md');
+  const tasksFile = path.join(base, 'tasks.yaml');
+  const reviewFile = path.join(base, 'review.yaml');
+  if (![specFile, tasksFile, reviewFile].every((file) => migrationPathExists(file))) return false;
+
+  try {
+    const spec = validateSpec(readMigrationText(specFile), { expectedWorkItem: workItemId });
+    const tasks = parseTasks(readMigrationText(tasksFile), { expectedWorkItem: workItemId });
+    const review = parseReview(readMigrationText(reviewFile), { expectedWorkItem: workItemId });
+    validateReviewTaskReferences(
+      review,
+      new Set(tasks.tasks.map((task) => `${workItemId}-${task.id}`)),
+      `${workItemId} review.yaml`
+    );
+    return (
+      spec.valid &&
+      spec.metadata.maturity === 'ready' &&
+      tasks.tasks.length > 0 &&
+      tasks.tasks.every((task) => task.state === 'completed') &&
+      isReviewApproved(review)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function createCanonicalShell(base: string, item: MigratedWorkItem): void {
   ensureMigrationDirectory(base);
   writeMigrationText(
@@ -197,12 +227,13 @@ function migrateStaged(root: string, targetVersion: string): void {
     const folder = path.join(workRoot, item.folder);
     if (previous !== folder && migrationPathExists(previous)) moveMigrationPath(previous, folder);
     const archive = path.join(flow, 'docs', 'legacy-work-items', item.folder);
+    const preserveCompletedHistory = migrationPathExists(folder) && hasPreservableCompletedHistory(folder, item.id);
     if (migrationPathExists(folder)) {
       ensureMigrationDirectory(path.dirname(archive));
       copyMigrationDirectory(folder, archive);
-      removeMigrationPath(folder);
+      if (!preserveCompletedHistory) removeMigrationPath(folder);
     }
-    createCanonicalShell(folder, item);
+    if (!preserveCompletedHistory) createCanonicalShell(folder, item);
   }
   ensureMigrationDirectory(path.join(flow, 'docs'));
   for (const [old, next] of [
@@ -233,6 +264,19 @@ function migrateStaged(root: string, targetVersion: string): void {
 function hasLegacyBacklog(flow: string): boolean {
   return migrationPathExists(path.join(flow, 'BACKLOG.yaml')) || migrationPathExists(path.join(flow, 'backlog.yaml'));
 }
+
+function completedWorkItemFolders(root: string): Set<string> {
+  try {
+    const items = loadWorkItems(root);
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return new Set(
+      items.filter((item) => deriveWorkItemLifecycle(item, byId).status === 'completed').map((item) => item.folder)
+    );
+  } catch {
+    return new Set();
+  }
+}
+
 function inspectCurrent(root: string, targetVersion: string): string[] {
   const flow = path.join(root, '_flow');
   const changes: string[] = [];
@@ -244,10 +288,11 @@ function inspectCurrent(root: string, targetVersion: string): string[] {
     changes.push('upgrade config.yaml');
   }
   const workItems = path.join(flow, 'work-items');
+  const completedFolders = completedWorkItemFolders(root);
   if (!migrationPathExists(workItems)) changes.push('restore work-items directory');
   else
     for (const entry of migrationDirectoryEntries(workItems)) {
-      if (!entry.isDirectory) continue;
+      if (!entry.isDirectory || completedFolders.has(entry.name)) continue;
       const tasks = path.join(workItems, entry.name, 'tasks.yaml');
       if (!migrationPathExists(tasks)) {
         changes.push(`restore work-items/${entry.name}/tasks.yaml`);
@@ -439,13 +484,15 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
   }
   const source = config?.flow_version ?? 'legacy';
   const incompatibilities = migrationIncompatibilities(source, targetVersion);
+  const semanticReconciliationRequired =
+    usesLegacyDirectory || hasLegacyBacklog(flow) || legacy.length > 0 || unreadableConfig;
   return {
     from_version: source,
     to_version: targetVersion,
     changes,
     files_affected: [...legacy, 'config.yaml', 'backlog.yaml', 'state.yaml', 'gates.yaml'],
     incompatibilities,
-    human_decisions: changes.length
+    human_decisions: semanticReconciliationRequired
       ? ['Reconcile preserved product, engineering, spec and traceability semantics before implementation.']
       : [],
     can_apply: incompatibilities.length === 0
@@ -455,9 +502,10 @@ export function migrationPlan(root: string, targetVersion = '0.6.0'): MigrationP
 function upgradeCanonicalStaged(root: string, targetVersion: string): void {
   const flow = path.join(root, '_flow');
   const workItems = path.join(flow, 'work-items');
+  const completedFolders = completedWorkItemFolders(root);
   if (migrationPathExists(workItems))
     for (const entry of migrationDirectoryEntries(workItems)) {
-      if (!entry.isDirectory) continue;
+      if (!entry.isDirectory || completedFolders.has(entry.name)) continue;
       const taskPath = path.join(workItems, entry.name, 'tasks.yaml');
       if (!migrationPathExists(taskPath)) continue;
       const value = asRecord(parse(readMigrationText(taskPath)));
@@ -605,6 +653,11 @@ export function migrateProject(
     try {
       if (usesLegacyDirectory || hasLegacyBacklog(staged)) migrateStaged(staging, targetVersion);
       else upgradeCanonicalStaged(staging, targetVersion);
+      if (plan.human_decisions.length) {
+        const state = loadExecutionState(staging);
+        state.migration.status = 'pending_reconciliation';
+        writeExecutionState(staging, state);
+      }
       syncProject(staging);
       const findings = validateProject(staging);
       if (findings.length)
@@ -618,6 +671,7 @@ export function migrateProject(
       if (findings.length)
         throw new Error(`Migration rescue staging validation failed: ${findings.map((x) => x.code).join(', ')}.`);
     }
+    const pendingReconciliation = loadExecutionState(staging).migration.status === 'pending_reconciliation';
     renameMigrationPath(sourceFlow, backup);
     try {
       renameMigrationPath(staged, targetFlow);
@@ -630,7 +684,7 @@ export function migrateProject(
     const backupTarget = path.join(backupRoot, `migration-${Date.now()}`);
     renameMigrationPath(backup, backupTarget);
     return {
-      unresolved: ['semantic reconciliation'],
+      unresolved: pendingReconciliation ? ['semantic reconciliation'] : [],
       unchanged: false,
       backup: backupTarget,
       rescued,

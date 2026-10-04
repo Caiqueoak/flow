@@ -8,6 +8,7 @@ import { TASK_ID_PREFIX, type Task, type TaskCollection, type TaskId } from '../
 import type { LoadedWorkItem } from '../../domain/work-item/work-item.js';
 import { readText } from '../../infrastructure/filesystem/index.js';
 import { isWorkItemSpecApproved } from '../../domain/work-item/specification.mjs';
+import { assertWorkItemHistoryMutable } from '../../domain/work-item/lifecycle.js';
 import { inspectRecovery } from '../recovery/recovery.mjs';
 
 const parseTasksBoundary = parseTasks as unknown as (
@@ -23,12 +24,14 @@ export interface TaskContext {
 
 export function loadTaskContext(root: string, target: string | undefined): TaskContext {
   const workItemId = workItemIdFromTaskTarget(target);
-  const item = (loadWorkItems(root) as LoadedWorkItem[]).find((candidate) => candidate.id === workItemId);
+  const items = loadWorkItems(root) as LoadedWorkItem[];
+  const item = items.find((candidate) => candidate.id === workItemId);
 
   if (!item) {
     fail(`Unknown work-item '${workItemId}'.`);
   }
 
+  assertWorkItemHistoryMutable(item!, new Map(items.map((candidate) => [candidate.id, candidate])));
   ensureWorkItemReady(item!);
 
   const tasksFile = path.join(item!.base, TASKS_FILE);
