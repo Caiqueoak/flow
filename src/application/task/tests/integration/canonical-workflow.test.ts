@@ -61,6 +61,37 @@ function projectDocument(headings: readonly string[], metadata = '') {
   return `---\nschema_version: 2\nstatus: draft\n${metadata}---\n\n${body}\n`;
 }
 
+function approvalCheckpoint(target: { kind: string; ref: string }, phase: string) {
+  return JSON.stringify({
+    phase,
+    step: 'await_approval',
+    target: { ...target, revision: null },
+    inputs: [],
+    dimensions: [{ id: 'D001', state: 'resolved', summary: 'Approval target is complete.' }],
+    assumptions: [],
+    latest_authorized_direction: 'Present this exact revision for approval.',
+    next_frontier: []
+  });
+}
+
+function approveTarget(root: string, target: string, kind: string, phase: string) {
+  assert.equal(
+    run(root, ['checkpoint', 'begin', '--data', approvalCheckpoint({ kind, ref: target }, phase)]).status,
+    0
+  );
+  assert.equal(run(root, ['checkpoint', 'ready']).status, 0);
+  const approval = run(root, ['approval', 'record', target]);
+  assert.equal(approval.status, 0, approval.stderr);
+}
+
+function approveTargetCheckpointOnly(root: string, target: string, kind: string, phase: string) {
+  assert.equal(
+    run(root, ['checkpoint', 'begin', '--data', approvalCheckpoint({ kind, ref: target }, phase)]).status,
+    0
+  );
+  assert.equal(run(root, ['checkpoint', 'ready']).status, 0);
+}
+
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-canonical-'));
   temporaryRoots.add(root);
@@ -78,8 +109,8 @@ function project() {
       'baseline:\n  profile: flow/readability-first@2\n  existing_code_policy: incremental\n'
     )
   );
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/prd.md']).status, 0);
-  assert.equal(run(root, ['approval', 'record', '_flow/docs/engineering.md']).status, 0);
+  approveTarget(root, '_flow/docs/prd.md', 'project_document', 'discovery');
+  approveTarget(root, '_flow/docs/engineering.md', 'project_document', 'engineering');
   return root;
 }
 function ready(root: string, id = 'W101') {
@@ -104,7 +135,8 @@ function ready(root: string, id = 'W101') {
   const original = fs.readFileSync(spec, 'utf8');
   fs.writeFileSync(spec, `${original}\n${headings.map((heading) => `${heading}\nText.`).join('\n\n')}\n`);
   assert.equal(run(root, ['work-item', 'promote', id]).status, 0);
-  assert.equal(run(root, ['approval', 'record', path.relative(root, spec)]).status, 0);
+  const target = path.relative(root, spec).replaceAll('\\', '/');
+  approveTarget(root, target, 'work_item_spec', 'specification');
   return base;
 }
 
@@ -125,6 +157,32 @@ function approveReview(root: string, id = 'W101') {
   assert.equal(run(root, ['work-item', 'review-pass', id, '--mode', 'checkpoint', '--data', data]).status, 0);
   assert.equal(run(root, ['work-item', 'review-pass', id, '--mode', 'finalize']).status, 0);
   assert.equal(run(root, ['sync']).status, 0);
+}
+
+function completeWorkItem(root: string, id = 'W101') {
+  const base = ready(root, id);
+  assert.equal(run(root, ['task', 'create', id, '--title', 'Complete outcome']).status, 0);
+  assert.equal(run(root, ['task', 'start', `${id}-T001`]).status, 0);
+  const implementation = path.join(root, `${id}.txt`);
+  fs.writeFileSync(implementation, 'done\n');
+  execFileSync('git', ['add', path.basename(implementation)], { cwd: root });
+  assert.equal(run(root, ['sync']).status, 0);
+  assert.equal(
+    run(root, [
+      'task',
+      'commit',
+      `${id}-T001`,
+      '--message',
+      `feat(flow): complete outcome [${id}-T001]`,
+      '--files',
+      path.basename(implementation)
+    ]).status,
+    0
+  );
+  assert.equal(run(root, ['sync']).status, 0);
+  approveReview(root, id);
+  assert.equal(run(root, ['work-item', 'review-complete', id, '--domain', 'flow']).status, 0);
+  return base;
 }
 
 test('compiled CLI creates canonical shells and sync never mutates them', () => {
@@ -302,6 +360,48 @@ test('finished projects stay finished until new scope creates new immutable work
   }
 });
 
+test('completed work-item canonical history rejects every existing-item and task mutation', () => {
+  const root = project();
+  const base = completeWorkItem(root);
+  const historyFiles = ['spec.md', 'tasks.yaml', 'review.yaml'] as const;
+  const snapshot = Object.fromEntries(
+    historyFiles.map((file) => [file, fs.readFileSync(path.join(base, file), 'utf8')])
+  );
+
+  const mutationCommands = [
+    ['work-item', 'set', 'W101', '--title', 'Changed'],
+    ['work-item', 'priority', 'W101', '--priority', '99'],
+    ['work-item', 'dependencies', 'W101', '--depends-on', 'W999'],
+    ['work-item', 'blocker-add', 'W101', '--id', 'B001', '--type', 'external_action', '--description', 'Later issue'],
+    ['work-item', 'blocker-resolve', 'W101', '--id', 'B001'],
+    ['work-item', 'promote', 'W101'],
+    ['work-item', 'review-pass', 'W101', '--mode', 'finalize'],
+    ['work-item', 'review-complete', 'W101', '--domain', 'flow'],
+    ['task', 'create', 'W101', '--title', 'Forbidden task'],
+    ['task', 'set', 'W101-T001', '--title', 'Changed task'],
+    ['task', 'start', 'W101-T001'],
+    ['task', 'commit', 'W101-T001', '--message', 'fix(flow): mutate history [W101-T001]', '--files', 'W101.txt']
+  ];
+
+  for (const command of mutationCommands) {
+    const result = run(root, command);
+    assert.notEqual(result.status, 0, command.join(' '));
+    assert.match(result.stderr, /completed and its canonical history is immutable/, command.join(' '));
+    for (const [file, before] of Object.entries(snapshot)) {
+      assert.equal(fs.readFileSync(path.join(base, file), 'utf8'), before, `${command.join(' ')} changed ${file}`);
+    }
+  }
+
+  const specTarget = path.relative(root, path.join(base, 'spec.md')).replaceAll('\\', '/');
+  approveTargetCheckpointOnly(root, specTarget, 'work_item_spec', 'specification');
+  const approval = run(root, ['approval', 'record', specTarget]);
+  assert.notEqual(approval.status, 0);
+  assert.match(approval.stderr, /completed and its canonical history is immutable/);
+  for (const [file, before] of Object.entries(snapshot)) {
+    assert.equal(fs.readFileSync(path.join(base, file), 'utf8'), before);
+  }
+});
+
 test('validate identifies missing, stale and malformed projections', () => {
   const root = project();
   ready(root);
@@ -374,8 +474,14 @@ test('migration preserves legacy work-items and creates valid outlined shells', 
   );
   const migratedConfig = parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8'));
   assert.equal(migratedConfig.engineering.existing_code_policy, 'undecided');
-  const diagnosis = JSON.parse(run(root, ['doctor', '--quick', '--json']).stdout);
-  assert.equal(diagnosis.checks.find((check: { id: string }) => check.id === 'migration-state').status, 'pass');
+  const doctor = run(root, ['doctor', '--quick', '--json']);
+  assert.notEqual(doctor.status, 0);
+  const diagnosis = JSON.parse(doctor.stdout);
+  assert.equal(diagnosis.checks.find((check: { id: string }) => check.id === 'migration-state').status, 'fail');
+  assert.match(
+    diagnosis.checks.find((check: { id: string }) => check.id === 'migration-state').message,
+    /normal lifecycle execution remains blocked/
+  );
   assert.equal(run(root, ['validate', '--json']).status, 0);
 });
 

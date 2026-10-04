@@ -35,7 +35,10 @@ export function parseTasks(
   const document = parseDocument(text, { prettyErrors: false, uniqueKeys: true });
   if (document.errors.length) fail(`${source} is invalid: ${document.errors[0]?.message ?? 'unknown YAML error'}`);
   const value = requireObject(document.toJS(), source);
-  if (value.schema_version !== TASKS_SCHEMA_VERSION) fail(`${source} schema_version must be ${TASKS_SCHEMA_VERSION}.`);
+  const schemaVersion = value.schema_version;
+  const legacySchema = schemaVersion === 2;
+  if (!legacySchema && schemaVersion !== TASKS_SCHEMA_VERSION)
+    fail(`${source} schema_version must be 2 or ${TASKS_SCHEMA_VERSION}.`);
   const workItem = requireString(value.work_item, `${source} work_item`);
   if (!WORK_ITEM_ID.test(workItem)) fail(`${source} work_item must use W followed by a zero-padded numeric sequence.`);
   if (expectedWorkItem && workItem !== expectedWorkItem)
@@ -64,23 +67,34 @@ export function parseTasks(
     }
     const mutation = parseMutation(task.mutation, `${id}.mutation`);
     if (
-      Object.hasOwn(task, 'traceability') ||
-      Object.hasOwn(task, 'implementation') ||
-      Object.hasOwn(task, 'commit_sha')
+      !legacySchema &&
+      (Object.hasOwn(task, 'traceability') ||
+        Object.hasOwn(task, 'implementation') ||
+        Object.hasOwn(task, 'commit_sha'))
     )
       fail(`${id}: traceability, implementation and commit_sha are retired.`);
     if (task.provenance !== undefined && task.provenance !== 'legacy_migration')
       fail(`${id}.provenance must be legacy_migration when present.`);
     if (task.provenance === 'legacy_migration' && state !== 'completed')
       fail(`${id}: legacy_migration is reserved for completed migrated tasks.`);
+    const legacyCommit =
+      typeof task.legacy_commit === 'string'
+        ? task.legacy_commit
+        : legacySchema && state === 'completed' && typeof task.commit_sha === 'string'
+          ? task.commit_sha
+          : undefined;
+    const provenance =
+      task.provenance === 'legacy_migration' || (legacySchema && legacyCommit)
+        ? ('legacy_migration' as const)
+        : undefined;
     return {
       id: id as TaskId,
       title,
       state: state as LifecycleState,
       depends_on: dependencies as TaskId[],
       ...(mutation ? { mutation } : {}),
-      ...(task.provenance ? { provenance: 'legacy_migration' as const } : {}),
-      ...(task.legacy_commit ? { legacy_commit: task.legacy_commit as string } : {})
+      ...(provenance ? { provenance } : {}),
+      ...(legacyCommit ? { legacy_commit: legacyCommit } : {})
     };
   });
   const byId = new Map(tasks.map((task) => [task.id, task]));
