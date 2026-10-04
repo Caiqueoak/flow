@@ -27,6 +27,9 @@ import { validateEngineeringDocument } from '../../../domain/project/engineering
 import { BACKLOG_SCHEMA_VERSION } from '../../../domain/work-item/work-item.js';
 import { GATES_SCHEMA_VERSION } from '../../../domain/gate/gate.js';
 import { TASKS_SCHEMA_VERSION } from '../../../domain/task/task.js';
+import { parseTasks } from '../../../domain/task/task-list.mjs';
+import { isReviewApproved, parseReview, validateReviewTaskReferences } from '../../../domain/work-item/review.mjs';
+import { validateSpec } from '../../../domain/work-item/specification.mjs';
 import type { LifecycleState } from '../../../domain/task/task.js';
 import {
   copyMigrationDirectory,
@@ -120,6 +123,33 @@ function number(value: unknown): string {
   if (!match) throw new Error(`Cannot normalize ID '${value}'.`);
   return match[0].padStart(3, '0');
 }
+function hasPreservableCompletedHistory(base: string, workItemId: string): boolean {
+  const specFile = path.join(base, 'spec.md');
+  const tasksFile = path.join(base, 'tasks.yaml');
+  const reviewFile = path.join(base, 'review.yaml');
+  if (![specFile, tasksFile, reviewFile].every((file) => migrationPathExists(file))) return false;
+
+  try {
+    const spec = validateSpec(readMigrationText(specFile), { expectedWorkItem: workItemId });
+    const tasks = parseTasks(readMigrationText(tasksFile), { expectedWorkItem: workItemId });
+    const review = parseReview(readMigrationText(reviewFile), { expectedWorkItem: workItemId });
+    validateReviewTaskReferences(
+      review,
+      new Set(tasks.tasks.map((task) => `${workItemId}-${task.id}`)),
+      `${workItemId} review.yaml`
+    );
+    return (
+      spec.valid &&
+      spec.metadata.maturity === 'ready' &&
+      tasks.tasks.length > 0 &&
+      tasks.tasks.every((task) => task.state === 'completed') &&
+      isReviewApproved(review)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function createCanonicalShell(base: string, item: MigratedWorkItem): void {
   ensureMigrationDirectory(base);
   writeMigrationText(
@@ -197,12 +227,13 @@ function migrateStaged(root: string, targetVersion: string): void {
     const folder = path.join(workRoot, item.folder);
     if (previous !== folder && migrationPathExists(previous)) moveMigrationPath(previous, folder);
     const archive = path.join(flow, 'docs', 'legacy-work-items', item.folder);
+    const preserveCompletedHistory = migrationPathExists(folder) && hasPreservableCompletedHistory(folder, item.id);
     if (migrationPathExists(folder)) {
       ensureMigrationDirectory(path.dirname(archive));
       copyMigrationDirectory(folder, archive);
-      removeMigrationPath(folder);
+      if (!preserveCompletedHistory) removeMigrationPath(folder);
     }
-    createCanonicalShell(folder, item);
+    if (!preserveCompletedHistory) createCanonicalShell(folder, item);
   }
   ensureMigrationDirectory(path.join(flow, 'docs'));
   for (const [old, next] of [
