@@ -10,6 +10,7 @@ import { completeMigrationReconciliation, migrateProject, migrationPlan, runMigr
 import { routeProject } from '../../../route/operations/route.mjs';
 import { documentMetadata, isProjectDocumentApproved } from '../../../../domain/project/document.mjs';
 import { ENGINEERING_HEADINGS } from '../../../../domain/project/engineering-document.mjs';
+import { SPEC_HEADINGS } from '../../../../domain/work-item/specification.mjs';
 
 function temporaryProject(t: test.TestContext, prefix: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -149,6 +150,63 @@ test('migrates the .flow layout transactionally and preserves legacy artifacts i
   );
   assert.equal(parse(fs.readFileSync(path.join(root, '_flow', 'config.yaml'), 'utf8')).flow_version, '0.8.0');
   assert.equal(fs.existsSync(path.join(result.backup!, 'backlog.yaml')), true);
+});
+
+test('legacy backlog migration preserves proven completed canonical history verbatim', (t) => {
+  const root = legacyProject(t, [{ ...legacyItem, status: 'done' }]);
+  const legacyBase = path.join(root, '.flow', 'work-items', 'old-feature');
+  fs.mkdirSync(legacyBase);
+
+  const spec = [
+    '---',
+    'schema_version: 1',
+    'work_item: W001',
+    'title: Old Feature',
+    'kind: feature',
+    'priority: 2',
+    'depends_on: []',
+    'blockers: []',
+    'maturity: ready',
+    '---',
+    '',
+    ...SPEC_HEADINGS.flatMap((heading) => [heading, 'Preserved legacy contract.', ''])
+  ].join('\n');
+  const tasks = JSON.stringify({
+    schema_version: 2,
+    work_item: 'W001',
+    tasks: [
+      {
+        id: 'T001',
+        title: 'Completed legacy task',
+        state: 'completed',
+        depends_on: [],
+        commit_sha: 'abc123',
+        traceability: []
+      }
+    ]
+  });
+  const review = 'schema_version: 1\nwork_item: W001\nstatus: approved\nreviewed_at: 2026-01-01T00:00:00.000Z\n';
+
+  fs.writeFileSync(path.join(legacyBase, 'spec.md'), spec);
+  fs.writeFileSync(path.join(legacyBase, 'tasks.yaml'), tasks);
+  fs.writeFileSync(path.join(legacyBase, 'review.yaml'), review);
+  const before = { spec, tasks, review };
+
+  const result = migrateProject(root, { targetVersion: '0.8.0' });
+
+  assert.equal(result.rescued, false);
+  const canonicalBase = path.join(root, '_flow', 'work-items', 'W001-old-feature');
+  assert.equal(fs.readFileSync(path.join(canonicalBase, 'spec.md'), 'utf8'), before.spec);
+  assert.equal(fs.readFileSync(path.join(canonicalBase, 'tasks.yaml'), 'utf8'), before.tasks);
+  assert.equal(fs.readFileSync(path.join(canonicalBase, 'review.yaml'), 'utf8'), before.review);
+  assert.equal(
+    parse(fs.readFileSync(path.join(root, '_flow', 'generated', 'backlog.yaml'), 'utf8')).work_items[0].state,
+    'completed'
+  );
+
+  const archivedBase = path.join(root, '_flow', 'docs', 'legacy-work-items', 'W001-old-feature');
+  assert.equal(fs.readFileSync(path.join(archivedBase, 'tasks.yaml'), 'utf8'), before.tasks);
+  assert.equal(fs.readFileSync(path.join(archivedBase, 'review.yaml'), 'utf8'), before.review);
 });
 
 test('migrates a legacy backlog already stored in _flow', (t) => {
